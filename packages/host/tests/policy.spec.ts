@@ -78,6 +78,19 @@ describe('host policy', () => {
       start: () => Promise.reject(new Error('down')),
     }
     expect(await probeBrain('broken', [broken])).toMatchObject({ healthy: false, message: 'down' })
+    // A provider that knows why it is unhealthy says so, instead of sending the user to a log.
+    const reasoned = {
+      ...createEchoProvider(),
+      id: 'reasoned',
+      healthy: () => false,
+      reason: () => 'pi is not available: Cannot find module',
+    }
+    expect(await probeBrain('reasoned', [reasoned], 'reasoned')).toMatchObject({
+      healthy: false,
+      code: 'provider-unhealthy',
+      message: 'pi is not available: Cannot find module',
+    })
+    expect(await probeBrain('reasoned', [reasoned])).toMatchObject({ message: 'pi is not available: Cannot find module' })
   })
 
   it('names a missing field and rejects a private field', async () => {

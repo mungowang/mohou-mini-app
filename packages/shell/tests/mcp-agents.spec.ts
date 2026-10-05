@@ -30,6 +30,29 @@ describe('assistant dest tables', () => {
     })
   })
 
+  it('offers Pi 1.0 its own mcp.json beside the adapter file', () => {
+    const home = homedir()
+    const agents = builtinMcpAgents(home, {})
+    // Pi 1.0 reads `mcp.json` in the agent directory and validates it, so it gets documented keys only.
+    const pi = agents.find(agent => agent.id === 'pi')
+    expect(pi).toMatchObject({
+      label: 'Pi',
+      file: path.join(home, '.pi', 'agent', 'mcp.json'),
+      detectDir: path.join(home, '.pi'),
+      format: 'mcpServers',
+      entry: 'url',
+    })
+    expect(pi?.adapter).toBeUndefined()
+    // A Pi that still runs the adapter keeps its own file.
+    expect(agents.find(agent => agent.id === 'pi-adapter')).toMatchObject({
+      label: 'Pi · mcp-adapter',
+      file: path.join(home, '.pi', 'agent', 'mcp-adapter.json'),
+      detectDir: path.join(home, '.pi', 'agent'),
+      format: 'mcpServers',
+      adapter: 'pi-mcp-adapter',
+    })
+  })
+
   it('writes the DSH MCP entry into the active profile patch layer', () => {
     const home = homedir()
     expect(builtinMcpAgents(home, {}).find(agent => agent.id === 'dsh')).toMatchObject({

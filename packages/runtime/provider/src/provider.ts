@@ -41,6 +41,11 @@ export interface RuntimeProvider {
   start(): Promise<void>
   stop(): Promise<void>
   healthy(): boolean
+  /**
+   * Why `healthy()` is false, for a settings probe. Absent means the host says only that the
+   * provider is unhealthy; a provider that knows the reason should not make the user guess.
+   */
+  reason?(): string | undefined
   /** Vendor groups. Absent means this brain does not reject a model name. Each call may fetch. */
   models?(): Promise<readonly ModelListing[]>
   llm(prompt: string, options?: RuntimeLlmOptions): Promise<string>

@@ -109,6 +109,7 @@ export function registerPiRuntime(registry: ProviderRegistry): RuntimeProvider {
     start: () => inner.start(),
     stop: () => inner.stop(),
     healthy: () => inner.healthy() && piLoad.loaded(),
+    reason: () => inner.healthy() && piLoad.loaded() ? undefined : unavailable(piLoad.failure()),
     models: () => inner.models?.() ?? Promise.resolve([]),
     async llm(prompt, options) {
       if (!await piLoad.ensure()) throw new ProviderError('provider-unhealthy', unavailable(piLoad.failure()))

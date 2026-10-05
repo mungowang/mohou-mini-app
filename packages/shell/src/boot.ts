@@ -70,7 +70,7 @@ export async function bootHost(options: {
       { kind: 'builtin-json', file: homeCredentialsPath(home) },
     ]),
     ...options.panel === undefined ? {} : { panel: options.panel },
-    mcpImports: { pi: path.join(home, '.pi', 'agent', 'mcp-adapter.json') },
+    mcpImports: Object.fromEntries(builtinMcpAgents(home).map(agent => [agent.id, agent.file])),
     authorSkill: {
       source: resolveAuthorSkillSource(),
       agents: builtinSkillAgents(home),

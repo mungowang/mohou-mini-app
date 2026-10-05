@@ -108,6 +108,15 @@ export async function writeHostPolicy(
  * @param providers - brains Shell registered
  * @param liveId - the provider Host is running, if any
  */
+/**
+ * What a probe says about an unhealthy provider. A provider that can name the reason does, because
+ * "not healthy" sends the user to a log while "Cannot find module …" sends them to the fix.
+ */
+function unhealthyMessage(provider: RuntimeProvider, id: string): string {
+  const reason = provider.reason?.()
+  return reason === undefined || reason.length === 0 ? `runtime provider is not healthy: ${id}` : reason
+}
+
 export async function probeBrain(
   id: string,
   providers: readonly RuntimeProvider[],
@@ -120,7 +129,7 @@ export async function probeBrain(
   if (id === liveId) {
     const healthy = provider.healthy()
     if (!healthy) {
-      return { healthy: false, code: 'provider-unhealthy', message: `runtime provider is not healthy: ${id}` }
+      return { healthy: false, code: 'provider-unhealthy', message: unhealthyMessage(provider, id) }
     }
     return { healthy: true }
   }
@@ -131,7 +140,7 @@ export async function probeBrain(
     await provider.stop()
     return healthy
       ? { healthy: true }
-      : { healthy: false, code: 'provider-unhealthy', message: `runtime provider is not healthy: ${id}` }
+      : { healthy: false, code: 'provider-unhealthy', message: unhealthyMessage(provider, id) }
   } catch (error) {
     await provider.stop().catch(() => undefined)
     const message = error instanceof Error ? error.message : 'runtime provider probe failed'

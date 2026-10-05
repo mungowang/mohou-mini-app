@@ -26,6 +26,18 @@ describe('author mcp install', () => {
     expect(saved.mcpServers['mini-app']?.url).toBe(live.url)
   })
 
+  it('writes only the documented keys into a client that validates its file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-native-'))
+    const file = join(root, 'mcp.json')
+    const layout = {
+      agents: [{ id: 'pi', label: 'Pi', file, detectDir: root, format: 'mcpServers' as const, entry: 'url' as const }],
+    }
+    await writeAuthorMcp(layout, ['pi'], live)
+    const saved = JSON.parse(await readFile(file, 'utf8')) as { mcpServers: Record<string, unknown> }
+    expect(saved.mcpServers['mini-app']).toEqual({ url: live.url, headers: { Authorization: `Bearer ${live.token}` } })
+    expect(await readAuthorMcp(layout, live).then(status => status.agents[0]?.installed)).toBe(true)
+  })
+
   it('marks a stale token as updateAvailable and writes opencode remote shape', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-mcp-oc-'))
     const file = join(root, 'opencode.jsonc')

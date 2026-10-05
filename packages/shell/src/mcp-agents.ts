@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 
 /** Built-in assistants that can receive the authoring MCP connection. */
-export const mcpAgentIds = ['claude', 'pi', 'cursor', 'opencode', 'kiro', 'workbuddy', 'dsh'] as const
+export const mcpAgentIds = ['claude', 'pi', 'pi-adapter', 'cursor', 'opencode', 'kiro', 'workbuddy', 'dsh'] as const
 
 export type McpAgentId = (typeof mcpAgentIds)[number]
 
@@ -16,6 +16,12 @@ export interface McpAgentTarget {
   readonly format: McpAgentFormat
   /** Pi extension that owns this file. Other assistants omit it. */
   readonly adapter?: string
+  /**
+   * Which entry keys this client accepts. `url` writes only what the client documents; the
+   * default adds the adapter's `transport`, `description`, and marker, which a strict reader of a
+   * native config may reject.
+   */
+  readonly entry?: 'url' | 'extended'
 }
 
 /**
@@ -32,7 +38,9 @@ export function builtinMcpAgents(home = homedir(), env: NodeJS.ProcessEnv = proc
   const dshProfile = dshProfileDir(home, env)
   return [
     { id: 'claude', label: 'Claude', file: claudeFile, detectDir: claudeHome, format: 'claude' },
-    { id: 'pi', label: 'Pi', file: path.join(home, '.pi', 'agent', 'mcp-adapter.json'), detectDir: path.join(home, '.pi', 'agent'), format: 'mcpServers', adapter: 'pi-mcp-adapter' },
+    // Pi 1.0 reads `mcp.json` in its agent directory, with the `mcpServers` shape other clients use.
+    { id: 'pi', label: 'Pi', file: path.join(home, '.pi', 'agent', 'mcp.json'), detectDir: path.join(home, '.pi'), format: 'mcpServers', entry: 'url' },
+    { id: 'pi-adapter', label: 'Pi · mcp-adapter', file: path.join(home, '.pi', 'agent', 'mcp-adapter.json'), detectDir: path.join(home, '.pi', 'agent'), format: 'mcpServers', adapter: 'pi-mcp-adapter' },
     { id: 'cursor', label: 'Cursor', file: path.join(home, '.cursor', 'mcp.json'), detectDir: path.join(home, '.cursor'), format: 'mcpServers' },
     { id: 'opencode', label: 'OpenCode', file: path.join(configHome, 'opencode', 'opencode.jsonc'), detectDir: path.join(configHome, 'opencode'), format: 'opencode' },
     { id: 'kiro', label: 'Kiro', file: path.join(home, '.kiro', 'settings', 'mcp.json'), detectDir: path.join(home, '.kiro'), format: 'mcpServers' },

@@ -20,6 +20,8 @@ export interface AuthorMcpAgent {
   readonly detectDir: string
   readonly format: AuthorMcpFormat
   readonly adapter?: string
+  /** See `McpAgentTarget.entry`: which keys this client's file may carry. */
+  readonly entry?: 'url' | 'extended'
 }
 
 export interface AuthorMcpLayout {
@@ -92,7 +94,7 @@ async function writeAgent(agent: AuthorMcpAgent, live: AuthorMcpLive): Promise<v
   const root = await readRoot(agent.file)
   const key = nestKey(agent.format)
   const nest = isRecord(root[key]) ? { ...root[key] } : {}
-  nest[authorMcpServerId] = entryOf(agent.format, live)
+  nest[authorMcpServerId] = entryOf(agent.format, live, agent.entry)
   const next = { ...root, [key]: nest }
   await mkdir(path.dirname(agent.file), { recursive: true })
   await writeFile(agent.file, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
@@ -195,10 +197,11 @@ async function readRoot(file: string): Promise<Record<string, unknown>> {
   return parsed
 }
 
-function entryOf(format: AuthorMcpFormat, live: AuthorMcpLive): Record<string, unknown> {
+function entryOf(format: AuthorMcpFormat, live: AuthorMcpLive, entry: 'url' | 'extended' = 'extended'): Record<string, unknown> {
   const headers = { Authorization: `Bearer ${live.token}` }
   if (format === 'opencode') return { type: 'remote', url: live.url, enabled: true, headers }
   if (format === 'claude') return { type: 'http', url: live.url, headers }
+  if (entry === 'url') return { url: live.url, headers }
   return {
     url: live.url,
     transport: 'streamable-http',

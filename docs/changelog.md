@@ -7,6 +7,12 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.28
+
+Pi 1.0 reads MCP servers from `mcp.json` in its agent directory, with the `mcpServers` shape other clients use, and validates that file. Mohou pointed at the `mcp-adapter.json` of the extension that Pi 1.0 made unnecessary, so the import wrote where a current Pi does not read, and the entry it wrote carried the adapter's `transport` and a marker key. There are two Pi rows now: `Pi`, which writes `~/.pi/agent/mcp.json` with the keys Pi documents, and `Pi · mcp-adapter`, which keeps serving a Pi that still runs the extension. Pi's row is offered as soon as Pi's own directory exists rather than only after its agent directory appears.
+
+A provider can also say why it is unhealthy. The settings probe showed `runtime provider is not healthy: pi` for every Pi failure, while the reason — a missing peer, a link that could not be written — was known and thrown away. `RuntimeProvider.reason` carries it, the probe reports it as the message, and the row shows it.
+
 ## 1.0.27
 
 The splash never appeared on Windows: the window opened white and stayed white until the panel arrived. The pre-origin navigation guard admitted the window's own assets by scheme, and Tauri serves them as `tauri://localhost` on macOS but as the wry workaround `http://tauri.localhost` on Windows — so the splash was admitted on one platform and denied on the other. The guard names that origin on either scheme now, and still refuses everything else until Shell prints the loopback origin. The splash also no longer enters from `opacity: 0` with `fill-mode: both`, so an animation that does not run cannot hide it.

@@ -109,6 +109,8 @@ describe('registerPiRuntime', () => {
     expect(registry.ids()).toContain('pi')
     expect(registry.get('pi')).toBe(provider)
     expect(provider.healthy()).toBe(false)
+    // The probe shows this text, so it has to name the failure rather than the state.
+    expect(provider.reason?.()).toContain('pi is not available')
   })
 })
 

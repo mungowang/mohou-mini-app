@@ -5,12 +5,98 @@ import path from 'node:path'
 import { createProviderRegistry } from '@mohou/runtime-provider'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { linkPiPeers, peerRoots, piPackage, registerPiRuntime } from '../src/register.ts'
+import { createPiLoad, linkPiPeers, peerRoots, piPackage, registerPiRuntime } from '../src/register.ts'
 
 const temps: string[] = []
 
 afterEach(() => {
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+describe('createPiLoad', () => {
+  /** A load that fails the first time and succeeds after the repair, the way a hot update leaves it. */
+  function steps(present: boolean[], loadResults: boolean[]) {
+    const calls: string[] = []
+    let index = 0
+    const steps = {
+      present: () => {
+        const value = present[Math.min(index, present.length - 1)] ?? true
+        calls.push(`present:${value}`)
+        return value
+      },
+      link: () => {
+        calls.push('link')
+      },
+      load: async () => {
+        const ok = loadResults[Math.min(index, loadResults.length - 1)] ?? true
+        index += 1
+        calls.push(`load:${ok}`)
+        if (!ok) throw new Error('Cannot find package')
+      },
+    }
+    return { calls, steps }
+  }
+
+  it('repairs before it touches the loader, because a failed resolution is cached for the process', async () => {
+    const { calls, steps: fake } = steps([false, true], [true])
+    const load = createPiLoad(fake)
+    expect(await load.ensure()).toBe(true)
+    expect(calls).toEqual(['present:false', 'link', 'load:true'])
+    expect(load.loaded()).toBe(true)
+    expect(load.failure()).toBeUndefined()
+  })
+
+  it('does not repair a prefix that is already linked', async () => {
+    const { calls, steps: fake } = steps([true], [true])
+    const load = createPiLoad(fake)
+    expect(await load.ensure()).toBe(true)
+    expect(calls).toEqual(['present:true', 'load:true'])
+  })
+
+  it('does not remember a failure, so the next caller retries and can recover', async () => {
+    const { calls, steps: fake } = steps([true, true, true], [false, true])
+    const load = createPiLoad(fake)
+    expect(await load.ensure()).toBe(false)
+    expect(load.loaded()).toBe(false)
+    expect(load.failure()).toBe('Cannot find package')
+    // The retry, which the old loader never made: it cached the first failure for the whole process.
+    expect(await load.ensure()).toBe(true)
+    expect(load.loaded()).toBe(true)
+    expect(load.failure()).toBeUndefined()
+    expect(calls).toEqual(['present:true', 'load:false', 'present:true', 'load:true'])
+  })
+
+  it('caches a success, and shares one attempt between concurrent callers', async () => {
+    const { calls, steps: fake } = steps([true], [true])
+    const load = createPiLoad(fake)
+    const [first, second] = await Promise.all([load.ensure(), load.ensure()])
+    expect([first, second]).toEqual([true, true])
+    expect(await load.ensure()).toBe(true)
+    expect(calls).toEqual(['present:true', 'load:true'])
+  })
+
+  it('answers false when the repair itself fails, instead of rejecting the shared promise', async () => {
+    const load = createPiLoad({
+      present: () => false,
+      link: () => {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      },
+      load: () => Promise.resolve(),
+    })
+    await expect(load.ensure()).resolves.toBe(false)
+    expect(load.loaded()).toBe(false)
+    expect(load.failure()).toBe('EACCES: permission denied')
+  })
+
+  it('names why the last attempt failed', async () => {
+    const failing = createPiLoad({
+      present: () => true,
+      link: () => undefined,
+      load: () => Promise.reject(new Error('Cannot find module @earendil-works/pi-ai')),
+    })
+    expect(await failing.ensure()).toBe(false)
+    expect(failing.failure()).toBe('Cannot find module @earendil-works/pi-ai')
+  })
 })
 
 describe('registerPiRuntime', () => {

@@ -10,18 +10,97 @@ import { createPiProvider } from './pi.ts'
 
 const peers = ['@earendil-works/pi-coding-agent', '@earendil-works/pi-ai'] as const
 
-let loading: Promise<boolean> | undefined
+/**
+ * The three things one load does, injectable so a test can watch their order and the retry.
+ * `present` answers from the filesystem on purpose: see {@link createPiLoad}.
+ */
+export interface PiLoadSteps {
+  present(): boolean
+  link(): void | Promise<void>
+  load(): Promise<void>
+}
+
+export interface PiLoad {
+  /** One attempt, shared with any concurrent caller. A failure is not remembered. */
+  ensure(): Promise<boolean>
+  /** Whether the last finished attempt loaded both peers. */
+  loaded(): boolean
+  /** Why the last finished attempt failed, for the message a caller shows. */
+  failure(): string | undefined
+}
+
+/**
+ * One loader for the Pi peers.
+ *
+ * The first step is a filesystem question, never a module-loader one. Node remembers a failed
+ * resolution for the rest of the process, so asking the loader whether `@earendil-works/…` resolves
+ * and only then creating the link poisons every later attempt in that process: the host would repair
+ * its own prefix and still report Pi as unavailable until the next restart. Repair first, then the
+ * one loader call an attempt makes.
+ * @param steps - presence check, repair, and the load itself
+ */
+export function createPiLoad(steps: PiLoadSteps): PiLoad {
+  let loading: Promise<boolean> | undefined
+  let loaded = false
+  let failure: string | undefined
+
+  async function attempt(): Promise<boolean> {
+    try {
+      // The repair is inside the guard too: a prefix the user cannot write must leave the id
+      // registered and unhealthy, not reject the promise every caller awaits.
+      if (!steps.present()) await steps.link()
+      await steps.load()
+      failure = undefined
+      return true
+    } catch (error) {
+      failure = error instanceof Error && error.message.length > 0 ? error.message : 'the peers did not load'
+      return false
+    }
+  }
+
+  return {
+    ensure() {
+      loading ??= attempt().then((ok) => {
+        loaded = ok
+        // A failed attempt is forgotten, so the next caller retries instead of inheriting it.
+        if (!ok) loading = undefined
+        return ok
+      })
+      return loading
+    },
+    loaded: () => loaded,
+    failure: () => failure,
+  }
+}
+
+/** The real steps: the prefix's own `node_modules`, this machine's Pi installs, and the two imports. */
+function realSteps(): PiLoadSteps {
+  const prefix = installRoot()
+  const roots = () => peerRoots(process.execPath, homedir(), process.env)
+  return {
+    present: () => peersPresent(prefix),
+    async link() {
+      linkPiPeers(prefix, roots())
+      if (peersPresent(prefix)) return
+      const global = await npmRootGlobal(process.env)
+      if (global !== undefined) linkPiPeers(prefix, [global])
+    },
+    async load() {
+      await import('@earendil-works/pi-coding-agent')
+      await import('@earendil-works/pi-ai')
+    },
+  }
+}
+
+const piLoad = createPiLoad(realSteps())
 
 /**
  * Register Pi and return immediately. Linking and loading run after this call.
- * A failed load leaves the id registered and unhealthy. It does not fail boot.
+ * A failed load leaves the id registered and unhealthy. It does not fail boot, and a later
+ * caller retries it.
  */
 export function registerPiRuntime(registry: ProviderRegistry): RuntimeProvider {
-  const ready = ensurePiLoaded()
-  let loaded = false
-  void ready.then((ok) => {
-    loaded = ok
-  })
+  void piLoad.ensure()
   const inner = createPiProvider()
   const provider: RuntimeProvider = {
     id: inner.id,
@@ -29,14 +108,14 @@ export function registerPiRuntime(registry: ProviderRegistry): RuntimeProvider {
     configure: (config) => { inner.configure?.(config) },
     start: () => inner.start(),
     stop: () => inner.stop(),
-    healthy: () => inner.healthy() && loaded,
+    healthy: () => inner.healthy() && piLoad.loaded(),
     models: () => inner.models?.() ?? Promise.resolve([]),
     async llm(prompt, options) {
-      if (!await ready) throw new ProviderError('provider-unhealthy', 'pi is not available')
+      if (!await piLoad.ensure()) throw new ProviderError('provider-unhealthy', unavailable(piLoad.failure()))
       return inner.llm(prompt, options)
     },
     async agent(goal, options) {
-      if (!await ready) throw new ProviderError('provider-unhealthy', 'pi is not available')
+      if (!await piLoad.ensure()) throw new ProviderError('provider-unhealthy', unavailable(piLoad.failure()))
       return inner.agent(goal, options)
     },
   }
@@ -45,37 +124,19 @@ export function registerPiRuntime(registry: ProviderRegistry): RuntimeProvider {
 }
 
 export function ensurePiLoaded(): Promise<boolean> {
-  loading ??= loadPi()
-  return loading
+  return piLoad.ensure()
 }
 
-async function loadPi(): Promise<boolean> {
-  if (!peersResolvable()) {
-    linkPiPeers(installRoot(), peerRoots(process.execPath, homedir(), process.env))
-    if (!peersResolvable()) {
-      const global = await npmRootGlobal(process.env)
-      if (global !== undefined) linkPiPeers(installRoot(), [global])
-    }
-  }
-  try {
-    await import('@earendil-works/pi-coding-agent')
-    await import('@earendil-works/pi-ai')
-    return true
-  } catch {
-    return false
-  }
+function unavailable(reason: string | undefined): string {
+  return reason === undefined ? 'pi is not available' : `pi is not available: ${reason}`
 }
 
-/** ESM resolve. `require.resolve` throws: these packages export no CJS main. */
-function peersResolvable(): boolean {
-  return peers.every((name) => {
-    try {
-      import.meta.resolve(name)
-      return true
-    } catch {
-      return false
-    }
-  })
+/**
+ * Whether both peers are reachable through the prefix's `node_modules`. Filesystem only: this runs
+ * before the repair, and a loader probe here is what {@link createPiLoad} exists to avoid.
+ */
+function peersPresent(prefix: string): boolean {
+  return peers.every(peer => existsSync(path.join(prefix, 'node_modules', ...peer.split('/'))))
 }
 
 /** Prefix that contains this package's `node_modules`. */

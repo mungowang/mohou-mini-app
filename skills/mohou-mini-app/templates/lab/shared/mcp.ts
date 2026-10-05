@@ -1,9 +1,12 @@
 import type { RunKind } from './events'
 
 /**
- * The host's connected MCP servers, as read while authoring this app with the authoring tools
- * (`mini_app_mcp_list` / `mini_app_mcp_tools`). `ctx` has no server-discovery member, so the app
- * ships this catalog to offer choices. A call to a server that is not connected fails on its own.
+ * MCP servers this app offers, as its own catalog. `ctx.mcp` calls a server by id and does not
+ * discover them, so the app ships the three the MCP section adds with one click: `jira`
+ * (`@mohou/jira-mcp`), `gitlab` (`@mohou/gitlab-mcp`), and `jenkins` (`@kud/mcp-jenkins`). A call
+ * to a server that is not connected fails on its own, and the picker says so before the call.
+ *
+ * The catalog is a starting point: add a row for any other server you connected.
  */
 export type McpTool = {
   name: string
@@ -21,74 +24,11 @@ export type McpServer = {
   tools: McpTool[]
 }
 
-/**
- * The connected `filesystem` server is launched with this directory as its only allowed root
- * (see `~/.mini-app/runtime/mcp.json`), so every seeded path stays inside it. `ctx` has no
- * server-discovery member, which is why the root is spelled out here rather than discovered.
- * The `list_allowed_directories` tool in the picker answers the same question at runtime.
- */
-export const WORKSPACE_ROOT = '/Users/wangpeng/Workspace/DeepSeekRoot'
-
 export const MCP_SERVERS: McpServer[] = [
-  {
-    id: 'filesystem',
-    label: 'filesystem · 本机文件',
-    note: `允许的根目录 ${WORKSPACE_ROOT}`,
-    tools: [
-      {
-        name: 'list_directory',
-        description: '列出目录内容，带 [FILE] / [DIR] 前缀',
-        required: ['path'],
-        example: { path: WORKSPACE_ROOT },
-      },
-      {
-        name: 'read_text_file',
-        description: '按文本读一个文件，可用 head / tail 只取若干行',
-        required: ['path'],
-        example: { path: `${WORKSPACE_ROOT}/hermes-memo/README.md`, head: 40 },
-      },
-      {
-        name: 'directory_tree',
-        description: '递归目录树',
-        required: ['path'],
-        example: { path: `${WORKSPACE_ROOT}/hermes-memo/scripts` },
-      },
-      {
-        name: 'read_multiple_files',
-        description: '一次读多个文件',
-        required: ['paths'],
-        example: { paths: [`${WORKSPACE_ROOT}/hermes-memo/package.json`] },
-      },
-      {
-        name: 'search_files',
-        description: '按模式搜索文件',
-        required: ['path', 'pattern'],
-        example: { path: `${WORKSPACE_ROOT}/hermes-memo`, pattern: '*.md' },
-      },
-      {
-        name: 'get_file_info',
-        description: '文件元信息：大小、时间、权限',
-        required: ['path'],
-        example: { path: `${WORKSPACE_ROOT}/hermes-memo/package.json` },
-      },
-      {
-        name: 'list_allowed_directories',
-        description: '这个 server 被允许访问的根目录',
-        required: [],
-        example: {},
-      },
-      {
-        name: 'read_media_file',
-        description: '读图片/音频，返回 base64',
-        required: ['path'],
-        example: { path: `${WORKSPACE_ROOT}/hermes-memo/LICENSE` },
-      },
-    ],
-  },
   {
     id: 'jira',
     label: 'jira · Jira Server + Zephyr Scale',
-    note: '全部只读：Jira 侧 8 个 + Zephyr 测试用例 9 个；写操作走各自界面。实例走 VPN，未连 VPN 时调用会失败',
+    note: '只列只读工具：@mohou/jira-mcp 还提供创建、流转、评论等写操作。连不上实例时调用会失败',
     tools: [
       {
         name: 'jira_server_info',
@@ -97,124 +37,158 @@ export const MCP_SERVERS: McpServer[] = [
         example: {},
       },
       {
-        name: 'jira_get_issue',
-        description: '读一个 issue，默认带回全部字段，自定义字段也在里面',
-        required: ['key'],
-        example: { key: 'QA-1' },
-      },
-      {
-        name: 'jira_search_issues',
-        description: '用 JQL 搜索 issue，可用 fields 只取需要的字段',
-        required: ['jql'],
-        example: { jql: 'project = QA ORDER BY created DESC', fields: ['summary', 'status', 'assignee'], maxResults: 5 },
+        name: 'jira_get_current_user',
+        description: '当前凭据对应的账号，用来确认 token 配对正确',
+        required: [],
+        example: {},
       },
       {
         name: 'jira_list_projects',
-        description: '列出当前账号可见的项目',
+        description: '可见项目列表，拿 project key 用',
         required: [],
         example: {},
       },
       {
-        name: 'jira_get_fields',
-        description: '列出全部字段（含插件提供的），用来查字段 id 是否是 customfield_xxxxx',
-        required: [],
-        example: {},
-      },
-      {
-        name: 'jira_describe_create',
-        description: '创建 issue 前先调它：返回该项目/类型的可写字段、必填项、值形状和可选值',
-        required: ['projectKey', 'issueTypeName'],
-        example: { projectKey: 'QA', issueTypeName: 'Task' },
-      },
-      {
-        name: 'jira_list_comments',
-        description: '列出某个 issue 的评论',
-        required: ['key'],
-        example: { key: 'QA-1' },
-      },
-      {
-        name: 'jira_get_transitions',
-        description: '列出这个 issue 当前可用的状态流转，id 就是流转时要传的 transitionId',
-        required: ['key'],
-        example: { key: 'QA-1' },
-      },
-      // Zephyr Scale 测试用例。同一个 MCP server，工具名没有 jira_ 前缀。
-      {
-        name: 'search_test_cases',
-        description: '用 TQL 搜测试用例（这里按当前用户 owner 过滤）；语法严格，运算符两侧要有空格、值用双引号',
-        required: ['query'],
+        name: 'jira_search_issues',
+        description: '按 JQL 搜索 issue',
+        required: ['jql'],
         example: {
-          query: 'projectKey = "QA" AND owner = "rainie.lu"',
-          fields: ['key', 'name', 'status', 'priority', 'folder', 'lastTestResultStatus'],
-          maxResults: 20,
+          jql: 'assignee = currentUser() ORDER BY created DESC',
+          fields: ['summary', 'status', 'assignee'],
+          maxResults: 5,
         },
       },
       {
-        name: 'get_test_case',
-        description: '读一个测试用例；STEP_BY_STEP 的每个步骤都带数值 id，按 id 改才不会丢步骤',
-        required: ['testCaseKey'],
-        example: { testCaseKey: 'QA-T2' },
-      },
-      {
-        name: 'get_latest_result_for_test_case',
-        description: '某个用例最近一次执行的结果：状态、环境、执行人',
-        required: ['testCaseKey'],
-        example: { testCaseKey: 'QA-T2' },
-      },
-      {
-        name: 'get_test_cases_linked_to_issue',
-        description: '某个 issue 关联的测试用例；按 link 返回，同一用例可能重复出现',
+        name: 'jira_get_issue',
+        description: '读一条 issue 的字段与描述',
         required: ['issueKey'],
-        example: { issueKey: 'TA-11616' },
+        example: { issueKey: 'PROJ-1' },
       },
       {
-        name: 'get_issue_test_coverage',
-        description: '某个 issue 的测试覆盖：关联用例 + 各自最近一次执行。看需求/缺陷和用例的追溯',
+        name: 'jira_get_fields',
+        description: '字段目录（自定义字段用 id 才稳）',
+        required: [],
+        example: {},
+      },
+      {
+        name: 'jira_get_transitions',
+        description: '一条 issue 当前可做的状态流转',
         required: ['issueKey'],
-        example: { issueKey: 'TA-11616' },
+        example: { issueKey: 'PROJ-1' },
       },
       {
-        name: 'get_custom_field_definitions',
-        description: '该项目的用例自定义字段定义；customFields 的键是字段名，不是 id',
-        required: ['projectKey'],
-        example: { projectKey: 'QA' },
-      },
-      {
-        name: 'get_status_options',
-        description: '执行状态 / 用例状态 / 优先级的「确切」名字，大小写敏感，写错了会被拒',
-        required: ['projectKey'],
-        example: { projectKey: 'QA' },
-      },
-      {
-        name: 'get_folder_tree',
-        description: '用例文件夹树：路径与数值 folderId 都在这；列表接口拿不到它',
-        required: ['projectKey'],
-        example: { projectKey: 'QA' },
-      },
-      {
-        name: 'find_jira_user',
-        description: '把 Jira user key 换成能看懂的名字（owner / executedBy 要的就是 key）',
-        required: ['query'],
-        example: { query: 'Rainie' },
+        name: 'jira_list_comments',
+        description: '一条 issue 的评论',
+        required: ['issueKey'],
+        example: { issueKey: 'PROJ-1' },
       },
     ],
   },
+  {
+    id: 'gitlab',
+    label: 'gitlab · GitLab',
+    note: '只列只读工具：发布版还提供创建、评论、合并等写操作，可用 GITLAB_READ_ONLY=true 全禁掉',
+    tools: [
+      {
+        name: 'gitlab_whoami',
+        description: '当前凭据对应的账号——证明 token 可用最便宜的一步',
+        required: [],
+        example: {},
+      },
+      {
+        name: 'gitlab_server_version',
+        description: '目标实例的 GitLab 版本',
+        required: [],
+        example: {},
+      },
+      {
+        name: 'gitlab_project_search',
+        description: '按名字搜项目，拿项目路径',
+        required: ['search'],
+        example: { search: 'demo' },
+      },
+      {
+        name: 'gitlab_project_get',
+        description: '按路径或 id 读项目，拿默认分支',
+        required: ['project'],
+        example: { project: 'group/project' },
+      },
+      {
+        name: 'gitlab_mr_list',
+        description: '项目的合并请求，默认只看 opened',
+        required: ['project'],
+        example: { project: 'group/project', state: 'opened' },
+      },
+      {
+        name: 'gitlab_mr_get',
+        description: '一个合并请求的字段，含 work_in_progress',
+        required: ['project', 'iid'],
+        example: { project: 'group/project', iid: 1 },
+      },
+      {
+        name: 'gitlab_mr_changes',
+        description: '逐文件 diff 摘要（patch 有截断上限）',
+        required: ['project', 'iid'],
+        example: { project: 'group/project', iid: 1 },
+      },
+      {
+        name: 'gitlab_mr_pipelines',
+        description: '这个合并请求的流水线状态，合并前的闸门',
+        required: ['project', 'iid'],
+        example: { project: 'group/project', iid: 1 },
+      },
+      {
+        name: 'gitlab_branches_list',
+        description: '项目分支，新建 MR 前确认源分支',
+        required: ['project'],
+        example: { project: 'group/project' },
+      },
+      {
+        name: 'gitlab_labels_list',
+        description: '项目标签名——写标签前先查，避免建出拼错的标签',
+        required: ['project'],
+        example: { project: 'group/project' },
+      },
+    ],
+  },
+  {
+    id: 'jenkins',
+    label: 'jenkins · Jenkins',
+    note: '只列只读工具：@kud/mcp-jenkins 还能触发/停止构建，预设里没有屏蔽这两类',
+    tools: [
+      { name: 'jenkins_get_version', description: '控制器版本与就绪状态，最便宜的一次探活', required: [], example: {} },
+      { name: 'jenkins_list_jobs', description: '任务列表（可按 folder 收窄）', required: [], example: {} },
+      { name: 'jenkins_search_jobs', description: '按名字搜任务', required: [], example: { search: 'build' } },
+      { name: 'jenkins_get_job_status', description: '一个任务的状态与最近构建', required: ['jobName'], example: { jobName: 'demo' } },
+      { name: 'jenkins_get_recent_builds', description: '最近几次构建的编号与结果', required: ['jobName'], example: { jobName: 'demo' } },
+      {
+        name: 'jenkins_get_build_status',
+        description: '一次构建的结果、时长、参数',
+        required: ['jobName', 'buildNumber'],
+        example: { jobName: 'demo', buildNumber: 1 },
+      },
+      {
+        name: 'jenkins_get_console_log',
+        description: '控制台输出（排错主入口）',
+        required: ['jobName'],
+        example: { jobName: 'demo', buildNumber: 1, limit: 200 },
+      },
+      {
+        name: 'jenkins_get_pipeline_stages',
+        description: '流水线各阶段与耗时',
+        required: ['jobName', 'buildNumber'],
+        example: { jobName: 'demo', buildNumber: 1 },
+      },
+      {
+        name: 'jenkins_get_build_changes',
+        description: '这次构建带的提交',
+        required: ['jobName', 'buildNumber'],
+        example: { jobName: 'demo', buildNumber: 1 },
+      },
+      { name: 'jenkins_list_nodes', description: '节点与在线状态', required: [], example: {} },
+    ],
+  },
 ]
-
-/**
- * The same tool surface, served by the published package rather than by this checkout. Registered
- * in the host as `jira-npm`, so the panel can compare "what a user installs" against "what we are
- * editing" - the local entry keeps working offline and picks up source edits with no publish.
- */
-const localJira = MCP_SERVERS.find(s => s.id === 'jira')
-if (localJira) {
-  MCP_SERVERS.push({
-    ...localJira,
-    id: 'jira-npm',
-    label: 'jira · npm 发布版',
-    note: '同一批工具，由 npm 上发布的 @mohou/jira-mcp 提供（跟随 latest）',
-  })
-}
 
 export function findServer(id: string): McpServer | undefined {
   return MCP_SERVERS.find(s => s.id === id)
@@ -231,29 +205,24 @@ export type McpPreset = {
 
 /** One preset per useful call, matched to a server by tool name — a starting point, not a limit. */
 export const MCP_PRESETS: McpPreset[] = [
-  { label: '列工作区目录', tool: 'list_directory', args: { path: WORKSPACE_ROOT } },
-  {
-    label: '读 README 前 40 行',
-    tool: 'read_text_file',
-    args: { path: `${WORKSPACE_ROOT}/hermes-memo/README.md`, head: 40 },
-  },
-  { label: '允许的根目录', tool: 'list_allowed_directories', args: {} },
   { label: 'Jira 版本', tool: 'jira_server_info', args: {} },
+  { label: 'Jira 当前账号', tool: 'jira_get_current_user', args: {} },
   {
-    label: '最近 5 条 issue',
+    label: '我名下最近 5 条',
     tool: 'jira_search_issues',
-    args: { jql: 'project = QA ORDER BY created DESC', fields: ['summary', 'status', 'assignee'], maxResults: 5 },
-  },
-  { label: '字段目录', tool: 'jira_get_fields', args: {} },
-  {
-    label: '我的用例前 20 条',
-    tool: 'search_test_cases',
     args: {
-      query: 'projectKey = "QA" AND owner = "rainie.lu"',
-      fields: ['key', 'name', 'status', 'priority', 'folder', 'lastTestResultStatus'],
-      maxResults: 20,
+      jql: 'assignee = currentUser() ORDER BY created DESC',
+      fields: ['summary', 'status', 'assignee'],
+      maxResults: 5,
     },
   },
-  { label: '读一个用例', tool: 'get_test_case', args: { testCaseKey: 'QA-T2' } },
-  { label: 'issue 测试覆盖', tool: 'get_issue_test_coverage', args: { issueKey: 'TA-11616' } },
+  { label: '字段目录', tool: 'jira_get_fields', args: {} },
+  { label: 'GitLab 当前账号', tool: 'gitlab_whoami', args: {} },
+  { label: '搜项目', tool: 'gitlab_project_search', args: { search: 'demo' } },
+  { label: '项目的 opened MR', tool: 'gitlab_mr_list', args: { project: 'group/project', state: 'opened' } },
+  { label: '一个 MR 的流水线', tool: 'gitlab_mr_pipelines', args: { project: 'group/project', iid: 1 } },
+  { label: 'Jenkins 版本', tool: 'jenkins_get_version', args: {} },
+  { label: '任务列表', tool: 'jenkins_list_jobs', args: {} },
+  { label: '最近构建', tool: 'jenkins_get_recent_builds', args: { jobName: 'demo' } },
+  { label: '控制台输出', tool: 'jenkins_get_console_log', args: { jobName: 'demo', buildNumber: 1, limit: 200 } },
 ]

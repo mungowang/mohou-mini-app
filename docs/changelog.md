@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.35
+
+The workbench's MCP tab names the three servers the MCP section presets — `jira` (`@mohou/jira-mcp`), `gitlab`, and `jenkins` (`@kud/mcp-jenkins`) — with the read-only tools worth starting from: job and build status, recent builds, console output, pipeline stages, project and merge-request reads. The catalog it shipped with named a filesystem server rooted at one machine's directory and a checkout-specific Jira entry, which was machine-specific and, in a template that ships to everyone, more than it should have said. Settings → Agent → Install samples installs the corrected app into a library that does not have it.
+
 ## 1.0.34
 
 Settings can install the sample apps on demand. The startup samples are seeded once per runtime root, so a library that already had apps — or was seeded before the workbench existed — never received it. Settings → Agent now has one button that asks Host for the samples this library is missing, and reports how many it installed and how many were already there. Nothing present is replaced, and the app the owner edited stays theirs.

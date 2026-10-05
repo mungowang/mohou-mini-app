@@ -1,11 +1,12 @@
 import { createServer } from 'node:http'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { emptyCredentials } from '@mohou/host'
+import { emptyCredentials, hostAuthoringToken } from '@mohou/host'
 import { httpLayout } from '@mohou/host/http'
 
 import { bootHost, resolveAuthorSkillSource } from '../src/index.ts'
@@ -87,8 +88,9 @@ describe('bootHost', () => {
       },
     })
     const origin = `http://127.0.0.1:${port}`
+    const token = readFileSync(hostAuthoringToken(root), 'utf8').trim()
     expect((await fetch(`${origin}${httpLayout.hostConfig}`)).ok).toBe(true)
-    expect((await fetch(`${origin}${httpLayout.restart}`, { method: 'POST' })).ok).toBe(true)
+    expect((await fetch(`${origin}${httpLayout.restart}`, { method: 'POST', headers: { authorization: `Bearer ${token}` } })).ok).toBe(true)
     await new Promise((resolve) => { setTimeout(resolve, 600) })
     expect(processRestarts).toBe(1)
     // Sidecar disposed; wrapper would relaunch outside tests.

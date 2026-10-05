@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-09-22
+updated: 2026-10-03
 ---
 
 # Panel
@@ -18,6 +18,7 @@ The shipped Shell window is standalone: the panel is the window, so close-panel 
 - [Page find](find.md)
 - [Settings](settings.md)
 - [MCP servers](mcp.md)
+- [Credentials](credentials.md)
 - [Theme](theme.md)
 - [Git UI](git.md)
 - [Storage browse](storage.md)

@@ -1,6 +1,6 @@
 import { CredentialError } from './codes.ts'
 import { createFileCredentials } from './file.ts'
-import { admitCredentialName, emptyCredentials, type CredentialListing, type CredentialProvider } from './provider.ts'
+import { admitCredentialName, cannotWrite, emptyCredentials, type CredentialListing, type CredentialProvider } from './provider.ts'
 
 /** Sources this package knows how to open. A later source adds one member. */
 export const credentialSourceKinds = ['builtin-json'] as const
@@ -34,7 +34,11 @@ export function createCredentials(sources: readonly CredentialSource[]): Credent
 }
 
 function combineCredentials(providers: readonly CredentialProvider[]): CredentialProvider {
+  // One store owns writes: the first source that accepts them. With one source that is unambiguous,
+  // and a second read-only source cannot silently take a write meant for the first.
+  const writer = providers.find(provider => provider.writable)
   return {
+    writable: writer !== undefined,
     async list() {
       const rows = await Promise.all(providers.map(provider => provider.list()))
       const seen = new Set<string>()
@@ -59,5 +63,7 @@ function combineCredentials(providers: readonly CredentialProvider[]): Credentia
       }
       return found[0]
     },
+    put: (name, description, secret) => writer === undefined ? Promise.reject(cannotWrite()) : writer.put(name, description, secret),
+    remove: name => writer === undefined ? Promise.reject(cannotWrite()) : writer.remove(name),
   }
 }

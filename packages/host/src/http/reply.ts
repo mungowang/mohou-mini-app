@@ -10,6 +10,11 @@ export async function ok(c: Context, work: () => Promise<unknown>): Promise<Resp
   }
 }
 
+/** The one refusal for a route that requires the authoring token. */
+export function authoringDenied(c: Context): Response {
+  return c.json({ ok: false, error: { code: 'authoring-token', message: 'authoring token is missing or wrong' } }, 401)
+}
+
 export function errorBody(error: unknown): { code: string; message: string } {
   const code = typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
     ? error.code

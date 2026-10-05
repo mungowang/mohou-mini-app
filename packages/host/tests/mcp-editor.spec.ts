@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest'
 import { hostMcpPath } from '../src/host/layout.ts'
 import { mcpConfigEnv } from '../src/host/mcp.ts'
 import { checkMcpEditor, editorServers, readMcpEditor, readMcpImport, writeMcpEditor } from '../src/host/mcp-editor.ts'
+import { createFileCredentials } from '../src/credentials/file.ts'
+import { mcpReferenceSources } from '../src/host/mcp.ts'
 
 describe('mcp editor', () => {
   it('writes a valid file and refuses an empty id', async () => {
@@ -85,5 +87,27 @@ describe('mcp editor', () => {
       { id: 'local', command: 'echo', args: ['hi'], env: { A: 'b' } },
       { id: 'remote', url: 'https://example.com/mcp', transport: 'sse', headers: { K: 'v' } },
     ])
+  })
+
+  it('returns the servers a write resolved, and the ones it left out', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-edit-ref-'))
+    const credentials = createFileCredentials(join(root, 'credentials.json'))
+    await credentials.put('DEMO', 'demo', 'the-real-secret')
+    const sources = mcpReferenceSources({ HOME: '/home/me' }, credentials)
+    const resolved = await writeMcpEditor(root, [
+      { id: 'ok', command: 'npx', env: { TOKEN: '${credential:DEMO}', HOME: '${env:HOME}' } },
+      { id: 'broken', command: 'npx', env: { TOKEN: '${credential:nope}' } },
+    ], {}, sources)
+    expect(resolved.servers).toEqual({ ok: { command: 'npx', env: { TOKEN: 'the-real-secret', HOME: '/home/me' } } })
+    expect(resolved.failures).toEqual([{
+      id: 'broken',
+      code: 'mcp-reference-unknown',
+      message: 'broken env.TOKEN names an unknown credential: nope',
+    }])
+    // The file keeps each reference, so the next boot reads the same two servers.
+    expect(JSON.parse(await readFile(hostMcpPath(root), 'utf8'))).toMatchObject({
+      ok: { env: { TOKEN: '${credential:DEMO}' } },
+      broken: { env: { TOKEN: '${credential:nope}' } },
+    })
   })
 })

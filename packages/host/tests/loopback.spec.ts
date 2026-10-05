@@ -13,6 +13,8 @@ import { createHost } from '../src/host/session.ts'
 import { appsResource, httpLayout, runnerPath } from '../src/http/layout.ts'
 import { hostAuthoringToken, platformRuntimePath, platformSdkPath, platformVendorPath } from '../src/index.ts'
 
+import { freePort } from './free-port.ts'
+
 const files = {
   'manifest.json': JSON.stringify({
     id: 'com.example.app',
@@ -34,7 +36,7 @@ describe('loopback', () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-loop-'))
     const host = await createHost({
       runtimeRoot: root,
-      seed: { hostPort: 0, theme: 'light', palette: 'default', locale: 'en' },
+      seed: { hostPort: await freePort(), theme: 'light', palette: 'default', locale: 'en' },
       provider: createEchoProvider(),
       panel: { html: '<!doctype html><title>panel</title>', script: 'export {}' },
     })
@@ -83,14 +85,16 @@ describe('loopback', () => {
     const provider = createEchoProvider()
     const host = await createHost({
       runtimeRoot: root,
-      seed: { hostPort: 0, theme: 'light', palette: 'default', locale: 'en' },
+      seed: { hostPort: await freePort(), theme: 'light', palette: 'default', locale: 'en' },
       provider,
     })
     await registerWithFiles(host.author, 'com.example.app', files)
     const started = await host.start()
+    const token = readFileSync(hostAuthoringToken(root), 'utf8').trim()
+    const guarded = (path: string, body: string) => post(started.port, path, body, token)
     expect(provider.healthy()).toBe(true)
     try {
-      const live = await post(started.port, httpLayout.probe, JSON.stringify({ id: 'echo' }))
+      const live = await guarded(httpLayout.probe, JSON.stringify({ id: 'echo' }))
       expect(objectBody(live.body)).toMatchObject({ result: { healthy: true } })
       const opened = await post(started.port, appsResource('com.example.app', httpLayout.open), '{}')
       expect(opened.status).toBe(200)
@@ -125,7 +129,6 @@ describe('loopback', () => {
       expect(table.status).toBe(200)
       const denied = await get(started.port, '/api/app/com.example.app/errors')
       expect(denied.status).toBe(401)
-      const token = readFileSync(hostAuthoringToken(root), 'utf8').trim()
       const errors = await get(started.port, '/api/app/com.example.app/errors', token)
       expect(errors.status).toBe(200)
       expect((await post(started.port, '/api/app/com.example.app/alive', '1')).status).toBe(204)
@@ -138,24 +141,24 @@ describe('loopback', () => {
       expect((await get(started.port, `${appsResource('com.example.app', httpLayout.history)}?limit=0`)).status).toBe(200)
       expect((await get(started.port, `${appsResource('com.example.app', httpLayout.history)}?limit=9999`)).status).toBe(200)
       expect((await get(started.port, platformVendorPath('motion'))).status).toBe(200)
-      const probe = await post(started.port, httpLayout.probe, JSON.stringify({ id: 'nope' }))
+      const probe = await guarded(httpLayout.probe, JSON.stringify({ id: 'nope' }))
       expect(objectBody(probe.body)).toMatchObject({ result: { healthy: false } })
-      const badProbe = await post(started.port, httpLayout.probe, '{}')
+      const badProbe = await guarded(httpLayout.probe, '{}')
       expect(badProbe.status).toBe(400)
       const config = await get(started.port, httpLayout.hostConfig)
       const policy = objectBody(config.body).policy
-      const written = await post(started.port, httpLayout.hostConfig, JSON.stringify({
+      const written = await guarded(httpLayout.hostConfig, JSON.stringify({
         ...objectBody(JSON.stringify(policy)),
         hostPort: 9743,
         locale: 'en',
         chatLanguage: 'en',
       }))
       expect(written.status).toBe(200)
-      const badConfig = await post(started.port, httpLayout.hostConfig, '{')
+      const badConfig = await guarded(httpLayout.hostConfig, '{')
       expect(badConfig.status).toBe(400)
-      const activated = await post(started.port, httpLayout.activate, JSON.stringify({ id: 'echo' }))
+      const activated = await guarded(httpLayout.activate, JSON.stringify({ id: 'echo' }))
       expect(activated.status).toBe(200)
-      const badActivate = await post(started.port, httpLayout.activate, '{}')
+      const badActivate = await guarded(httpLayout.activate, '{}')
       expect(badActivate.status).toBe(400)
       const events = await headers(started.port, httpLayout.events)
       expect(events).toBe(200)
@@ -172,15 +175,15 @@ describe('loopback', () => {
       expect(objectBody(missing.body).error).toBe('missing appId or method')
       expect(objectBody((await get(started.port, '/no-such')).body).error).toMatchObject({ code: 'not-found' })
       expect((await get(started.port, httpLayout.authorSkill)).status).toBe(400)
-      expect((await post(started.port, httpLayout.authorSkill, '{}')).status).toBe(400)
-      expect((await post(started.port, httpLayout.authorSkillReveal, '{}')).status).toBe(400)
+      expect((await post(started.port, httpLayout.authorSkill, '{}', token)).status).toBe(400)
+      expect((await post(started.port, httpLayout.authorSkillReveal, '{}', token)).status).toBe(400)
       expect((await get(started.port, httpLayout.authorMcp)).status).toBe(400)
-      expect((await post(started.port, httpLayout.authorMcp, '{}')).status).toBe(400)
-      expect((await post(started.port, httpLayout.authorMcpReveal, '{}')).status).toBe(400)
-      expect((await post(started.port, httpLayout.restart, '{}')).status).toBe(400)
-      expect((await post(started.port, httpLayout.mcpServers, JSON.stringify({ servers: 'nope' }))).status).toBe(400)
-      expect((await post(started.port, httpLayout.mcpServers, JSON.stringify({ servers: [{ id: '' }] }))).status).toBe(400)
-      expect((await post(started.port, httpLayout.mcpCheck, JSON.stringify({ id: '' }))).status).toBe(400)
+      expect((await post(started.port, httpLayout.authorMcp, '{}', token)).status).toBe(400)
+      expect((await post(started.port, httpLayout.authorMcpReveal, '{}', token)).status).toBe(400)
+      expect((await post(started.port, httpLayout.restart, '{}', token)).status).toBe(400)
+      expect((await post(started.port, httpLayout.mcpServers, JSON.stringify({ servers: 'nope' }), token)).status).toBe(400)
+      expect((await post(started.port, httpLayout.mcpServers, JSON.stringify({ servers: [{ id: '' }] }), token)).status).toBe(400)
+      expect((await post(started.port, httpLayout.mcpCheck, JSON.stringify({ id: '' }), token)).status).toBe(400)
       expect((await post(started.port, httpLayout.mcpAdmit, '{}')).status).toBe(400)
       const admitted = await post(started.port, httpLayout.mcpAdmit, JSON.stringify({ text: '[]' }))
       expect(admitted.status).toBe(200)
@@ -194,7 +197,7 @@ describe('loopback', () => {
           enabled: false,
           disabled: true,
         }],
-      }))
+      }), token)
       expect(writtenMcp.status).toBe(200)
       expect((await get(started.port, httpLayout.mcpServers)).status).toBe(200)
       const openTitled = await post(started.port, appsResource('com.example.app', httpLayout.open), JSON.stringify({ title: 'Title' }))
@@ -230,8 +233,8 @@ function get(port: number, path: string, token?: string): Promise<{ status: numb
   return call(port, path, 'GET', undefined, token)
 }
 
-function post(port: number, path: string, body: string): Promise<{ status: number; body: string }> {
-  return call(port, path, 'POST', body)
+function post(port: number, path: string, body: string, token?: string): Promise<{ status: number; body: string }> {
+  return call(port, path, 'POST', body, token)
 }
 
 function call(port: number, path: string, method: string, body?: string, token?: string): Promise<{ status: number; body: string }> {

@@ -7,7 +7,9 @@ import type { RuntimeProvider } from '@mohou/runtime-provider'
 import type { AuthorMcpLayout, AuthorMcpStatus } from '../host/author-mcp.ts'
 import type { AuthorSkillLayout, AuthorSkillStatus } from '../host/author-skill.ts'
 import { probeBrain, type HostPolicy } from '../host/config.ts'
+import type { CredentialListing } from '../credentials/provider.ts'
 import type { McpCheck, McpEditorServer } from '../host/mcp-editor.ts'
+import type { McpLoadFailure } from '../host/mcp.ts'
 import type { AppPin } from '../theme/pin.ts'
 import type { UpdateCheck } from './updates.ts'
 
@@ -75,11 +77,20 @@ export interface LoopbackPorts {
   readAuthorMcp?(): Promise<AuthorMcpStatus>
   writeAuthorMcp?(agentIds: readonly string[], description: string): Promise<AuthorMcpStatus>
   revealAuthorMcp?(dest: string): Promise<void>
-  readMcp(): Promise<readonly McpEditorServer[]>
-  writeMcp(servers: readonly McpEditorServer[]): Promise<void>
+  readMcp(): Promise<{ servers: readonly McpEditorServer[]; unresolved: readonly McpLoadFailure[] }>
+  writeMcp(servers: readonly McpEditorServer[]): Promise<{ unresolved: readonly McpLoadFailure[] }>
   checkMcp(server: McpEditorServer): Promise<McpCheck>
   admitMcp(text: string): readonly McpEditorServer[]
   importMcp(source: string): Promise<readonly McpEditorServer[]>
+  /** Names, descriptions, and whether the store accepts a write. A secret is never on this surface. */
+  readCredentials(): Promise<{ credentials: readonly CredentialListing[]; writable: boolean }>
+  /**
+   * Write one account. An absent or empty secret keeps the stored one, so an owner can fix a
+   * description without pasting a secret they may no longer hold. A name with no account and no
+   * secret has nothing to keep: `credential-invalid`.
+   */
+  putCredential(name: string, description: string, secret: string | undefined): Promise<void>
+  removeCredential(name: string): Promise<void>
 }
 
 export async function readVendorFile(dir: string, name: string): Promise<string> {

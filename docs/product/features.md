@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-09-22
+updated: 2026-10-03
 ---
 
 # Product features
@@ -59,6 +59,7 @@ Adapters that embed this platform in another agent product are out of scope.
 | Panel | [Page find](panel/find.md) |
 | Panel | [Settings](panel/settings.md) |
 | Panel | [MCP servers](panel/mcp.md) |
+| Panel | [Credentials](panel/credentials.md) |
 | Panel | [Theme](panel/theme.md) |
 | Panel | [Git UI](panel/git.md) |
 | Panel | [Storage browse](panel/storage.md) |

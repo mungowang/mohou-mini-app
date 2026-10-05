@@ -102,7 +102,7 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
     },
   },
   mini_app_mcp_add: {
-    description: 'Add or replace one MCP server in the host config, and check it by opening it once. The row is live after the next host start.',
+    description: 'Add or replace one MCP server in the host config, and check it by opening it once. A value may be written as ${env:NAME} or ${credential:NAME}; the host resolves it and the secret never reaches the file. The row is live after the next host start.',
     inputSchema: {
       type: 'object',
       properties: {

@@ -33,7 +33,7 @@ import { probeBrain, resolveHostConfig, writeHostPolicy, type HostPolicy, type H
 import { allocateHostPort, PortInUseError } from './port.ts'
 import { homeThemesDir, hostAppsDir, hostTrashDir } from './layout.ts'
 import { createHostLog, type HostLog } from './log.ts'
-import { loadMcpServers } from './mcp.ts'
+import { loadMcpServers, mcpReferenceSources, type McpLoadFailure } from './mcp.ts'
 import { createAppWorkbench } from './workbench.ts'
 
 /** Command and HTTP bounds for a booted host. Not locked numbers. */
@@ -107,8 +107,15 @@ export async function createHost(options: {
   if (live === undefined) {
     throw new ConfigError('config-invalid', `runtime provider is not registered: ${policy.runtimeProvider.id}`)
   }
-  const servers = await loadMcpServers(options.runtimeRoot, options.env)
-  const mcp = new McpClient(servers, options.env)
+  const credentials = options.credentials ?? emptyCredentials()
+  const mcpSources = mcpReferenceSources(options.env ?? process.env, credentials)
+  const mcpLoaded = await loadMcpServers(options.runtimeRoot, options.env, mcpSources)
+  const mcp = new McpClient(mcpLoaded.servers, options.env)
+  // What the live client left out. Boot sets it, and every write replaces it, so the panel and the
+  // author list never report a boot-time answer about a file that has changed since.
+  let mcpFailures: readonly McpLoadFailure[] = mcpLoaded.failures
+  const readMcpFailures = (): readonly McpLoadFailure[] => mcpFailures
+  const recordMcpFailures = (failures: readonly McpLoadFailure[]): void => { mcpFailures = failures }
   const bash = createBash(commandPolicy)
   const pwsh = createPwsh(commandPolicy)
   const registry = createAppRegistry(options.runtimeRoot)
@@ -122,12 +129,14 @@ export async function createHost(options: {
   const author = createAuthorTools({
     registry,
     mcp,
+    readMcpFailures,
+    recordMcpFailures,
     ...options.env === undefined ? {} : { env: options.env },
     onTreeChanged: (appId) => {
       author.hostEvents.publish({ type: 'app:reload', appId })
     },
     ports: {
-      credentials: options.credentials ?? emptyCredentials(),
+      credentials,
       config: {
         get theme() { return policy.theme },
         get palette() { return policy.palette },
@@ -266,6 +275,9 @@ export async function createHost(options: {
             vendorDir,
             runtimeRoot: options.runtimeRoot,
             env: options.env ?? process.env,
+            credentials,
+            mcpFailures: readMcpFailures,
+            recordMcpFailures,
             ...options.mcpImports === undefined ? {} : { mcpImports: options.mcpImports },
             ...options.restart === undefined ? {} : { restart: options.restart },
             ...options.authorSkill === undefined ? {} : { authorSkill: options.authorSkill },

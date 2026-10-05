@@ -5,6 +5,8 @@ export const mcpCodes = [
   'mcp-start-failed',
   'mcp-tool-failed',
   'config-invalid',
+  'mcp-reference-unknown',
+  'mcp-reference-invalid',
 ] as const
 
 /** An MCP client failure. Callers match `code`. */

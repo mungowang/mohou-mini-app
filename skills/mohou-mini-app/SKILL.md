@@ -76,7 +76,7 @@ mini_app_register({
 | Ask the rendered view | `mini_app_view_eval({ appId, code? })` |
 | Connected MCP servers + tool names | `mini_app_mcp_list()` |
 | One server's tool schemas | `mini_app_mcp_tools({ serverId, toolName? })` |
-| Add or replace one MCP server | `mini_app_mcp_add({ id, command?, args?, env?, url?, transport?, headers? })` — opens it once as the check; `check: false` skips that and `force: true` keeps a row that failed it. The server is usable at once, and the result masks the secret part of a credential while keeping its label (`Bearer ab*****gh`) |
+| Add or replace one MCP server | `mini_app_mcp_add({ id, command?, args?, env?, url?, transport?, headers? })` — opens it once as the check; `check: false` skips that and `force: true` keeps a row that failed it. A value may be `${env:NAME}` or `${credential:NAME}` instead of a secret, and the host resolves it at load; a name that exists nowhere fails the check and the next boot with `mcp-reference-unknown`. The server is usable at once, and the result masks the secret part of a literal credential while keeping its label (`Bearer ab*****gh`) |
 | Remove one MCP server | `mini_app_mcp_remove({ id })` — also at once |
 | Credential names | `mini_app_credential_list()` |
 | Confirm the host | `mini_app_list()` |

@@ -1,5 +1,6 @@
-import { McpClient, McpError } from '@mohou/mcp-client'
+import { McpClient, McpError, type McpCode } from '@mohou/mcp-client'
 
+import type { McpLoadFailure } from '../host/mcp.ts'
 import { AuthorError } from './codes.ts'
 
 export interface AuthorMcpTool {
@@ -11,22 +12,30 @@ export interface AuthorMcpTool {
 export interface AuthorMcpServerNames {
   id: string
   tools?: readonly string[]
-  error?: { code: 'mcp-not-connected' | 'mcp-start-failed' }
+  error?: { code: McpCode; message?: string }
 }
 
 export interface AuthorMcpServerTools {
   id: string
   tools?: AuthorMcpTool[]
-  error?: { code: 'mcp-not-connected' | 'mcp-start-failed' }
+  error?: { code: McpCode; message?: string }
 }
 
 /**
  * Authoring index of external MCP servers. Names only. No descriptions, no schemas, no env.
- * One server failure does not drop the others.
+ * One server failure does not drop the others, and a server boot left out is listed with the
+ * reference that kept it out, so the author learns why it is missing.
  * @param client - host-held MCP client
+ * @param failures - servers boot left out
  */
-export async function listMcpForAuthor(client: McpClient): Promise<{ servers: AuthorMcpServerNames[] }> {
-  const servers: AuthorMcpServerNames[] = []
+export async function listMcpForAuthor(
+  client: McpClient,
+  failures: readonly McpLoadFailure[] = [],
+): Promise<{ servers: AuthorMcpServerNames[] }> {
+  const servers: AuthorMcpServerNames[] = failures.map(failure => ({
+    id: failure.id,
+    error: { code: failure.code as McpCode, message: failure.message },
+  }))
   for (const id of client.serverIds()) {
     try {
       const tools = await client.listTools(id)
@@ -43,12 +52,18 @@ export async function listMcpForAuthor(client: McpClient): Promise<{ servers: Au
  * @param client - host-held MCP client
  * @param serverId - key in the resolved config
  * @param toolName - when set, only that tool; unknown name is `tool-args`
+ * @param failures - servers boot left out; asking about one answers with its reference failure
  */
 export async function toolsMcpForAuthor(
   client: McpClient,
   serverId: string,
   toolName?: string,
+  failures: readonly McpLoadFailure[] = [],
 ): Promise<AuthorMcpServerTools> {
+  const leftOut = failures.find(failure => failure.id === serverId)
+  if (leftOut !== undefined) {
+    return { id: serverId, error: { code: leftOut.code as McpCode, message: leftOut.message } }
+  }
   try {
     const listed = await client.listTools(serverId)
     const tools = listed.map(tool => ({

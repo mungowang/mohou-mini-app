@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-03
+updated: 2026-10-05
 ---
 
 # HTTP surface
@@ -28,7 +28,7 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 | `GET /api/app/:appId/events` | iframe | one app's author stream. The panel does not use this for an open tab |
 | `POST /api/call` | iframe, authoring tool | `{ ok, value }` or `{ ok: false, error }`. `Accept: text/event-stream` writes each method yield as `{ value }`, then `{ return }` or `{ error }` |
 | `GET /api/host-config` | Panel | public config fields |
-| `POST /api/host-config` | Panel | writes a valid config, or 400 with the field error |
+| `POST /api/host-config` | Panel, token | writes a valid config, or 400 with the field error |
 | `GET /api/palettes` | Panel | shipped and custom palettes, each with `origin`, plus `ignored[]` |
 | `GET /api/apps/:appId/history` | Panel | commit list, limit default 50, max 200 |
 | `GET /api/apps/:appId/history/:commitId` | Panel | message, time, files, per-file add/del and preview |
@@ -39,20 +39,20 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 | `POST /api/apps/:appId/theme` | Panel | saves or clears the pin |
 | `GET /api/about` | Panel | process name, environment, package versions, and the authoring MCP url plus token |
 | `GET /api/updates` | Panel | `{ name, current, latest, updateAvailable, channel?, installable?, error? }` |
-| `POST /api/updates/install` | Panel | stage `update.json` in the install prefix, then restart the sidecar |
+| `POST /api/updates/install` | Panel, token | stage `update.json` in the install prefix, then restart the sidecar |
 | `GET /api/runtime-providers` | Panel | registered providers and their settings fields |
-| `POST /api/runtime-providers/activate` | Panel | writes the selection; `{ restartRequired: true }` |
-| `POST /api/runtime-providers/probe` | Panel | one tiny completion against the selected provider; does not switch the live brain |
-| `POST /api/restart` | Panel | Shell recycles the host process; the written runtime becomes live |
+| `POST /api/runtime-providers/activate` | Panel, token | writes the selection; `{ restartRequired: true }` |
+| `POST /api/runtime-providers/probe` | Panel, token | one tiny completion against the selected provider; does not switch the live brain |
+| `POST /api/restart` | Panel, token | Shell recycles the host process; the written runtime becomes live |
 | `GET /api/author-skill` | Panel | writing skill dests, source `version`, and per-copy `version` / `updateAvailable` |
-| `POST /api/author-skill` | Panel | copy the writing skill into the selected assistant and custom dirs |
+| `POST /api/author-skill` | Panel, token | copy the writing skill into the selected assistant and custom dirs |
 | `POST /api/author-skill/reveal` | Panel | open one installed skill folder |
 | `GET /api/author-mcp` | Panel | assistant MCP files and whether `mini-app` is current |
-| `POST /api/author-mcp` | Panel | merge the authoring server into the selected assistant files |
+| `POST /api/author-mcp` | Panel, token | merge the authoring server into the selected assistant files |
 | `POST /api/author-mcp/reveal` | Panel | open one assistant MCP file |
-| `GET /api/mcp-servers` | Panel | servers in `mcp.json` |
-| `POST /api/mcp-servers` | Panel | replace `mcp.json` |
-| `POST /api/mcp-servers/check` | Panel | start one server and list tools; does not write |
+| `GET /api/mcp-servers` | Panel | servers in `mcp.json`, and `unresolved` for the ones the live client left out |
+| `POST /api/mcp-servers` | Panel, token | replace `mcp.json`, put the resolved servers live, and answer `unresolved` |
+| `POST /api/mcp-servers/check` | Panel, token | start one server and list tools; does not write |
 | `POST /api/mcp-servers/admit` | Panel | parse pasted text into server drafts |
 | `GET /api/mcp-servers/import/:source` | Panel | read one import file Shell named |
 | `GET /api/tools` | authoring client | authoring tool names and input schemas |
@@ -70,7 +70,12 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 | `POST /api/app/:appId/alive` | iframe | always 204 |
 | `POST /api/app/:appId/absent` | panel | always 204; the app has no frame to take a query |
 | `POST /api/app/:appId/view/eval` | iframe | always 204 |
+| `GET /api/credentials` | Panel, token | names, descriptions, and `writable`; never a secret |
+| `POST /api/credentials` | Panel, token | write one account; an absent or empty secret keeps the stored one, and a missing name is `credential-invalid` |
+| `POST /api/credentials/remove` | Panel, token | remove one account; a missing name is `credential-invalid` |
 
+- A row marked `token` requires the authoring token: configuration, a process started from that configuration, an update, a copy into another assistant's home, and the credential store. The panel's own reads, the app-browsing routes, and the iframe routes do not.
+- The authoring token separates a caller that presents it from one that does not. It does not separate one local application from another: the panel document is served to any loopback caller, and `GET /api/about` hands the panel its token because the agent settings show and install that connection. A caller that can reach the loopback port can read the token and the token file. What the check does close is a request that arrives without looking: a route it guards refuses before it reads a body.
 - Failure: invalid JSON on `POST /api/call` is `{ ok: false, error: "invalid json" }`. A missing method is `{ ok: false, error: "missing appId or method" }`. Those two failures stay JSON even when the client asked for a stream. A method failure on a stream is `{ error }` and then the response ends. Host-unreachable is the client's error to show. Diagnostic posts never return an error status.
 - A stream response is one `POST`. Parallel `streamCall`s are parallel responses. A yield is not the method return. The return is the `{ return }` frame, and the UI promise resolves to it. It is not a yielded event.
 - Non-goals: a remote multi-user API; panel routes that import Host code; serving a directory listing of vendors.

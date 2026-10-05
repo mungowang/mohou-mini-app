@@ -25,6 +25,54 @@ const calendar: McpServerDraft = {
 }
 
 describe('McpSettings', () => {
+  it('says which server the last boot left out, and why', async () => {
+    const client: PanelSettingsClient = {
+      readPolicy: () => Promise.resolve(policy),
+      writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
+      probe: () => Promise.resolve({ healthy: true }),
+      listMcp: () => Promise.resolve({
+        servers: [{ id: 'git', command: 'npx', env: { TOKEN: '${credential:nope}' } }],
+        unresolved: [{ id: 'git', code: 'mcp-reference-unknown', message: 'git env.TOKEN names an unknown credential: nope' }],
+      }),
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<McpSettings client={client} locale="en" mode="production" />)
+    })
+    expect(host.textContent).toContain('Not started: git env.TOKEN names an unknown credential: nope')
+    expect(host.textContent).toContain('Add it in Credentials, then restart the host.')
+  })
+
+
+  it('shows what a save left out, without waiting for a reload', async () => {
+    const client: PanelSettingsClient = {
+      readPolicy: () => Promise.resolve(policy),
+      writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
+      probe: () => Promise.resolve({ healthy: true }),
+      listMcp: () => Promise.resolve({ servers: [calendar], unresolved: [] }),
+      writeMcp: () => Promise.resolve({
+        unresolved: [{ id: 'calendar', code: 'mcp-reference-unknown', message: 'calendar headers.AUTH names an unknown credential: nope' }],
+      }),
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<McpSettings client={client} locale="en" mode="production" />)
+    })
+    await flush()
+    expect(host.textContent).not.toContain('Not started')
+    const toggle = host.querySelector('[role="switch"]')
+    await act(async () => {
+      toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(host.textContent).toContain('Not started: calendar headers.AUTH names an unknown credential: nope')
+    expect(host.textContent).toContain('Add it in Credentials, then restart the host.')
+  })
+
   it('adds, checks, toggles, imports, and deletes a server without writing on check', async () => {
     const written: McpServerDraft[][] = []
     let listed: McpServerDraft[] = [calendar]
@@ -32,11 +80,11 @@ describe('McpSettings', () => {
       readPolicy: () => Promise.resolve(policy),
       writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
       probe: () => Promise.resolve({ healthy: true }),
-      listMcp: () => Promise.resolve(listed),
+      listMcp: () => Promise.resolve({ servers: listed, unresolved: [] }),
       writeMcp: (servers) => {
         listed = [...servers]
         written.push(listed)
-        return Promise.resolve()
+        return Promise.resolve({ unresolved: [] })
       },
       checkMcp: server => Promise.resolve({
         ok: true,
@@ -232,7 +280,7 @@ describe('McpSettings', () => {
         readPolicy: () => Promise.resolve(policy),
         writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
         probe: () => Promise.resolve({ healthy: true }),
-        listMcp: () => Promise.resolve([]),
+        listMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
       }} locale="en" mode="production" />)
     })
     await flush()
@@ -250,8 +298,8 @@ describe('McpSettings', () => {
       readPolicy: () => Promise.resolve(policy),
       writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
       probe: () => Promise.resolve({ healthy: true }),
-      listMcp: () => Promise.resolve([{ id: 'web', url: 'https://example.com/mcp', transport: 'sse', headers: { A: 'b' } }]),
-      writeMcp: () => Promise.resolve(),
+      listMcp: () => Promise.resolve({ servers: [{ id: 'web', url: 'https://example.com/mcp', transport: 'sse', headers: { A: 'b' } }], unresolved: [] }),
+      writeMcp: () => Promise.resolve({ unresolved: [] }),
       checkMcp: () => Promise.reject(new Error('down')),
       admitMcp: () => Promise.reject(new Error('bad')),
       importMcp: () => Promise.resolve([]),
@@ -307,8 +355,8 @@ describe('McpSettings', () => {
         readPolicy: () => Promise.resolve(policy),
         writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
         probe: () => Promise.resolve({ healthy: true }),
-        listMcp: () => Promise.resolve([{ id: 'echo', command: 'echo', args: ['hi'], env: { A: 'b' } }]),
-        writeMcp: () => Promise.resolve(),
+        listMcp: () => Promise.resolve({ servers: [{ id: 'echo', command: 'echo', args: ['hi'], env: { A: 'b' } }], unresolved: [] }),
+        writeMcp: () => Promise.resolve({ unresolved: [] }),
       }} locale="en" mode="production" />)
     })
     await flush()

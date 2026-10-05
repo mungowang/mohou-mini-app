@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-01
+updated: 2026-10-03
 ---
 
 # Implementation plan
@@ -93,6 +93,8 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `app-not-trashed` | undelete names an id that has no trash copy |
 | `app-duplicate` | register or undelete names an id that already exists |
 | `config-invalid` | a present config field fails its bound |
+| `mcp-reference-unknown` | a server value names an environment variable or a credential that exists nowhere; that server does not start, so set it or add the credential, then restart |
+| `mcp-reference-invalid` | a server value holds a malformed reference; fix the brace or the name |
 | `config-missing` | a present config file lacks a required field |
 | `path-escape` | a tool path is absolute or contains `..` |
 | `path-is-directory` | the tool path names a directory |
@@ -114,6 +116,7 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `credential-invalid` | `get` was called with an empty name |
 | `credential-unreadable` | the credential file is present and cannot be read; it is not rewritten |
 | `credential-duplicate` | the same credential name is present in more than one source |
+| `credential-write-unavailable` | the store has no writable source; the panel hides its write controls |
 
 HTTP 4xx and 5xx do not throw and have no code. A non-zero bash exit does not throw and has no code. `push` does not throw. A non-JSON push payload is dropped and logged.
 

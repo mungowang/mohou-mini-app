@@ -2,6 +2,8 @@
 
 Status: implemented
 
+Superseded in part by [Credentials are one provider, and it writes](./2026-10-03-credentials-one-provider.md): the store has a write side on the same interface, and the panel has an editor. The read port's rules — one name is one account, `get` is `undefined` when absent, app code sees `get` alone — still stand.
+
 ## Problem
 
 A string map on Host holds every secret. Authors also invent a new name per app for the same account.

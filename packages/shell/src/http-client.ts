@@ -16,6 +16,8 @@ import {
   type PanelUpdateCheck,
   type McpCheckResult,
   type McpServerDraft,
+  type PanelCredential,
+  type PanelMcpFailure,
   type PanelSettingsClient,
   type StorageClient,
   type ThemeClient,
@@ -33,7 +35,7 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
     reload: appId => postOk(origin, appsResource(appId, httpLayout.reload)),
     readPolicy: async () => publicPolicy((await getJson(origin, httpLayout.hostConfig)).policy),
     writePolicy: async (policy) => {
-      const body = await sendJson(origin, 'POST', httpLayout.hostConfig, policy)
+      const body = await sendJson(origin, 'POST', httpLayout.hostConfig, policy, true)
       const result = record(body.result)
       return {
         policy: publicPolicy(result.policy),
@@ -41,7 +43,7 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
       } satisfies PanelPolicyWrite
     },
     probe: async (id) => {
-      const body = await sendJson(origin, 'POST', httpLayout.probe, { id })
+      const body = await sendJson(origin, 'POST', httpLayout.probe, { id }, true)
       return probeOf(resultOf(body))
     },
     readAbout: async () => panelAbout(await getJson(origin, httpLayout.about)),
@@ -49,22 +51,41 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
       const query = customDirs.length === 0 ? '' : `?custom=${encodeURIComponent(customDirs.join('\n'))}`
       return skillStatus(await getJson(origin, `${httpLayout.authorSkill}${query}`))
     },
-    installSkill: async (agentIds, customDirs) => skillStatus(await sendJson(origin, 'POST', httpLayout.authorSkill, { agentIds, customDirs })),
+    installSkill: async (agentIds, customDirs) => skillStatus(await sendJson(origin, 'POST', httpLayout.authorSkill, { agentIds, customDirs }, true)),
     revealSkill: dest => postOk(origin, httpLayout.authorSkillReveal, { dest }),
     readAuthorMcp: async () => authorMcpStatus(await getJson(origin, httpLayout.authorMcp)),
-    installAuthorMcp: async (agentIds, description) => authorMcpStatus(await sendJson(origin, 'POST', httpLayout.authorMcp, { agentIds, description })),
+    installAuthorMcp: async (agentIds, description) => authorMcpStatus(await sendJson(origin, 'POST', httpLayout.authorMcp, { agentIds, description }, true)),
     revealAuthorMcp: dest => postOk(origin, httpLayout.authorMcpReveal, { dest }),
     checkUpdate: async () => updateCheck(await getJson(origin, httpLayout.updates)),
-    installUpdate: async (version) => { await postOk(origin, httpLayout.updateInstall, { version }) },
-    restartHost: () => postOk(origin, httpLayout.restart),
+    installUpdate: async (version) => { await sendJson(origin, 'POST', httpLayout.updateInstall, { version }, true) },
+    restartHost: async () => { await sendJson(origin, 'POST', httpLayout.restart, {}, true) },
     listRuntimes: async () => arrayOf((await getJson(origin, httpLayout.providers)).providers, runtimeOf),
-    listMcp: async () => {
-      const body = await getJson(origin, httpLayout.mcpServers)
-      return arrayOf(resultOf(body).servers, mcpServer)
+    readCredentials: async () => {
+      const result = resultOf(await sendJson(origin, 'GET', httpLayout.credentials, undefined, true))
+      return {
+        credentials: arrayOf(result.credentials, panelCredential),
+        writable: result.writable === true,
+      }
     },
-    writeMcp: servers => postOk(origin, httpLayout.mcpServers, { servers }),
+    putCredential: async (name, description, secret) => {
+      await sendJson(origin, 'POST', httpLayout.credentials, { name, description, secret }, true)
+    },
+    removeCredential: async (name) => {
+      await sendJson(origin, 'POST', httpLayout.credentialRemove, { name }, true)
+    },
+    listMcp: async () => {
+      const result = resultOf(await getJson(origin, httpLayout.mcpServers))
+      return {
+        servers: arrayOf(result.servers, mcpServer),
+        unresolved: arrayOf(result.unresolved, mcpFailure),
+      }
+    },
+    writeMcp: async (servers) => {
+      const body = await sendJson(origin, 'POST', httpLayout.mcpServers, { servers }, true)
+      return { unresolved: arrayOf(resultOf(body).unresolved, mcpFailure) }
+    },
     checkMcp: async (server) => {
-      const body = await sendJson(origin, 'POST', httpLayout.mcpCheck, server)
+      const body = await sendJson(origin, 'POST', httpLayout.mcpCheck, server, true)
       return mcpCheck(resultOf(body))
     },
     admitMcp: async (text) => {
@@ -296,12 +317,34 @@ async function getJson(origin: string, path: string): Promise<Record<string, unk
   return sendJson(origin, 'GET', path)
 }
 
-async function sendJson(origin: string, method: string, path: string, body?: unknown): Promise<Record<string, unknown>> {
+/** The panel's own token, read once per origin. The about block is where a panel gets it. */
+const panelTokens = new Map<string, string>()
+
+async function authoringToken(origin: string): Promise<string> {
+  const known = panelTokens.get(origin)
+  if (known !== undefined) return known
+  const token = panelAbout(await getJson(origin, httpLayout.about)).authoring.token
+  panelTokens.set(origin, token)
+  return token
+}
+
+/** `authorize` marks a route Host guards with the authoring token. Each call site says which. */
+async function sendJson(
+  origin: string,
+  method: string,
+  path: string,
+  body?: unknown,
+  authorize = false,
+): Promise<Record<string, unknown>> {
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['content-type'] = 'application/json'
+  if (authorize) headers.authorization = `Bearer ${await authoringToken(origin)}`
   let response: Response
   try {
     response = await fetch(`${origin}${path}`, {
       method,
-      ...body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
+      ...Object.keys(headers).length === 0 ? {} : { headers },
+      ...body === undefined ? {} : { body: JSON.stringify(body) },
     })
   } catch (error) {
     throw new PanelClientError('unreachable', error instanceof Error ? error.message : 'host is unreachable')
@@ -317,6 +360,22 @@ async function sendJson(origin: string, method: string, path: string, body?: unk
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function mcpFailure(value: unknown): PanelMcpFailure {
+  const row = record(value)
+  if (typeof row.id !== 'string') throw new PanelClientError('failed', 'mcp failure is invalid')
+  return {
+    id: row.id,
+    code: typeof row.code === 'string' ? row.code : 'config-invalid',
+    message: typeof row.message === 'string' ? row.message : '',
+  }
+}
+
+function panelCredential(value: unknown): PanelCredential {
+  const row = record(value)
+  if (typeof row.name !== 'string') throw new PanelClientError('failed', 'credential is invalid')
+  return { name: row.name, description: typeof row.description === 'string' ? row.description : '' }
 }
 
 function mcpServer(value: unknown): McpServerDraft {

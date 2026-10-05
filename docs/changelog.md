@@ -1,11 +1,37 @@
 ---
 status: locked
-updated: 2026-10-03
+updated: 2026-10-05
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.17
+
+A credential's description can be edited on its own. The stored secret never leaves the store, so the edit form leaves the secret field empty and saving it that way keeps the value that is already there; a new credential still needs one. Nothing reads a secret back to the panel to make this work: the host asks the store for the value it is about to keep.
+
+## 1.0.16
+
+Changing MCP configuration while the host runs keeps its promise now. A server whose value is `${env:NAME}` or `${credential:NAME}` works as soon as it is saved, in the panel and through the authoring tools, with no restart: the write hands the live client resolved values, where before it handed over the reference text and the running process authenticated with the literal `${credential:...}`. The check had always resolved, so a server could report a full tool list and still behave differently the moment it ran.
+
+Adding or removing one server no longer damages the others. Those tools read the file through the masked view meant for an agent, and wrote it back, so every other credential-shaped value became its own mask — `ghp_realsecret1234` to `ghp_re*****34`, a string that still looks like a token and no longer works. The masked view is now only ever an answer.
+
+A server whose reference names nothing is left out of the running set and reported, in the panel and to the agent, the same way the last release began handling it at boot.
+
+## 1.0.15
+
+Pi stays available after a hot update. The install drops Pi's peers from the prefix, and the next sidecar repaired them but could not use them: the load asked the runtime whether a peer resolved before it created the link, and the runtime remembers a failed resolution for the life of the process. The load now repairs first and asks the runtime once. It also retries an attempt that failed, instead of answering every later caller with the first failure, and says why when it cannot load. Previously the workaround was to reopen the app.
+
+## 1.0.14
+
+Credentials have an editor: a new settings section creates, edits, and removes accounts. A secret is written once and never listed back, so the panel shows a name, a description, and the reference a server writes to use it. The store is one provider with a read side and a write side, and its file is owner-only.
+
+A server value may name where its secret lives instead of holding it: `${env:NAME}` reads the environment, `${credential:NAME}` reads that store. A value in a command, an argument, a URL, an environment entry, or a header. The file keeps the reference, so re-editing a server cannot destroy it.
+
+A name that exists nowhere leaves that one server out: it does not start, the panel says so with the reason and the next step, and `mini_app_mcp_list` reports the same code. The host still starts, which is what lets the credentials section fix it. The value never becomes an empty string.
+
+The authoring token now also guards the routes that change host configuration, start a process from that configuration, install an update, or copy into another assistant's home, together with the credential store. A caller naming the local port without that token is refused before any body is read.
 
 ## 1.0.12
 

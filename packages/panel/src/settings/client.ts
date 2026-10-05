@@ -104,11 +104,44 @@ export interface PanelSettingsClient {
   readAuthorMcp?(): Promise<PanelAuthorMcpStatus>
   installAuthorMcp?(agentIds: readonly string[], description: string): Promise<PanelAuthorMcpStatus>
   revealAuthorMcp?(dest: string): Promise<void>
-  listMcp?(): Promise<readonly McpServerDraft[]>
-  writeMcp?(servers: readonly McpServerDraft[]): Promise<void>
+  /** Names, descriptions, and whether the store accepts a write. A secret never crosses this. */
+  readCredentials?(): Promise<PanelCredentials>
+  /**
+   * Save one account. An omitted secret keeps the one already stored, which is how the form edits a
+   * description without the owner pasting a secret again. Host reads the stored value; the panel
+   * never receives one.
+   */
+  putCredential?(name: string, description: string, secret?: string): Promise<void>
+  removeCredential?(name: string): Promise<void>
+  listMcp?(): Promise<PanelMcpList>
+  writeMcp?(servers: readonly McpServerDraft[]): Promise<{ unresolved: readonly PanelMcpFailure[] }>
   checkMcp?(server: McpServerDraft): Promise<McpCheckResult>
   admitMcp?(text: string): Promise<readonly McpServerDraft[]>
   importMcp?(source: string): Promise<readonly McpServerDraft[]>
+}
+
+/** One stored account, as the editor lists it. No secret: values are write-only. */
+export interface PanelCredential {
+  readonly name: string
+  readonly description: string
+}
+
+export interface PanelCredentials {
+  readonly credentials: readonly PanelCredential[]
+  /** False when the store is read-only, and then the form shows no write control. */
+  readonly writable: boolean
+}
+
+/** One server the last boot left out, and why. */
+export interface PanelMcpFailure {
+  readonly id: string
+  readonly code: string
+  readonly message: string
+}
+
+export interface PanelMcpList {
+  readonly servers: readonly McpServerDraft[]
+  readonly unresolved: readonly PanelMcpFailure[]
 }
 
 /** One MCP server the settings section can edit. */

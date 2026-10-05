@@ -21,7 +21,8 @@ import { DEFAULT_STORAGE_NOTICE_BYTES } from '../storage/open.ts'
 import { restoreStorageBackup } from '../storage/schema.ts'
 import type { CredentialProvider } from '../credentials/provider.ts'
 import { hostAuthoringToken } from '../host/layout.ts'
-import { checkMcpEditor, readMcpEditor, writeMcpEditor, type McpEditorServer } from '../host/mcp-editor.ts'
+import { checkMcpEditor, maskEditorServers, readMcpEditor, writeMcpEditor, type McpEditorServer } from '../host/mcp-editor.ts'
+import { mcpReferenceSources, type McpLoadFailure } from '../host/mcp.ts'
 import { recordOpen } from '../host/activity.ts'
 import { InstallError } from '../install/codes.ts'
 import { installApp, type InstallRequest, type NpmRun } from '../install/install.ts'
@@ -116,6 +117,9 @@ interface Registry {
 export function createAuthorTools(options: {
   readonly registry: Registry
   readonly mcp: McpClient
+  /** Servers the live client left out: boot's list, replaced by every write. The list reports them. */
+  readonly readMcpFailures?: () => readonly McpLoadFailure[]
+  readonly recordMcpFailures?: (failures: readonly McpLoadFailure[]) => void
   /** Process environment. Names the MCP server file when `MINI_APP_MCP_CONFIG` is set. */
   readonly env?: NodeJS.ProcessEnv
   readonly ports: AuthorCallPorts
@@ -215,6 +219,9 @@ async function invoke(
   options: {
     registry: Registry
     mcp: McpClient
+    /** Servers boot left out because a reference names nothing. The author list reports them. */
+    readMcpFailures?: () => readonly McpLoadFailure[]
+    recordMcpFailures?: (failures: readonly McpLoadFailure[]) => void
     env?: NodeJS.ProcessEnv
     ports: AuthorCallPorts
     onTreeChanged?: (appId: string) => void
@@ -273,9 +280,9 @@ async function invoke(
     case 'mini_app_call':
       return callApp(options, live, input)
     case 'mini_app_mcp_list':
-      return listMcpForAuthor(options.mcp)
+      return listMcpForAuthor(options.mcp, options.readMcpFailures?.() ?? [])
     case 'mini_app_mcp_tools':
-      return toolsMcpForAuthor(options.mcp, requiredString(input, 'serverId'), optionalString(input, 'toolName'))
+      return toolsMcpForAuthor(options.mcp, requiredString(input, 'serverId'), optionalString(input, 'toolName'), options.readMcpFailures?.() ?? [])
     case 'mini_app_mcp_add':
       return addMcpServer(options, input)
     case 'mini_app_mcp_remove':
@@ -807,19 +814,29 @@ function optionalCleanCaches(value: unknown): boolean {
  * file and the client alone unless `force` is true.
  */
 async function addMcpServer(
-  options: { registry: Registry; mcp: McpClient; env?: NodeJS.ProcessEnv },
+  options: {
+    registry: Registry
+    mcp: McpClient
+    env?: NodeJS.ProcessEnv
+    ports: AuthorCallPorts
+    recordMcpFailures?: (failures: readonly McpLoadFailure[]) => void
+  },
   input: Record<string, unknown>,
 ) {
   const env = options.env ?? process.env
   const root = options.registry.runtimeRoot
   const server = mcpServerRow(input)
-  const check = input.check === false ? undefined : await checkMcpEditor(server, env)
-  const servers = await readMcpEditor(root, env, true)
+  const sources = mcpReferenceSources(env, options.ports.credentials)
+  const check = input.check === false ? undefined : await checkMcpEditor(server, env, sources)
+  // The write input is the file itself. The masked rows are for the answer, and writing those back
+  // would replace every other server's secret with its own mask.
+  const file = await readMcpEditor(root, env)
   if (check !== undefined && !check.ok && input.force !== true) {
-    return { added: false, id: server.id, check, servers }
+    return { added: false, id: server.id, check, servers: maskEditorServers(file) }
   }
-  const specs = await writeMcpEditor(root, [...servers.filter(row => row.id !== server.id), server], env)
-  await options.mcp.setServers(specs)
+  const resolved = await writeMcpEditor(root, [...file.filter(row => row.id !== server.id), server], env, sources)
+  await options.mcp.setServers(resolved.servers)
+  options.recordMcpFailures?.(resolved.failures)
   return {
     added: true,
     id: server.id,
@@ -830,16 +847,24 @@ async function addMcpServer(
 
 /** Remove one MCP server by id, live. An unknown id changes nothing. */
 async function removeMcpServer(
-  options: { registry: Registry; mcp: McpClient; env?: NodeJS.ProcessEnv },
+  options: {
+    registry: Registry
+    mcp: McpClient
+    env?: NodeJS.ProcessEnv
+    ports: AuthorCallPorts
+    recordMcpFailures?: (failures: readonly McpLoadFailure[]) => void
+  },
   input: Record<string, unknown>,
 ) {
   const env = options.env ?? process.env
   const root = options.registry.runtimeRoot
   const id = requiredString(input, 'id')
-  const servers = await readMcpEditor(root, env, true)
-  if (!servers.some(row => row.id === id)) return { removed: false, id, servers }
-  const specs = await writeMcpEditor(root, servers.filter(row => row.id !== id), env)
-  await options.mcp.setServers(specs)
+  const sources = mcpReferenceSources(env, options.ports.credentials)
+  const file = await readMcpEditor(root, env)
+  if (!file.some(row => row.id === id)) return { removed: false, id, servers: maskEditorServers(file) }
+  const resolved = await writeMcpEditor(root, file.filter(row => row.id !== id), env, sources)
+  await options.mcp.setServers(resolved.servers)
+  options.recordMcpFailures?.(resolved.failures)
   return { removed: true, id, servers: await readMcpEditor(root, env, true) }
 }
 

@@ -126,7 +126,7 @@ export { requiredThemeTokens, themeTokens, type ThemeToken } from './theme/token
 export { resolveFirstPaint, firstPaintStyle, type FirstPaint } from './theme/paint.ts'
 export { createThemePins, type AppPin, type PaletteList } from './theme/pin.ts'
 export { CredentialError, credentialCodes, type CredentialCode } from './credentials/codes.ts'
-export { deleteFileCredential, writeFileCredential } from './credentials/file.ts'
+export { createFileCredentials } from './credentials/file.ts'
 export {
   createCredentials,
   credentialSourceKinds,
@@ -174,7 +174,7 @@ export {
   hostMcpPath,
 } from './host/layout.ts'
 export { createHostLog, DEFAULT_HOST_LOG_BYTES, type HostLog } from './host/log.ts'
-export { loadMcpServers, mcpConfigEnv } from './host/mcp.ts'
+export { loadMcpServers, mcpConfigEnv, mcpReferenceSources } from './host/mcp.ts'
 export { createHost, type HostSession } from './host/session.ts'
 export {
   ensureRuntimeAppsLayout,

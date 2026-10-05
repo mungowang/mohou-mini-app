@@ -24,6 +24,8 @@ export const httpLayout = {
   mcpCheck: '/api/mcp-servers/check',
   mcpAdmit: '/api/mcp-servers/admit',
   mcpImport: '/api/mcp-servers/import',
+  credentials: '/api/credentials',
+  credentialRemove: '/api/credentials/remove',
   tools: '/api/tools',
   invoke: '/api/tools/invoke',
   mcp: '/mcp',

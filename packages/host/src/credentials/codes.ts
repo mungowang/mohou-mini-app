@@ -1,6 +1,11 @@
 /** Codes the credential provider emits. Callers match `code`. */
 
-export const credentialCodes = ['credential-invalid', 'credential-unreadable', 'credential-duplicate'] as const
+export const credentialCodes = [
+  'credential-invalid',
+  'credential-unreadable',
+  'credential-duplicate',
+  'credential-write-unavailable',
+] as const
 
 export type CredentialCode = (typeof credentialCodes)[number]
 

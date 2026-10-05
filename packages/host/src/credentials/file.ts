@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import { CredentialError } from './codes.ts'
@@ -10,12 +10,14 @@ interface CredentialEntry {
 }
 
 /**
- * Read one JSON file on each call. A missing file is an empty source.
+ * One JSON file as one credential store. Read and write reach the same file, so the two sides
+ * cannot drift. A missing file is an empty source.
  * A present bad file throws `credential-unreadable` and is not rewritten.
  * @param file - absolute path. The name lives in `homeLayout`.
  */
 export function createFileCredentials(file: string): CredentialProvider {
   return {
+    writable: true,
     async list() {
       const entries = await readCredentialFile(file)
       return [...entries.entries()]
@@ -27,6 +29,8 @@ export function createFileCredentials(file: string): CredentialProvider {
       const entries = await readCredentialFile(file)
       return entries.get(name)?.secret
     },
+    put: (name, description, secret) => writeFileCredential(file, name, description, secret),
+    remove: name => deleteFileCredential(file, name),
   }
 }
 
@@ -64,7 +68,10 @@ async function writeEntries(file: string, entries: ReadonlyMap<string, Credentia
   await mkdir(path.dirname(file), { recursive: true })
   const body: Record<string, CredentialEntry> = {}
   for (const [name, entry] of entries) body[name] = entry
-  await writeFile(file, `${JSON.stringify(body, null, 2)}\n`)
+  // The file holds secrets in the clear, so it is owner-only. `mode` covers a new file and the
+  // chmod tightens one that an earlier version wrote world-readable.
+  await writeFile(file, `${JSON.stringify(body, null, 2)}\n`, { mode: 0o600 })
+  await chmod(file, 0o600).catch(() => undefined)
 }
 
 async function readCredentialFile(file: string): Promise<ReadonlyMap<string, CredentialEntry>> {

@@ -6,7 +6,7 @@ import type { McpEditorServer } from '../host/mcp-editor.ts'
 import { authorMcpToolList } from '../tools/schemas.ts'
 import { historyListBound, httpLayout } from './layout.ts'
 import { aboutInfo, type LoopbackPorts } from './ports.ts'
-import { isPin, isRecord, mergePolicy, ok } from './reply.ts'
+import { authoringDenied, isPin, isRecord, mergePolicy, ok } from './reply.ts'
 
 /** Panel and owner routes. No authoring token. */
 export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
@@ -31,7 +31,11 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     return c.json(await ports.listPalettes())
   })
   app.get(httpLayout.hostConfig, c => c.json({ ok: true, policy: ports.readPolicy() }))
-  app.post(httpLayout.hostConfig, c => writeConfig(c, ports))
+  app.post(httpLayout.hostConfig, (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
+    return writeConfig(c, ports)
+  })
   app.get(httpLayout.about, c => c.json({
     ok: true,
     ...aboutInfo(),
@@ -45,6 +49,8 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     return c.json({ ok: true, ...await ports.checkUpdate() })
   })
   app.post(httpLayout.updateInstall, async (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
     if (ports.installUpdate === undefined) {
       return c.json({ ok: false, error: { code: 'config-invalid', message: 'update install is not available' } }, 400)
     }
@@ -57,8 +63,16 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     })
   })
   app.get(httpLayout.providers, async c => c.json({ providers: await providerList(ports) }))
-  app.post(httpLayout.activate, c => activate(c, ports))
-  app.post(httpLayout.probe, c => probe(c, ports))
+  app.post(httpLayout.activate, (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
+    return activate(c, ports)
+  })
+  app.post(httpLayout.probe, (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
+    return probe(c, ports)
+  })
   app.get(httpLayout.authorSkill, (c) => {
     if (ports.readAuthorSkill === undefined) {
       return c.json({ ok: false, error: { code: 'config-invalid', message: 'author skill is not available' } }, 400)
@@ -71,6 +85,8 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     })
   })
   app.post(httpLayout.authorSkill, async (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
     if (ports.writeAuthorSkill === undefined) {
       return c.json({ ok: false, error: { code: 'config-invalid', message: 'author skill is not available' } }, 400)
     }
@@ -103,6 +119,8 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     })
   })
   app.post(httpLayout.authorMcp, async (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
     if (ports.writeAuthorMcp === undefined) {
       return c.json({ ok: false, error: { code: 'config-invalid', message: 'author mcp is not available' } }, 400)
     }
@@ -126,6 +144,8 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     })
   })
   app.post(httpLayout.restart, (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
     if (ports.restart === undefined) {
       return c.json({ ok: false, error: { code: 'config-invalid', message: 'host restart is not available' } }, 400)
     }
@@ -137,14 +157,18 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     }, 400)
     return c.json({ ok: true, result: { restarting: true } })
   })
-  app.get(httpLayout.mcpServers, c => ok(c, async () => ({ servers: await ports.readMcp() })))
+  app.get(httpLayout.mcpServers, c => ok(c, () => ports.readMcp()))
   app.post(httpLayout.mcpServers, async (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
     const body = await readBody(c)
     const servers = isRecord(body) ? mcpServers(body.servers) : undefined
     if (servers === undefined) return c.json({ ok: false, error: { code: 'config-invalid', message: 'servers are invalid' } }, 400)
     return ok(c, () => ports.writeMcp(servers))
   })
   app.post(httpLayout.mcpCheck, async (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
     const body = await readBody(c)
     const server = mcpServer(body)
     if (server === undefined) return c.json({ ok: false, error: { code: 'config-invalid', message: 'server is invalid' } }, 400)
@@ -157,6 +181,28 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     return ok(c, () => Promise.resolve({ servers: ports.admitMcp(text) }))
   })
   app.get(`${httpLayout.mcpImport}/:source`, c => ok(c, () => ports.importMcp(c.req.param('source')).then(servers => ({ servers }))))
+  app.get(httpLayout.credentials, (c) => {
+    if (!ports.authorized(c.req.header('authorization'))) return authoringDenied(c)
+    return ok(c, () => ports.readCredentials())
+  })
+  app.post(httpLayout.credentials, async (c) => {
+    if (!ports.authorized(c.req.header('authorization'))) return authoringDenied(c)
+    const body = await readBody(c)
+    const name = isRecord(body) && typeof body.name === 'string' ? body.name : undefined
+    const secret = isRecord(body) && typeof body.secret === 'string' ? body.secret : undefined
+    const description = isRecord(body) && typeof body.description === 'string' ? body.description : ''
+    if (name === undefined) {
+      return c.json({ ok: false, error: { code: 'credential-invalid', message: 'a credential needs a name' } }, 400)
+    }
+    return ok(c, () => ports.putCredential(name, description, secret))
+  })
+  app.post(httpLayout.credentialRemove, async (c) => {
+    if (!ports.authorized(c.req.header('authorization'))) return authoringDenied(c)
+    const body = await readBody(c)
+    const name = isRecord(body) && typeof body.name === 'string' ? body.name : undefined
+    if (name === undefined) return c.json({ ok: false, error: { code: 'credential-invalid', message: 'credential name is missing' } }, 400)
+    return ok(c, () => ports.removeCredential(name))
+  })
   app.post(`${httpLayout.apps}/:appId/${httpLayout.open}`, async (c) => {
     const body = await readBody(c)
     const title = isRecord(body) && typeof body.title === 'string' ? body.title : undefined
@@ -286,6 +332,11 @@ function stringRecord(value: unknown): Record<string, string> | undefined {
     record[key] = item
   }
   return record
+}
+
+/** A route that changes host configuration or spawns a configured process requires the token. */
+function rejectWithoutToken(c: Context, ports: LoopbackPorts): Response | undefined {
+  return ports.authorized(c.req.header('authorization')) ? undefined : authoringDenied(c)
 }
 
 async function readBody(c: Context): Promise<unknown> {

@@ -65,7 +65,7 @@ Owner `restoreStorage` closes the live storage handle, then calls `restoreStorag
 - Input: the public fields. One language control writes `locale` and `chatLanguage` together.
 - Output: a written config, or a field error and an unchanged file. A change of `hostPort` or `runtimeProvider.id` reports that restart is required. It does not switch the live brain or rebind the listening port until restart.
 - Failure: `config-invalid` or `config-missing`. The form stays dirty.
-- Non-goals: a credential editor; writing `mcp.json`; a second language control. The panel MCP editor is a separate operation. [MCP servers](panel/mcp.md) owns it.
+- Non-goals: writing `mcp.json`; a second language control. The panel MCP editor and the credential editor are separate operations: [MCP servers](panel/mcp.md) and [credentials](panel/settings.md).
 
 ## restartHost
 

@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createHost } from '@mohou/host'
+import { createCredentials, createHost } from '@mohou/host'
 import { createEchoProvider } from '@mohou/runtime-provider'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +17,7 @@ describe('httpPanelClients', () => {
       runtimeRoot: root,
       seed: { hostPort: 0, theme: 'dark', palette: 'default', locale: 'en' },
       provider: createEchoProvider(),
+      credentials: createCredentials([{ kind: 'builtin-json', file: join(root, 'credentials.json') }]),
     })
     const started = await host.start()
     const client = httpPanelClients(`http://127.0.0.1:${started.port}`)
@@ -53,6 +55,24 @@ describe('httpPanelClients', () => {
       expect(await client.setPin('com.example.app', { kind: 'follow-host' })).toEqual({ kind: 'follow-host' })
       expect(await client.appFile?.('com.example.app')).toBe(false)
       await expect(client.open('com.example.missing')).rejects.toMatchObject({ code: 'failed' })
+      // The credential routes require the panel's own token, which the client reads from the about block.
+      expect(await client.readCredentials?.()).toEqual({ credentials: [], writable: true })
+      await client.putCredential?.('github', 'GitHub', 'ghp_test')
+      expect(await client.readCredentials?.()).toEqual({ credentials: [{ name: 'github', description: 'GitHub' }], writable: true })
+      // A save that omits the secret keeps the stored one: Host resolves it, and the secret still reads back.
+      await client.putCredential?.('github', 'Work GitHub')
+      expect(await client.readCredentials?.()).toEqual({ credentials: [{ name: 'github', description: 'Work GitHub' }], writable: true })
+      expect(JSON.parse(readFileSync(join(root, 'credentials.json'), 'utf8'))).toEqual({ github: { description: 'Work GitHub', secret: 'ghp_test' } })
+      // An empty secret means the same thing, and a name with nothing stored has none to keep.
+      await client.putCredential?.('github', 'Personal GitHub', '')
+      expect((await client.readCredentials?.())?.credentials).toEqual([{ name: 'github', description: 'Personal GitHub' }])
+      // The adapter normalizes a panel error to `failed`; the host's own sentence survives in it.
+      await expect(client.putCredential?.('gitlab', 'GitLab')).rejects.toMatchObject({
+        code: 'failed',
+        message: expect.stringContaining('credential has no secret to keep: gitlab'),
+      })
+      await client.removeCredential?.('github')
+      expect((await client.readCredentials?.())?.credentials).toEqual([])
       await expect(httpPanelClients('http://127.0.0.1:1').list()).rejects.toMatchObject({ code: 'unreachable' })
     } finally {
       await host.dispose()
@@ -84,7 +104,7 @@ describe('httpPanelClients', () => {
     await client.reload?.('com.example.app')
     expect((await client.readSkill?.())?.skillId).toBe('mohou-mini-app')
     expect((await client.readAuthorMcp?.())?.agents[0]?.id).toBe('pi')
-    expect((await client.listMcp?.())?.[0]?.env?.K).toBe('v')
+    expect((await client.listMcp?.())?.servers[0]?.env?.K).toBe('v')
     expect((await client.checkMcp?.({ id: 'echo', command: 'echo' }))?.ok).toBe(true)
     expect((await client.admitMcp?.('{}'))?.[0]?.id).toBe('from')
     expect((await client.importMcp?.('pi'))?.[0]?.id).toBe('from')
@@ -93,7 +113,7 @@ describe('httpPanelClients', () => {
     expect((await client.readSkill?.(['/tmp/skills']))?.agents).toEqual([])
     expect((await client.readAuthorMcp?.())?.agents).toHaveLength(1)
     expect((await client.listRuntimes?.())?.[0]?.models).toEqual([])
-    expect((await client.listMcp?.())?.[0]?.enabled).toBe(false)
+    expect((await client.listMcp?.())?.servers[0]?.enabled).toBe(false)
   })
 
   it('reads the remaining wire shapes', async () => {
@@ -103,7 +123,8 @@ describe('httpPanelClients', () => {
     })))
     const client = httpPanelClients('http://127.0.0.1')
     const servers = await client.listMcp?.()
-    expect(servers?.[0]).toMatchObject({ id: 'sse', transport: 'sse', description: 'd', args: ['a'] })
+    expect(servers?.servers[0]).toMatchObject({ id: 'sse', transport: 'sse', description: 'd', args: ['a'] })
+    expect(servers?.unresolved[0]).toMatchObject({ id: 'git', code: 'mcp-reference-unknown' })
     expect((await client.checkMcp?.({ id: 'sse' }))).toMatchObject({ ok: false, code: 'mcp-start-failed', message: 'down' })
     expect((await client.readAbout?.())?.authoring.tools[0]?.name).toBe('mini_app_register')
     expect((await client.readSkill?.())?.customs[0]?.dir).toBe('/tmp/skills')
@@ -111,6 +132,28 @@ describe('httpPanelClients', () => {
     expect((await client.listRuntimes?.())?.[0]?.label).toBe('Echo')
     expect((await client.checkUpdate?.())?.latest).toBeNull()
     expect((await client.listPalettes?.())?.palettes).toEqual([])
+    // Every guarded route presents the panel token, which the client reads from the about block,
+    // and a read route presents nothing.
+    await client.readCredentials?.()
+    await client.putCredential?.('github', 'GitHub', 'ghp_test')
+    await client.removeCredential?.('github')
+    await client.probe('echo')
+    const written = await client.writeMcp?.([{ id: 'git', command: 'npx', env: { TOKEN: '${credential:DEMO}' } }])
+    expect(written?.unresolved).toEqual([{ id: 'git', code: 'mcp-reference-unknown', message: 'git env.TOKEN names an unknown credential: nope' }])
+    await client.checkMcp?.({ id: 'echo' })
+    await client.installSkill?.([], [])
+    await client.installAuthorMcp?.([], 'd')
+    await client.installUpdate?.('1.0.0')
+    await client.restartHost?.()
+    const guardedPosts = ['/api/credentials', '/api/credentials/remove', '/api/runtime-providers/probe', '/api/mcp-servers', '/api/author-skill', '/api/author-mcp', '/api/updates/install', '/api/restart']
+    const calls = vi.mocked(fetch).mock.calls as unknown as Array<[string, { method?: string; headers?: Record<string, string> }]>
+    const writes = calls.filter(([url, init]) => init.method !== 'GET' && guardedPosts.some(part => String(url).includes(part)))
+    expect(writes.length).toBeGreaterThanOrEqual(guardedPosts.length)
+    expect(new Set(writes.map(([, init]) => init.headers?.authorization))).toEqual(new Set(['Bearer t']))
+    const credentialRead = calls.find(([url, init]) => init.method === 'GET' && String(url).endsWith('/api/credentials'))
+    expect(credentialRead?.[1].headers?.authorization).toBe('Bearer t')
+    const readMcp = calls.find(([url, init]) => String(url).endsWith('/api/mcp-servers') && init.method === 'GET')
+    expect(readMcp?.[1].headers?.authorization).toBeUndefined()
   })
 
   it('rejects a wire body that is not the panel shape', async () => {
@@ -197,6 +240,8 @@ describe('httpPanelClients', () => {
 })
 
 function dense(url: string): unknown {
+  if (url.includes('/probe')) return { ok: true, result: { healthy: true } }
+  if (url.includes('/api/credentials')) return { ok: true, result: { credentials: [{ name: 'github', description: 'GitHub' }], writable: true } }
   if (url.includes('/check')) return { ok: true, result: { ok: false, tools: [{ name: 'ping' }, { nope: true }], code: 'mcp-start-failed', message: 'down' } }
   if (url.includes('/about')) return { ok: true, name: 'host', current: '1', platform: 'darwin', authoring: { url: 'http://x', token: 't', tools: [{ name: 'mini_app_register', description: 'create' }, { description: 'skip' }] } }
   if (url.includes('/author-skill')) return { ok: true, result: { skillId: 's', version: '', agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/x', skillsDir: '/tmp', homePresent: false, installed: false }], customs: [{ dir: '/tmp/skills', dest: '/tmp/skills/s', installed: true, version: '1.0.0', updateAvailable: true }] } }
@@ -204,10 +249,11 @@ function dense(url: string): unknown {
   if (url.includes('/runtime-providers')) return { providers: [{ id: 'echo', label: 'Echo', models: [{ provider: 'echo', models: ['m'] }] }] }
   if (url.endsWith('/api/updates')) return { ok: true, name: 'h', current: '1', latest: null, updateAvailable: false, error: 'x' }
   if (url.endsWith('/api/palettes')) return { palettes: [], ignored: [] }
-  return { ok: true, result: { servers: [{ id: 'sse', description: 'd', url: 'https://x', transport: 'sse', args: ['a', 1], env: {}, headers: { A: 'b' } }] } }
+  return { ok: true, result: { servers: [{ id: 'sse', description: 'd', url: 'https://x', transport: 'sse', args: ['a', 1], env: {}, headers: { A: 'b' } }], unresolved: [{ id: 'git', code: 'mcp-reference-unknown', message: 'git env.TOKEN names an unknown credential: nope' }] } }
 }
 
 function wire(url: string): unknown {
+  if (url.endsWith('/api/about')) return { ok: true, name: 'h', current: '1', platform: 'd', authoring: { url: 'u', token: 't', tools: [] } }
   if (url.includes('/api/author-skill')) {
     if (url.includes('custom=')) {
       return { ok: true, result: { skillId: 'mohou-mini-app', agents: [{ id: 'pi' }], customs: [{ dest: '/tmp/x' }] } }
@@ -225,7 +271,7 @@ function wire(url: string): unknown {
     return { ok: true, result: { servers: [{ id: 'from', command: 'npx' }] } }
   }
   if (url.endsWith('/api/mcp-servers')) {
-    return { ok: true, result: { servers: [{ id: 'echo', command: 'echo', env: { K: 'v' }, headers: { A: 'b' }, disabled: true }] } }
+    return { ok: true, result: { servers: [{ id: 'echo', command: 'echo', env: { K: 'v' }, headers: { A: 'b' }, disabled: true }], unresolved: [{ id: 'git', code: 'mcp-reference-unknown', message: 'git env.TOKEN names an unknown credential: nope' }] } }
   }
   if (url.endsWith('/history/abc')) {
     return { ok: true, result: { message: 'm', time: 't', parentIds: [], files: [{ path: 'ui.tsx', add: 1, del: 0, preview: '+' }] } }
@@ -334,7 +380,7 @@ function bad(url: string): unknown {
   if (url.includes('/author-skill')) return { ok: true, result: { skillId: 1, version: '1', agents: [], customs: [] } }
   if (url.includes('/author-mcp')) return { ok: true, result: { agents: [{ id: 'pi', dest: 1 }] } }
   if (url.includes('/runtime-providers')) return { providers: [{ id: 1 }] }
-  if (url.endsWith('/api/about')) return { ok: true, name: 'h', current: '1', platform: 'd', authoring: { url: 'u', token: 't', tools: 'x' } }
+  if (url.endsWith('/api/about')) return { ok: true, name: 'h', current: '1', platform: 'd', authoring: { url: 'u', token: 't', tools: [] } }
   return { apps: [{ id: 'a', name: 'n', description: 'd', version: '1', acronym: 'EX', tags: [1], activity: { openCount: 'x', lastOpenedAt: 't' } }] }
 }
 

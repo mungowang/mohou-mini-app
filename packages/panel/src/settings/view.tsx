@@ -8,11 +8,19 @@ import type { PaletteChip } from '../theme/client.ts'
 import { applyDocumentMode, paintHostStyle } from '../theme/menu.tsx'
 import { AuthorMcpInstall } from './author-mcp-view.tsx'
 import type { PanelAbout, PanelAuthorMcpStatus, PanelPolicy, PanelRuntime, PanelSettingsClient, PanelSkillStatus, PanelUpdateCheck } from './client.ts'
+import { CredentialSettings } from './credentials-view.tsx'
 import { McpSettings } from './mcp-view.tsx'
 import { SkillInstall } from './skill-install.tsx'
 import { loadSettings, reduceSettings, settingsDraft, settingsState } from './state.ts'
 
-type SettingsSection = 'appearance' | 'network' | 'agent' | 'mcp' | 'about'
+/** The rail. Credentials appear only when Host exposes the read call, so a store-less host shows no entry. */
+function sections(props: { readonly client?: PanelSettingsClient }): readonly SettingsSection[] {
+  return props.client?.readCredentials === undefined
+    ? ['appearance', 'network', 'agent', 'mcp', 'about']
+    : ['appearance', 'network', 'agent', 'mcp', 'credentials', 'about']
+}
+
+type SettingsSection = 'appearance' | 'network' | 'agent' | 'mcp' | 'credentials' | 'about'
 
 /**
  * Settings form. Hidden when Host exposes no config client. No route string lives here.
@@ -110,12 +118,13 @@ export function PanelSettings(props: {
       </header>
       <div className="flex min-h-0 flex-1">
         <nav className="flex w-36 shrink-0 flex-col gap-1 border-r bg-card p-3">
-          {(['appearance', 'network', 'agent', 'mcp', 'about'] as const).map(id => (
+          {sections(props).map(id => (
             <button key={id} type="button" className="rounded-lg px-2 py-1.5 text-left text-sm data-[on=1]:bg-muted data-[on=1]:font-medium" data-nav={id} data-on={section === id ? '1' : '0'} onClick={() => setSection(id)}>{label(`section-${id}`)}</button>
           ))}
         </nav>
         <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
           {section === 'mcp' ? <McpSettings client={client} locale={labelLocale} mode={props.mode} /> : null}
+          {section === 'credentials' ? <CredentialSettings client={client} locale={labelLocale} mode={props.mode} /> : null}
           {section === 'appearance' ? (<>
             <section className="mb-6">
               <h4>{label('section-appearance')}</h4>

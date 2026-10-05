@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-09-28
+updated: 2026-10-03
 ---
 
 # Identity, storage, state, credentials, config, log, signal
@@ -33,9 +33,9 @@ Layer: [App contract](README.md). Index: [features.md](../features.md).
 - `ctx.config.theme` is `light`, `dark`, or `system`. `system` stays a preference. `ctx.config.llm` is `{ provider, model }` or `null`, mirroring the runtime provider's model default.
 - Failure: a non-JSON `set` emits `storage-not-json`. A corrupt database file is quarantined and the call emits `storage-corrupt`. It is never replaced with an empty database. A schema stamp from another layout emits `storage-version` and leaves the file in place. SQL against `kv`, or a statement that leaves the file, emits `storage-forbidden`. A SQLite error emits `storage-sql`. Using `query` for a write, or `run` for a read, emits `storage-statement`. A result over the injected row cap emits `storage-too-large`. The cap is host policy and is not locked. A missing credential name is `undefined`; the app shows an empty state and does not invent a second name. An empty name emits `credential-invalid`. A credential file that cannot be read emits `credential-unreadable` and is not rewritten. Callers match the code. Codes: [implementation.md](../implementation.md).
 - `ctx.log` appends one JSON object per line under `apps/<appId>/logs/`. The active name is `app.log`. Snapshots and file listings skip `logs`, so history does not commit it. A line is written whole. When the active file plus that line would pass the host segment size, the file is sealed first. A line longer than the segment is still one whole line in its own file. Past the host byte cap, the oldest sealed file is deleted and the newest file stays. A write does not read the log. The cap and the segment size are host policy and are not locked. There is no log table in the app database and no panel log viewer.
-- Non-goals: a second database file; an engine argument; a credential editor in the panel; app-declared secrets; blocking writes when the file is large.
+- Non-goals: a second database file; an engine argument; app-declared secrets; blocking writes when the file is large. An app reads a named secret; it cannot list or write one.
 
 ## Implementation
 
 
-Role: definition for the ctx fields. Host provides storage, config, and `ctx.log`. `createHostLog` appends one JSON line to `apps/<appId>/logs/app.log`. It seals the active file before a line would cross it, and deletes the oldest sealed file past the cap. A write does not read the log. `logs` is in the snapshot skip table. Shell injects a credential provider. `ctx.credentials` exposes `get` only. The author lists names through `mini_app_credential_list`. The SQLite file is the committed record. Quarantine renames the corrupt file and fails the call. It does not create a replacement. Plan: [implementation.md](../implementation.md).
+Role: definition for the ctx fields. Host provides storage, config, and `ctx.log`. The credential provider is one interface with a write side; `ctx.credentials` projects `get` alone. `createHostLog` appends one JSON line to `apps/<appId>/logs/app.log`. It seals the active file before a line would cross it, and deletes the oldest sealed file past the cap. A write does not read the log. `logs` is in the snapshot skip table. Shell injects a credential provider. `ctx.credentials` exposes `get` only. The author lists names through `mini_app_credential_list`. The SQLite file is the committed record. Quarantine renames the corrupt file and fails the call. It does not create a replacement. Plan: [implementation.md](../implementation.md).

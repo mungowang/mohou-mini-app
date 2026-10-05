@@ -1,6 +1,8 @@
 import type { McpClient } from '@mohou/mcp-client'
 import type { RuntimeProvider } from '@mohou/runtime-provider'
 
+import type { CredentialProvider } from '../credentials/provider.ts'
+
 import { listedApp, type AppSummary } from '../apps/registry.ts'
 import { readActivity } from '../host/activity.ts'
 import { historyBounds } from '../history/store.ts'
@@ -17,6 +19,8 @@ import { checkPackageUpdate, stagePackageUpdate } from './updates.ts'
 import { McpError } from '@mohou/mcp-client'
 
 import { admitMcpText } from '../host/mcp-import.ts'
+import { CredentialError } from '../credentials/codes.ts'
+import { mcpReferenceSources, type McpLoadFailure } from '../host/mcp.ts'
 import { checkMcpEditor, readMcpEditor, readMcpImport, writeMcpEditor } from '../host/mcp-editor.ts'
 import { readAuthorMcp, revealAuthorMcp, writeAuthorMcp, type AuthorMcpLayout } from '../host/author-mcp.ts'
 import { readAuthorSkill, revealAuthorSkill, writeAuthorSkill, type AuthorSkillLayout } from '../host/author-skill.ts'
@@ -60,6 +64,11 @@ export function bindLoopback(input: {
   readonly vendorDir: string
   readonly runtimeRoot: string
   readonly env: NodeJS.ProcessEnv
+  /** The read port Shell injected. Only names and descriptions reach the panel surface. */
+  readonly credentials: CredentialProvider
+  /** Servers the live client left out: boot's list, replaced by every write. */
+  readonly mcpFailures: () => readonly McpLoadFailure[]
+  readonly recordMcpFailures: (failures: readonly McpLoadFailure[]) => void
   readonly mcpImports?: Readonly<Record<string, string>>
   readonly panel?: LoopbackPorts['panel']
   readonly restart?: () => Promise<void>
@@ -161,17 +170,33 @@ export function bindLoopback(input: {
       writeAuthorMcp: (agentIds, description) => writeAuthorMcp(mcpAgents, agentIds, authoringLive(description)),
       revealAuthorMcp: dest => revealAuthorMcp(mcpAgents, dest),
     },
-    readMcp: () => readMcpEditor(input.runtimeRoot, input.env),
-    writeMcp: async (servers) => {
-      await input.mcp.setServers(await writeMcpEditor(input.runtimeRoot, servers, input.env))
+    readMcp: async () => {
+      return { servers: await readMcpEditor(input.runtimeRoot, input.env), unresolved: input.mcpFailures() }
     },
-    checkMcp: server => checkMcpEditor(server, input.env),
+    writeMcp: async (servers) => {
+      const resolved = await writeMcpEditor(input.runtimeRoot, servers, input.env, mcpReferenceSources(input.env, input.credentials))
+      await input.mcp.setServers(resolved.servers)
+      input.recordMcpFailures(resolved.failures)
+      return { unresolved: resolved.failures }
+    },
+    checkMcp: server => checkMcpEditor(server, input.env, mcpReferenceSources(input.env, input.credentials)),
     admitMcp: text => admitMcpText(text),
     importMcp: (source) => {
       const file = input.mcpImports?.[source]
       if (file === undefined) return Promise.reject(new McpError('config-invalid', `mcp import is unknown: ${source}`))
       return readMcpImport(file)
     },
+    readCredentials: async () => ({ credentials: await input.credentials.list(), writable: input.credentials.writable }),
+    putCredential: async (name, description, secret) => {
+      // A blank field means "keep the stored secret". Host resolves it here: the panel never reads a
+      // secret back, so it has no value to send, and the store stays a store with one write op.
+      const keep = secret === undefined || secret.length === 0 ? await input.credentials.get(name) : secret
+      if (keep === undefined || keep.length === 0) {
+        throw new CredentialError('credential-invalid', `credential has no secret to keep: ${name}`)
+      }
+      await input.credentials.put(name, description, keep)
+    },
+    removeCredential: name => input.credentials.remove(name),
   }
 }
 

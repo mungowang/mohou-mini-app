@@ -45,7 +45,7 @@ export {
   type GalleryState,
 } from './gallery/state.ts'
 export { PanelGallery } from './gallery/view.tsx'
-export type { McpCheckResult, McpServerDraft, PanelAbout, PanelAuthorMcpAgent, PanelAuthorMcpStatus, PanelPolicy, PanelPolicyWrite, PanelProbe, PanelRuntime, PanelSettingsClient, PanelSkillAgent, PanelSkillStatus, PanelUpdateCheck } from './settings/client.ts'
+export type { McpCheckResult, McpServerDraft, PanelAbout, PanelCredential, PanelCredentials, PanelMcpFailure, PanelMcpList, PanelAuthorMcpAgent, PanelAuthorMcpStatus, PanelPolicy, PanelPolicyWrite, PanelProbe, PanelRuntime, PanelSettingsClient, PanelSkillAgent, PanelSkillStatus, PanelUpdateCheck } from './settings/client.ts'
 export { loadSettings, reduceSettings, settingsDraft, settingsState, type SettingsAction, type SettingsState } from './settings/state.ts'
 export { PanelSettings } from './settings/view.tsx'
 export type { HistoryClient, HistoryCommit, HistoryDetail, HistoryFile } from './history/client.ts'

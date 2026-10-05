@@ -9,7 +9,7 @@ import { acceptDiagnostic, DEFAULT_DIAGNOSTIC_MAX_BYTES, diagnosticLayout, type 
 import { httpLayout } from './layout.ts'
 import type { LoopbackPorts } from './ports.ts'
 import { RouteError } from './route-codes.ts'
-import { errorBody, isRecord } from './reply.ts'
+import { authoringDenied, errorBody, isRecord } from './reply.ts'
 
 /** Iframe document, call, platform files, and diagnostic posts. */
 export function mountIframe(app: Hono<HostEnv>, options: {
@@ -48,9 +48,7 @@ export function mountIframe(app: Hono<HostEnv>, options: {
   })
   app.get(`${diagnosticLayout.root}/:appId/${httpLayout.assets}/*`, c => asset(c, ports))
   app.get(`${diagnosticLayout.root}/:appId/${diagnosticLayout.errors}`, (c) => {
-    if (!ports.authorized(c.req.header('authorization'))) {
-      return c.json({ ok: false, error: { code: 'authoring-token', message: 'authoring token is missing or wrong' } }, 401)
-    }
+    if (!ports.authorized(c.req.header('authorization'))) return authoringDenied(c)
     return c.json(ports.readErrors(c.req.param('appId')))
   })
 }

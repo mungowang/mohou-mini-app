@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import { Dialog } from '../ui/dialog.tsx'
-import type { McpCheckResult, McpServerDraft, PanelSettingsClient } from './client.ts'
+import type { McpCheckResult, McpServerDraft, PanelMcpFailure, PanelSettingsClient } from './client.ts'
 
 type Transport = 'stdio' | 'sse' | 'http'
 type CheckMap = Readonly<Record<string, McpCheckResult>>
@@ -44,6 +44,7 @@ export function McpSettings(props: {
 }): ReactNode {
   const label = (key: string) => panelText(props.locale, key, props.mode)
   const [servers, setServers] = useState<McpServerDraft[]>([])
+  const [unresolved, setUnresolved] = useState<readonly PanelMcpFailure[]>([])
   const [draft, setDraft] = useState<Draft | undefined>(undefined)
   const [paste, setPaste] = useState(false)
   const [candidates, setCandidates] = useState<readonly McpServerDraft[] | undefined>(undefined)
@@ -60,18 +61,22 @@ export function McpSettings(props: {
     if (list === undefined || loaded.current) return
     loaded.current = true
     void list().then(
-      listed => setServers([...listed]),
+      (listed) => {
+        setServers([...listed.servers])
+        setUnresolved([...listed.unresolved])
+      },
       () => setLoadFailed(true),
     )
   }, [props.client.listMcp])
   if (props.client.listMcp === undefined) return <p className="text-sm text-muted-foreground">{label('mcp-empty')}</p>
-  const write = (next: readonly McpServerDraft[]) => commit(props.client, next, setServers, setAlert, setNotice, label)
+  const write = (next: readonly McpServerDraft[]) => commit(props.client, next, setServers, setUnresolved, setAlert, setNotice, label)
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="m-0">{label('section-mcp')}</h4>
           {servers.length === 0 ? <p className="mt-1 text-xs text-muted-foreground">{label('mcp-empty')}</p> : null}
+          {unresolved.length === 0 ? null : <p className="mt-1 text-xs text-destructive">{label('mcp-unresolved-hint')}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <button type="button" className="h-8 rounded-lg border bg-card px-3 text-sm" onClick={() => setPaste(true)}>{label('mcp-paste')}</button>
@@ -88,6 +93,7 @@ export function McpSettings(props: {
           <ServerCard
             key={server.id}
             server={server}
+            failure={unresolved.find(item => item.id === server.id)}
             check={checks[server.id]}
             busy={busy === server.id}
             label={label}
@@ -113,7 +119,7 @@ export function McpSettings(props: {
             setQueue([])
           }}
           onSubmit={() => {
-            void saveDraft(props.client, servers, draft, setServers, setAlert, setNotice, label).then((ok) => {
+            void saveDraft(props.client, servers, draft, setServers, setUnresolved, setAlert, setNotice, label).then((ok) => {
               if (!ok) return
               const next = queue[0]
               setQueue(queue.slice(1))
@@ -170,6 +176,8 @@ export function McpSettings(props: {
 function ServerCard(props: {
   readonly server: McpServerDraft
   readonly check: McpCheckResult | undefined
+  /** Set when the last boot left this server out, so the card says why instead of looking live. */
+  readonly failure: PanelMcpFailure | undefined
   readonly busy: boolean
   readonly label: (key: string) => string
   readonly onEdit: () => void
@@ -214,6 +222,9 @@ function ServerCard(props: {
         <button type="button" className="h-7 rounded-md px-2 text-xs hover:bg-muted" onClick={props.onCheck}>{props.busy ? '…' : props.label('mcp-check')}</button>
         <button type="button" className="h-7 rounded-md px-2 text-xs text-destructive hover:bg-muted" onClick={props.onRemove}>{props.label('delete')}</button>
       </div>
+      {props.failure === undefined ? null : (
+        <p className="m-0 text-xs text-destructive">{props.label('mcp-unstarted')}: {props.failure.message}</p>
+      )}
       {props.check !== undefined && props.check.ok !== true ? <p className="text-xs text-destructive">{props.check.message ?? props.label('mcp-offline')}</p> : null}
       {openTool === undefined ? null : (
         <ToolsDialog
@@ -308,11 +319,13 @@ function EditorDialog(props: {
         <label className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
           {props.label('mcp-env')}
           <textarea className="min-h-24 rounded-lg border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none" placeholder={props.label('mcp-env-hint')} value={props.draft.env} onChange={event => set({ env: event.target.value })} />
+          <span className="font-sans text-muted-foreground">{props.label('mcp-reference-hint')}</span>
         </label>
       ) : (
         <label className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
           {props.label('mcp-headers')}
           <textarea className="min-h-24 rounded-lg border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none" placeholder={props.label('mcp-headers-hint')} value={props.draft.headers} onChange={event => set({ headers: event.target.value })} />
+          <span className="font-sans text-muted-foreground">{props.label('mcp-reference-hint')}</span>
         </label>
       )}
       {check === undefined ? null : (
@@ -548,18 +561,20 @@ async function saveDraft(
   servers: readonly McpServerDraft[],
   draft: Draft,
   setServers: (servers: McpServerDraft[]) => void,
+  setUnresolved: (failures: readonly PanelMcpFailure[]) => void,
   setAlert: (alert: 'import' | 'save' | undefined) => void,
   setNotice: (message: string) => void,
   label: (key: string) => string,
 ): Promise<boolean> {
   const next = servers.filter(server => server.id !== draft.editing && server.id !== draft.id.trim()).concat(fromDraft(draft))
-  return commit(client, next, setServers, setAlert, setNotice, label)
+  return commit(client, next, setServers, setUnresolved, setAlert, setNotice, label)
 }
 
 async function commit(
   client: PanelSettingsClient,
   servers: readonly McpServerDraft[],
   setServers: (servers: McpServerDraft[]) => void,
+  setUnresolved: (failures: readonly PanelMcpFailure[]) => void,
   setAlert: (alert: 'import' | 'save' | undefined) => void,
   setNotice: (message: string) => void,
   label: (key: string) => string,
@@ -570,8 +585,10 @@ async function commit(
     return false
   }
   try {
-    await client.writeMcp(servers)
+    const written = await client.writeMcp(servers)
     setServers([...servers])
+    // The write resolved the file: what it left out is the current answer, not boot's.
+    setUnresolved([...written.unresolved])
     setAlert(undefined)
     setNotice(label('mcp-saved'))
     return true

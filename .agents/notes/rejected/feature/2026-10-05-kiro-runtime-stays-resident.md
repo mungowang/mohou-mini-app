@@ -1,10 +1,10 @@
 # Agent Note: Kiro stays resident
 
-Status: proposed
+Status: rejected — ACP still writes a Kiro session record
 
 Product home: [Kiro](../../../docs/product/runtime/kiro.md). That page owns the call. This note owns why.
 
-Supersedes [one process per Kiro call](../../rejected/feature/2026-10-05-kiro-runtime.md).
+Supersedes [one process per Kiro call](2026-10-05-kiro-runtime.md). Superseded by [Kiro needs an in-memory session](../../proposed/feature/2026-10-05-kiro-runtime-needs-memory.md).
 
 ## Problem
 
@@ -44,4 +44,5 @@ An llm session selects a mode with no tools and rejects permission requests. An 
 - No ACP field carries `maxTokens`. Host can reject an out-of-policy caller value and still cannot cap the prompt.
 - The first call still pays for process start. The process dying fails every session on it, and the next call pays for the start again.
 - Kiro may still run only one turn inside the process. That shows up as a failed or stalled overlapping prompt, which this provider does not turn into a queue.
-- `allow_once` depends on the CLI offering that option. A payload that only offers broader allows fails the agent call rather than persisting consent.
+- `allow_once` depends on the CLI offering that option. A payload that only offers broader allows fails the agent call rather than persisting consent. An `allow_always` answer would write a rule the IDE also reads.
+- A session Kiro has already saved can remain the directory's newest `--resume` target when no per-id delete is advertised.

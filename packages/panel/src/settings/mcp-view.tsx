@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import { Dialog } from '../ui/dialog.tsx'
 import type { McpCheckResult, McpServerDraft, PanelMcpFailure, PanelSettingsClient } from './client.ts'
+import { mcpPresets, presetDraft, type McpPreset } from './mcp-presets.ts'
 
 type Transport = 'stdio' | 'sse' | 'http'
 type CheckMap = Readonly<Record<string, McpCheckResult>>
 
-interface Draft {
+export interface Draft {
   readonly id: string
   readonly description: string
   readonly transport: Transport
@@ -88,6 +89,23 @@ export function McpSettings(props: {
           <button type="button" className="h-8 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground" onClick={() => setDraft(emptyDraft)}>{label('mcp-add')}</button>
         </div>
       </div>
+      {props.client.writeMcp === undefined ? null : (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">{label('mcp-quick-add')}</span>
+          {mcpPresets.map(preset => (
+            <button
+              key={preset.id}
+              type="button"
+              data-preset={preset.id}
+              className="h-8 rounded-lg border bg-card px-3 text-sm hover:bg-muted"
+              onClick={() => { void openPreset(props.client, preset, setDraft, setNotice, label) }}
+            >
+              {preset.label}
+            </button>
+          ))}
+          <span className="text-xs text-muted-foreground">{label('mcp-quick-add-help')}</span>
+        </div>
+      )}
       <ul className="grid grid-cols-1 gap-2 min-[720px]:grid-cols-2">
         {servers.map(server => (
           <ServerCard
@@ -582,6 +600,32 @@ function toDraft(server: McpServerDraft): Draft {
     headers: Object.entries(server.headers ?? {}).map(([key, value]) => `${key}=${value}`).join('\n'),
     editing: server.id,
   }
+}
+
+/**
+ * Open the form for one of our own servers, and make the credentials it references exist.
+ * The form is not saved here: the person fills the credentials, checks the server, then saves.
+ */
+async function openPreset(
+  client: PanelSettingsClient,
+  preset: McpPreset,
+  setDraft: (draft: Draft) => void,
+  setNotice: (notice: string) => void,
+  label: (key: string) => string,
+): Promise<void> {
+  setDraft(presetDraft(preset))
+  const put = client.putCredential
+  if (put === undefined) return
+  const created: string[] = []
+  for (const credential of preset.credentials) {
+    try {
+      await put(credential.name, credential.description)
+      created.push(credential.name)
+    } catch {
+      // A credential that cannot be written is not a reason to refuse the form.
+    }
+  }
+  if (created.length > 0) setNotice(`${label('mcp-preset-credentials')} ${created.join(', ')}`)
 }
 
 function fromDraft(draft: Draft): McpServerDraft {

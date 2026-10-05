@@ -2,7 +2,7 @@
 
 Status: rejected — a process per call is too heavy for ctx.llm
 
-Superseded by [Kiro stays resident](../../proposed/feature/2026-10-05-kiro-runtime-stays-resident.md).
+Superseded by [Kiro stays resident](2026-10-05-kiro-runtime-stays-resident.md).
 
 ## Problem
 

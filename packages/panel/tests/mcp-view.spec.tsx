@@ -248,6 +248,46 @@ describe('McpSettings', () => {
     host.remove()
   })
 
+  it('fills the form for one of our servers and creates the credentials it references', async () => {
+    const created: Array<{ name: string; description: string }> = []
+    const client: PanelSettingsClient = {
+      readPolicy: () => Promise.resolve(policy),
+      writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
+      probe: () => Promise.resolve({ healthy: true }),
+      listMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
+      writeMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
+      putCredential: (name, description) => {
+        created.push({ name, description })
+        return Promise.resolve()
+      },
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<McpSettings client={client} locale="en" mode="production" />)
+    })
+    await flush()
+    expect(host.textContent).toContain('Quick add')
+    await act(async () => {
+      host.querySelector('button[data-preset="jira"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    const values = [...host.querySelectorAll('input')].map(input => input.value)
+    expect(values).toContain('jira')
+    expect(values).toContain('npx')
+    expect(values).toContain('-y @mohou/jira-mcp')
+    const env = [...host.querySelectorAll('textarea')].map(area => area.value).join('\n')
+    expect(env).toContain('JIRA_BASE_URL=${credential:JIRA_BASE_URL}')
+    expect(env).toContain('JIRA_PASSWORD=${credential:JIRA_PASSWORD}')
+    // The credentials the form references exist before the person saves the server.
+    expect(created.map(item => item.name)).toEqual(['JIRA_BASE_URL', 'JIRA_USERNAME', 'JIRA_PASSWORD'])
+    expect(host.textContent).toContain('Empty credentials created: JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD')
+    // Nothing is written until the form is saved.
+    await act(async () => { root.unmount() })
+    host.remove()
+  })
+
   it('shows load and import failures, and empty paste', async () => {
     const client: PanelSettingsClient = {
       readPolicy: () => Promise.resolve(policy),

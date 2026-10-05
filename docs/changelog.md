@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.33
+
+Quick add gained a third server: `@kud/mcp-jenkins` as **Jenkins**, with the URL, the user, and the API token as credential references — and the tools that change an instance (create, update, delete, rename, copy, replay, enable, disable, take a node offline, quiet down, restart) blocked in the preset. Asking whether a build is green should not hand over a controller. The preset test is table-driven now, so a row that forgets its credentials or its package fails the suite.
+
 ## 1.0.32
 
 The MCP section offers the two servers this product publishes. **Quick add** fills the form for `@mohou/jira-mcp` or `@mohou/gitlab-mcp` — the command, the arguments, and an `env` of `${credential:NAME}` references — and creates those credentials as empty entries, so the next step is the Credentials section rather than a reference that names nothing. Nothing reaches `mcp.json` until the form is saved.

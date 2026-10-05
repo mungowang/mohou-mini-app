@@ -20,6 +20,26 @@ export interface McpPreset {
   readonly credentials: readonly McpPresetCredential[]
 }
 
+/**
+ * Jenkins tools that change something on the instance. The preset blocks them: a server that can
+ * restart a controller or delete a job does not need that reach to answer "is the build green".
+ */
+const jenkinsBlockedTools = [
+  'jenkins_create_job',
+  'jenkins_update_job_config',
+  'jenkins_delete_job',
+  'jenkins_rename_job',
+  'jenkins_copy_job',
+  'jenkins_delete_build',
+  'jenkins_replay_build',
+  'jenkins_enable_job',
+  'jenkins_disable_job',
+  'jenkins_toggle_node_offline',
+  'jenkins_quiet_down',
+  'jenkins_cancel_quiet_down',
+  'jenkins_safe_restart',
+].join(',')
+
 /** Presets the MCP section offers. Adding one here is all a new server needs. */
 export const mcpPresets: readonly McpPreset[] = [
   {
@@ -37,6 +57,24 @@ export const mcpPresets: readonly McpPreset[] = [
       { name: 'JIRA_BASE_URL', description: 'Jira instance root, for example https://jira.example.com' },
       { name: 'JIRA_USERNAME', description: 'Jira account name' },
       { name: 'JIRA_PASSWORD', description: 'Jira password or API token' },
+    ],
+  },
+  {
+    id: 'jenkins',
+    label: 'Jenkins',
+    description: 'Jenkins jobs, builds, and console output, through @kud/mcp-jenkins',
+    packageName: '@kud/mcp-jenkins',
+    env: {
+      MCP_JENKINS_URL: '${credential:JENKINS_URL}',
+      MCP_JENKINS_USER: '${credential:JENKINS_USERNAME}',
+      MCP_JENKINS_API_TOKEN: '${credential:JENKINS_API_TOKEN}',
+      MCP_JENKINS_TIMEOUT_MS: '30000',
+      MCP_JENKINS_BLOCK_TOOLS: jenkinsBlockedTools,
+    },
+    credentials: [
+      { name: 'JENKINS_URL', description: 'Jenkins root, for example https://jenkins.example.com' },
+      { name: 'JENKINS_USERNAME', description: 'Jenkins user' },
+      { name: 'JENKINS_API_TOKEN', description: 'Jenkins API token' },
     ],
   },
   {

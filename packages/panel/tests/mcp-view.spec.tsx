@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
 
 import type { McpServerDraft, PanelPolicy, PanelSettingsClient } from '../src/settings/client.ts'
+import { mcpPresets } from '../src/settings/mcp-presets.ts'
 import { McpSettings } from '../src/settings/mcp-view.tsx'
 import { PanelSettings } from '../src/settings/view.tsx'
 
@@ -248,44 +249,49 @@ describe('McpSettings', () => {
     host.remove()
   })
 
-  it('fills the form for one of our servers and creates the credentials it references', async () => {
-    const created: Array<{ name: string; description: string }> = []
-    const client: PanelSettingsClient = {
-      readPolicy: () => Promise.resolve(policy),
-      writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
-      probe: () => Promise.resolve({ healthy: true }),
-      listMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
-      writeMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
-      putCredential: (name, description) => {
-        created.push({ name, description })
-        return Promise.resolve()
-      },
+  it('fills a form per preset and creates the credentials each one references', async () => {
+    // Table-driven on purpose: a preset that forgets its credentials or its package fails here.
+    for (const preset of mcpPresets) {
+      const created: Array<{ name: string; description: string }> = []
+      let wrote = 0
+      const client: PanelSettingsClient = {
+        readPolicy: () => Promise.resolve(policy),
+        writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
+        probe: () => Promise.resolve({ healthy: true }),
+        listMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
+        writeMcp: () => {
+          wrote += 1
+          return Promise.resolve({ servers: [], unresolved: [] })
+        },
+        putCredential: (name, description) => {
+          created.push({ name, description })
+          return Promise.resolve()
+        },
+      }
+      const host = document.createElement('div')
+      document.body.append(host)
+      const root = createRoot(host)
+      await act(async () => {
+        root.render(<McpSettings client={client} locale="en" mode="production" />)
+      })
+      await flush()
+      expect(host.textContent).toContain('Quick add')
+      await act(async () => {
+        host.querySelector(`button[data-preset="${preset.id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      await flush()
+      const values = [...host.querySelectorAll('input')].map(input => input.value)
+      expect(values).toContain(preset.id)
+      expect(values).toContain('npx')
+      expect(values).toContain(`-y ${preset.packageName}`)
+      const env = [...host.querySelectorAll('textarea')].map(area => area.value).join('\n')
+      for (const [key, value] of Object.entries(preset.env)) expect(env).toContain(`${key}=${value}`)
+      expect(created.map(item => item.name)).toEqual(preset.credentials.map(credential => credential.name))
+      // The credentials exist before the server is saved, and nothing is written until then.
+      expect(wrote).toBe(0)
+      await act(async () => { root.unmount() })
+      host.remove()
     }
-    const host = document.createElement('div')
-    document.body.append(host)
-    const root = createRoot(host)
-    await act(async () => {
-      root.render(<McpSettings client={client} locale="en" mode="production" />)
-    })
-    await flush()
-    expect(host.textContent).toContain('Quick add')
-    await act(async () => {
-      host.querySelector('button[data-preset="jira"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await flush()
-    const values = [...host.querySelectorAll('input')].map(input => input.value)
-    expect(values).toContain('jira')
-    expect(values).toContain('npx')
-    expect(values).toContain('-y @mohou/jira-mcp')
-    const env = [...host.querySelectorAll('textarea')].map(area => area.value).join('\n')
-    expect(env).toContain('JIRA_BASE_URL=${credential:JIRA_BASE_URL}')
-    expect(env).toContain('JIRA_PASSWORD=${credential:JIRA_PASSWORD}')
-    // The credentials the form references exist before the person saves the server.
-    expect(created.map(item => item.name)).toEqual(['JIRA_BASE_URL', 'JIRA_USERNAME', 'JIRA_PASSWORD'])
-    expect(host.textContent).toContain('Empty credentials created: JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD')
-    // Nothing is written until the form is saved.
-    await act(async () => { root.unmount() })
-    host.remove()
   })
 
   it('shows load and import failures, and empty paste', async () => {

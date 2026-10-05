@@ -182,17 +182,37 @@ export function linkPiPeers(prefix: string, roots: readonly string[]): boolean {
   return linked
 }
 
+/**
+ * Where npm keeps its global packages, or `undefined` when npm cannot say. A missing npm is not an
+ * error: the peer roots already cover the usual layouts.
+ *
+ * The invocation is a named decision because Windows refuses to start a `.cmd` without a shell,
+ * and `npm.cmd` is the only npm there is. A failure is swallowed rather than thrown: "npm could not
+ * run" is not why Pi is unavailable, and reporting it as such replaces the real reason.
+ */
+export function npmRootPlan(
+  node: string,
+  platform: NodeJS.Platform = process.platform,
+): { file: string; args: string[]; shell: boolean } {
+  return {
+    file: path.join(path.dirname(node), platform === 'win32' ? 'npm.cmd' : 'npm'),
+    args: ['root', '-g'],
+    shell: platform === 'win32',
+  }
+}
+
 function npmRootGlobal(env: NodeJS.ProcessEnv): Promise<string | undefined> {
-  const npm = path.join(path.dirname(process.execPath), process.platform === 'win32' ? 'npm.cmd' : 'npm')
-  if (!existsSync(npm)) return Promise.resolve(undefined)
+  const plan = npmRootPlan(process.execPath, process.platform)
+  if (!existsSync(plan.file)) return Promise.resolve(undefined)
   return new Promise((resolve) => {
-    execFile(npm, ['root', '-g'], { env, timeout: 5_000 }, (error, stdout) => {
-      if (error) {
-        resolve(undefined)
-        return
-      }
-      resolve(stdout.split(/\r?\n/).find(line => line.length > 0))
-    })
+    const done = (value: string | undefined) => { resolve(value) }
+    try {
+      execFile(plan.file, plan.args, { env, timeout: 5_000, windowsHide: true, shell: plan.shell }, (error, stdout) => {
+        done(error ? undefined : stdout.split(/\r?\n/).find(line => line.length > 0))
+      })
+    } catch {
+      done(undefined)
+    }
   })
 }
 

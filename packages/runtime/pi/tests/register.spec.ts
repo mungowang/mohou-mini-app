@@ -5,7 +5,7 @@ import path from 'node:path'
 import { createProviderRegistry } from '@mohou/runtime-provider'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createPiLoad, linkPiPeers, peerRoots, piPackage, registerPiRuntime } from '../src/register.ts'
+import { createPiLoad, linkPiPeers, npmRootPlan, peerRoots, piPackage, registerPiRuntime } from '../src/register.ts'
 
 const temps: string[] = []
 
@@ -111,6 +111,18 @@ describe('registerPiRuntime', () => {
     expect(provider.healthy()).toBe(false)
     // The probe shows this text, so it has to name the failure rather than the state.
     expect(provider.reason?.()).toContain('pi is not available')
+  })
+})
+
+describe('npmRootPlan', () => {
+  it('asks the command interpreter for npm on windows and runs it directly elsewhere', () => {
+    // Windows refuses to start a `.cmd` without a shell, which is what `spawn EINVAL` was.
+    const windows = npmRootPlan('/usr/local/bin/node', 'win32')
+    expect(windows?.shell).toBe(true)
+    expect(windows?.file.endsWith('npm.cmd')).toBe(true)
+    const unix = npmRootPlan('/usr/local/bin/node', 'darwin')
+    expect(unix?.shell).toBe(false)
+    expect(unix?.file.endsWith(path.sep + 'npm')).toBe(true)
   })
 })
 

@@ -68,6 +68,8 @@ export interface LoopbackPorts {
   subscribeApp(appId: string, since: number, listener: (event: unknown) => void): () => void
   checkUpdate(): Promise<UpdateCheck>
   installUpdate?(version: string): Promise<void>
+  /** The panel showed the launcher's last attempt. The record is dropped, not shown twice. */
+  ackUpdate?(at: number): Promise<void>
   restart?(): Promise<void>
   authorSkill?: AuthorSkillLayout
   readAuthorSkill?(customDirs?: readonly string[]): Promise<AuthorSkillStatus>

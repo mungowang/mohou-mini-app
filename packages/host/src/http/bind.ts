@@ -15,7 +15,7 @@ import { readVendorFile } from './ports.ts'
 import type { LoopbackPorts } from './ports.ts'
 import { authoringTokenMatches } from './guard.ts'
 import { probeBrain, type HostPolicy } from '../host/config.ts'
-import { checkPackageUpdate, stagePackageUpdate } from './updates.ts'
+import { checkPackageUpdate, discardUpdateResult, readUpdateResult, stagePackageUpdate } from './updates.ts'
 import { McpError } from '@mohou/mcp-client'
 
 import { admitMcpText } from '../host/mcp-import.ts'
@@ -147,7 +147,13 @@ export function bindLoopback(input: {
     subscribeHost: listener => input.author.hostEvents.subscribe(listener),
     subscribeFrames: listener => forwardFrames(input.author.appEvents, listener),
     subscribeApp: (appId, since, listener) => input.author.appEvents.subscribe(appId, since, listener),
-    checkUpdate: () => checkPackageUpdate(),
+    checkUpdate: async () => {
+      const attempt = readUpdateResult(input.runtimeRoot)
+      return {
+        ...await checkPackageUpdate(),
+        ...attempt === undefined ? {} : { lastAttempt: attempt },
+      }
+    },
     installUpdate: (version) => {
       stagePackageUpdate(version)
       if (input.restart === undefined) return Promise.resolve()
@@ -155,6 +161,10 @@ export function bindLoopback(input: {
       setTimeout(() => {
         void restart()
       }, 200)
+      return Promise.resolve()
+    },
+    ackUpdate: (at) => {
+      discardUpdateResult(input.runtimeRoot, at)
       return Promise.resolve()
     },
     ...input.restart === undefined ? {} : { restart: input.restart },

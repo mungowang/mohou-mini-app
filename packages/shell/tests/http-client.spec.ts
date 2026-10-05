@@ -130,7 +130,9 @@ describe('httpPanelClients', () => {
     expect((await client.readSkill?.())?.customs[0]?.dir).toBe('/tmp/skills')
     expect((await client.readAuthorMcp?.())?.agents[0]?.id).toBe('pi')
     expect((await client.listRuntimes?.())?.[0]?.label).toBe('Echo')
-    expect((await client.checkUpdate?.())?.latest).toBeNull()
+    const update = await client.checkUpdate?.()
+    expect(update?.latest).toBeNull()
+    expect(update?.lastAttempt).toEqual({ state: 'failed', code: 'exit', from: '1.0.0', to: '1.1.0', rolledBack: true, exitCode: 2, at: 7 })
     expect((await client.listPalettes?.())?.palettes).toEqual([])
     // Every guarded route presents the panel token, which the client reads from the about block,
     // and a read route presents nothing.
@@ -154,6 +156,19 @@ describe('httpPanelClients', () => {
     expect(credentialRead?.[1].headers?.authorization).toBe('Bearer t')
     const readMcp = calls.find(([url, init]) => String(url).endsWith('/api/mcp-servers') && init.method === 'GET')
     expect(readMcp?.[1].headers?.authorization).toBeUndefined()
+  })
+
+  it('drops a recorded attempt this panel does not understand', async () => {
+    const answer = (lastAttempt: unknown) => vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, name: 'h', current: '1', latest: null, updateAvailable: false, lastAttempt }),
+    }))
+    vi.stubGlobal('fetch', answer({ state: 'failed', code: 'melted', at: 1 }))
+    expect((await httpPanelClients('http://127.0.0.1').checkUpdate?.())?.lastAttempt).toBeUndefined()
+    vi.stubGlobal('fetch', answer({ state: 'failed', at: 1 }))
+    expect((await httpPanelClients('http://127.0.0.1').checkUpdate?.())?.lastAttempt).toBeUndefined()
+    vi.stubGlobal('fetch', answer({ state: 'done', code: 'exit', to: '1.1.0', at: 2 }))
+    expect((await httpPanelClients('http://127.0.0.1').checkUpdate?.())?.lastAttempt).toEqual({ state: 'done', to: '1.1.0', at: 2 })
   })
 
   it('rejects a wire body that is not the panel shape', async () => {
@@ -247,7 +262,17 @@ function dense(url: string): unknown {
   if (url.includes('/author-skill')) return { ok: true, result: { skillId: 's', version: '', agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/x', skillsDir: '/tmp', homePresent: false, installed: false }], customs: [{ dir: '/tmp/skills', dest: '/tmp/skills/s', installed: true, version: '1.0.0', updateAvailable: true }] } }
   if (url.includes('/author-mcp')) return { ok: true, result: { agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/mcp.json', homePresent: false, installed: false, updateAvailable: false }, { id: 'skip' }] } }
   if (url.includes('/runtime-providers')) return { providers: [{ id: 'echo', label: 'Echo', models: [{ provider: 'echo', models: ['m'] }] }] }
-  if (url.endsWith('/api/updates')) return { ok: true, name: 'h', current: '1', latest: null, updateAvailable: false, error: 'x' }
+  if (url.endsWith('/api/updates')) {
+    return {
+      ok: true,
+      name: 'h',
+      current: '1',
+      latest: null,
+      updateAvailable: false,
+      error: 'x',
+      lastAttempt: { state: 'failed', code: 'exit', from: '1.0.0', to: '1.1.0', rolledBack: true, exitCode: 2, at: 7 },
+    }
+  }
   if (url.endsWith('/api/palettes')) return { palettes: [], ignored: [] }
   return { ok: true, result: { servers: [{ id: 'sse', description: 'd', url: 'https://x', transport: 'sse', args: ['a', 1], env: {}, headers: { A: 'b' } }], unresolved: [{ id: 'git', code: 'mcp-reference-unknown', message: 'git env.TOKEN names an unknown credential: nope' }] } }
 }

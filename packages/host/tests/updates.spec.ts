@@ -4,7 +4,8 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { checkPackageUpdate, newestTarball, stagePackageUpdate } from '../src/http/updates.ts'
+import { checkPackageUpdate, discardUpdateResult, newestTarball, readUpdateResult, stagePackageUpdate } from '../src/http/updates.ts'
+import { hostUpdateResultPath } from '../src/host/layout.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -67,7 +68,8 @@ describe('checkPackageUpdate', () => {
     expect(found.channel).toBe('tarball')
     expect(found.installable).toBe(true)
     stagePackageUpdate('1.2.0', {}, root)
-    const staged = JSON.parse(await readFile(join(root, 'update.json'), 'utf8')) as { args: string[] }
+    const staged = JSON.parse(await readFile(join(root, 'update.json'), 'utf8')) as { version: string; args: string[] }
+    expect(staged.version).toBe('1.2.0')
     expect(staged.args[0]).toBe('install')
     expect(staged.args.some(arg => arg.includes('mohou-shell-1.2.0.tgz'))).toBe(true)
     expect(staged.args).toContain('--omit=peer')
@@ -91,5 +93,59 @@ describe('checkPackageUpdate', () => {
     )
     expect(same.channel).toBe('registry')
     expect(same.installable).toBe(true)
+  })
+})
+
+describe('readUpdateResult', () => {
+  it('reads the launcher record and drops one it cannot trust', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-result-'))
+    expect(readUpdateResult(root)).toBeUndefined()
+    await writeFile(hostUpdateResultPath(root), `${JSON.stringify({
+      state: 'failed',
+      code: 'exit',
+      from: '1.0.16',
+      to: '1.0.17',
+      rolledBack: true,
+      exitCode: 1,
+      log: '/tmp/update.log',
+      at: 1_759_000_000_000,
+    })}\n`)
+    expect(readUpdateResult(root)).toEqual({
+      state: 'failed',
+      code: 'exit',
+      from: '1.0.16',
+      to: '1.0.17',
+      rolledBack: true,
+      exitCode: 1,
+      log: '/tmp/update.log',
+      at: 1_759_000_000_000,
+    })
+    await writeFile(hostUpdateResultPath(root), `${JSON.stringify({
+      state: 'done',
+      to: '1.0.17',
+      at: 1_759_000_000_001,
+    })}\n`)
+    expect(readUpdateResult(root)).toEqual({ state: 'done', to: '1.0.17', at: 1_759_000_000_001 })
+    for (const broken of [
+      'not json',
+      JSON.stringify({ state: 'failed', code: 'unknown', at: 1 }),
+      JSON.stringify({ state: 'failed', at: 1 }),
+      JSON.stringify({ state: 'done' }),
+      JSON.stringify({ state: 'done', at: 'now' }),
+      JSON.stringify([]),
+    ]) {
+      await writeFile(hostUpdateResultPath(root), broken)
+      expect(readUpdateResult(root)).toBeUndefined()
+    }
+  })
+
+  it('drops the record the panel showed and keeps a newer one', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-ack-'))
+    await writeFile(hostUpdateResultPath(root), JSON.stringify({ state: 'done', to: '1.0.17', at: 5 }))
+    discardUpdateResult(root, 4)
+    expect(readUpdateResult(root)).toEqual({ state: 'done', to: '1.0.17', at: 5 })
+    discardUpdateResult(root, 5)
+    expect(readUpdateResult(root)).toBeUndefined()
+    discardUpdateResult(root, 5)
   })
 })

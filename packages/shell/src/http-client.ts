@@ -1,5 +1,6 @@
 import { appsResource, httpLayout } from '@mohou/host/http'
 import {
+  panelUpdateFailureCodes,
   PanelClientError,
   type GalleryApp,
   type HistoryClient,
@@ -13,7 +14,9 @@ import {
   type PanelRuntime,
   type PanelAuthorMcpStatus,
   type PanelSkillStatus,
+  type PanelUpdateAttempt,
   type PanelUpdateCheck,
+  type PanelUpdateFailureCode,
   type McpCheckResult,
   type McpServerDraft,
   type PanelCredential,
@@ -58,6 +61,7 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
     revealAuthorMcp: dest => postOk(origin, httpLayout.authorMcpReveal, { dest }),
     checkUpdate: async () => updateCheck(await getJson(origin, httpLayout.updates)),
     installUpdate: async (version) => { await sendJson(origin, 'POST', httpLayout.updateInstall, { version }, true) },
+    ackUpdate: async (at) => { await sendJson(origin, 'POST', httpLayout.updateAck, { at }) },
     restartHost: async () => { await sendJson(origin, 'POST', httpLayout.restart, {}, true) },
     listRuntimes: async () => arrayOf((await getJson(origin, httpLayout.providers)).providers, runtimeOf),
     readCredentials: async () => {
@@ -530,6 +534,7 @@ function authorMcpAgent(value: unknown): PanelAuthorMcpStatus['agents'] {
 }
 
 function updateCheck(value: Record<string, unknown>): PanelUpdateCheck {
+  const attempt = updateAttempt(value.lastAttempt)
   return {
     name: text(value.name),
     current: text(value.current),
@@ -538,5 +543,40 @@ function updateCheck(value: Record<string, unknown>): PanelUpdateCheck {
     ...value.channel === 'registry' || value.channel === 'tarball' ? { channel: value.channel } : {},
     ...value.installable === true ? { installable: true } : {},
     ...typeof value.error === 'string' ? { error: value.error } : {},
+    ...attempt === undefined ? {} : { lastAttempt: attempt },
   }
+}
+
+/** The launcher's record crosses the wire as unknown JSON. A code this panel does not know reads as no record. */
+function updateAttempt(value: unknown): PanelUpdateAttempt | undefined {
+  const row = record(value)
+  const at = row.at
+  if (typeof at !== 'number' || !Number.isFinite(at)) return undefined
+  const from = updateVersion(row.from)
+  const to = updateVersion(row.to)
+  if (row.state === 'done') {
+    return {
+      state: 'done',
+      at,
+      ...from === undefined ? {} : { from },
+      ...to === undefined ? {} : { to },
+    }
+  }
+  if (row.state !== 'failed') return undefined
+  const code = row.code
+  if (typeof code !== 'string' || !(panelUpdateFailureCodes as readonly string[]).includes(code)) return undefined
+  return {
+    state: 'failed',
+    code: code as PanelUpdateFailureCode,
+    rolledBack: row.rolledBack === true,
+    at,
+    ...from === undefined ? {} : { from },
+    ...to === undefined ? {} : { to },
+    ...typeof row.exitCode === 'number' && Number.isFinite(row.exitCode) ? { exitCode: row.exitCode } : {},
+    ...typeof row.log === 'string' && row.log.length > 0 ? { log: row.log } : {},
+  }
+}
+
+function updateVersion(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }

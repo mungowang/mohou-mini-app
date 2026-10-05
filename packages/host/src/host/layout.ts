@@ -11,6 +11,8 @@ export const hostLayout = {
   logs: 'logs',
   appLog: 'app.log',
   activity: 'activity.json',
+  /** The launcher records the outcome of an install here. The panel shows it once. */
+  updateResult: 'update-result.json',
 } as const
 
 export function hostConfigPath(runtimeRoot: string): string {
@@ -36,6 +38,11 @@ export function hostMcpPath(runtimeRoot: string): string {
 /** Usage on this machine. Not source history. */
 export function hostActivityPath(runtimeRoot: string): string {
   return path.join(runtimeRoot, hostLayout.activity)
+}
+
+/** The launcher's record of the last install. Absent until an install has run. */
+export function hostUpdateResultPath(runtimeRoot: string): string {
+  return path.join(runtimeRoot, hostLayout.updateResult)
 }
 
 /** Active app log. It sits at `apps/<appId>/logs/app.log`. */

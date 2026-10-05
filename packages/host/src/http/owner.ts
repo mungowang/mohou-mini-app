@@ -62,6 +62,20 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
       await ports.installUpdate(version)
     })
   })
+  app.post(httpLayout.updateAck, async (c) => {
+    if (ports.ackUpdate === undefined) {
+      return c.json({ ok: false, error: { code: 'config-invalid', message: 'update acknowledgement is not available' } }, 400)
+    }
+    const body = await readBody(c)
+    const at = isRecord(body) && typeof body.at === 'number' ? body.at : undefined
+    if (at === undefined) {
+      return c.json({ ok: false, error: { code: 'config-invalid', message: 'attempt time is required' } }, 400)
+    }
+    return ok(c, () => {
+      if (ports.ackUpdate === undefined) throw new Error('update acknowledgement is not available')
+      return ports.ackUpdate(at)
+    })
+  })
   app.get(httpLayout.providers, async c => c.json({ providers: await providerList(ports) }))
   app.post(httpLayout.activate, (c) => {
     const denied = rejectWithoutToken(c, ports)

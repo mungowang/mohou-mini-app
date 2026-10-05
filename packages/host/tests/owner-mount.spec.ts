@@ -60,6 +60,7 @@ function basePorts(extra: Record<string, unknown> = {}): LoopbackPorts {
     subscribeFrames: () => () => undefined,
     subscribeApp: () => () => undefined,
     checkUpdate: async () => ({ name: 'Mohou', current: '1.0.0', latest: '1.0.0', updateAvailable: false }),
+    ackUpdate: async () => undefined,
     readMcp: async () => ({ servers: [], unresolved: [] }),
     writeMcp: async () => undefined,
     checkMcp: async () => ({ ok: true, tools: [] }),
@@ -137,6 +138,19 @@ describe('mountOwner', () => {
     })
     expect(noRemoveName.status).toBe(400)
     expect(JSON.parse(noRemoveName.body)).toMatchObject({ error: { code: 'credential-invalid' } })
+  })
+
+  it('acknowledges the launcher record by attempt time', async () => {
+    const app = new Hono<HostEnv>()
+    const acked: number[] = []
+    mountOwner(app, basePorts({ ackUpdate: async (at: number) => { acked.push(at) } }))
+    const body = { method: 'POST', headers: { 'content-type': 'application/json' } }
+    const missing = await request(app, httpLayout.updateAck, { ...body, body: JSON.stringify({}) })
+    expect(missing.status).toBe(400)
+    expect(JSON.parse(missing.body)).toMatchObject({ error: { code: 'config-invalid' } })
+    const answered = await request(app, httpLayout.updateAck, { ...body, body: JSON.stringify({ at: 7 }) })
+    expect(answered.status).toBe(200)
+    expect(acked).toEqual([7])
   })
 
   it('refuses every guarded route without the authoring token', async () => {

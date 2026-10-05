@@ -7,7 +7,7 @@ import { PanelHistory } from '../history/view.tsx'
 import type { HistoryClient } from '../history/client.ts'
 import { isPanelLocale, panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import type { PanelPolicy, PanelSettingsClient, PanelUpdateCheck } from '../settings/client.ts'
-import { Dialog } from '../ui/dialog.tsx'
+import { attemptCard, UpdateDialog, type UpdateCard } from '../settings/update-dialog.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { PanelSettings } from '../settings/view.tsx'
 import type { StorageClient } from '../storage/client.ts'
@@ -48,16 +48,13 @@ export function PanelSurface(props: {
   const [desk, setDesk] = useState<string | undefined>(undefined)
   const [hostPolicy, setHostPolicy] = useState<PanelPolicy | undefined>(undefined)
   const [chromeLocale, setChromeLocale] = useState<PanelLocale>(props.locale)
-  const [updateOffer, setUpdateOffer] = useState<PanelUpdateCheck | undefined>(undefined)
-  const [updateBusy, setUpdateBusy] = useState(false)
-  const [updateFailed, setUpdateFailed] = useState(false)
+  const [updateCard, setUpdateCard] = useState<UpdateCard | undefined>(undefined)
   useEffect(() => {
     const check = props.settings?.checkUpdate
     if (check === undefined) return
     void check().then((result) => {
-      if (!result.updateAvailable || result.installable !== true || result.latest === null) return
-      if (sessionStorage.getItem('mini-app.update-dismissed') === result.latest) return
-      setUpdateOffer(result)
+      const card = receiveUpdate(result, props.settings)
+      if (card !== undefined) setUpdateCard(card)
     }, () => undefined)
   }, [props.settings])
   useEffect(() => {
@@ -142,7 +139,10 @@ export function PanelSurface(props: {
                 onCardStyle={chrome.setCard}
                 client={props.settings}
                 onPreviewLocale={setChromeLocale}
-                onUpdateOffer={setUpdateOffer}
+                onUpdateOffer={(result) => {
+                  const card = receiveUpdate(result, props.settings)
+                  if (card !== undefined) setUpdateCard(card)
+                }}
                 onPolicy={(policy) => {
                   setDesk(policy.defaultWorkbenchId)
                   setHostPolicy(policy)
@@ -179,35 +179,29 @@ export function PanelSurface(props: {
               />
             </div>
           ) : null}
-          {updateOffer?.latest == null ? null : (
-            <div className="fixed inset-0 z-50">
-              <Dialog width="sm" onClose={() => {
-                if (updateOffer.latest !== null) sessionStorage.setItem('mini-app.update-dismissed', updateOffer.latest)
-                setUpdateOffer(undefined)
-                setUpdateFailed(false)
-              }}>
-                <h3 className="m-0 text-base font-semibold">{label('update-install')}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{updateBusy ? label('update-installing') : label('update-install-confirm').replace('{n}', updateOffer.latest)}</p>
-                {updateFailed ? <p className="mt-2 text-sm text-destructive">{label('update-install-failed')}</p> : null}
-                <div className="mt-4 flex justify-end gap-2">
-                  <button type="button" className="h-8 rounded-lg border px-3 text-sm" disabled={updateBusy} onClick={() => {
-                    if (updateOffer.latest !== null) sessionStorage.setItem('mini-app.update-dismissed', updateOffer.latest)
-                    setUpdateOffer(undefined)
-                  }}>{label('cancel')}</button>
-                  <button type="button" className="h-8 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60" disabled={updateBusy || props.settings?.installUpdate === undefined} onClick={() => {
-                    const install = props.settings?.installUpdate
-                    const version = updateOffer.latest
-                    if (install === undefined || version === null) return
-                    setUpdateBusy(true)
-                    setUpdateFailed(false)
-                    void install(version).then(() => undefined, () => {
-                      setUpdateFailed(true)
-                      setUpdateBusy(false)
-                    })
-                  }}>{label('update-install')}</button>
-                </div>
-              </Dialog>
-            </div>
+          {updateCard === undefined ? null : (
+            <UpdateDialog
+              locale={chromeLocale}
+              mode={props.mode}
+              card={updateCard}
+              onClose={() => {
+                if (updateCard.kind === 'offer') sessionStorage.setItem(updateDismissedKey, updateCard.latest)
+                setUpdateCard(undefined)
+              }}
+              onInstall={(version) => {
+                const install = props.settings?.installUpdate
+                if (install === undefined) return
+                setUpdateCard({ kind: 'installing', version, startedAt: Date.now() })
+                void install(version).then(() => undefined, (error: unknown) => {
+                  const detail = error instanceof Error ? error.message : ''
+                  setUpdateCard({
+                    kind: 'failed',
+                    reason: detail.length === 0 ? { text: label('update-install-failed') } : { text: detail },
+                    target: version,
+                  })
+                })
+              }}
+            />
           )}
         </>
       )}
@@ -230,4 +224,32 @@ async function writeDefault(
   const next: PanelPolicy = { ...rest, defaultWorkbenchId: id }
   const written = await settings.writePolicy(next)
   setDesk(written.policy.defaultWorkbenchId)
+}
+
+/** An offer the owner put away stays away for this window. */
+const updateDismissedKey = 'mini-app.update-dismissed'
+
+/**
+ * The card one check opens, if any. A recorded outcome outranks a fresh offer, and the host is told
+ * it was shown, so the next check does not open it again.
+ * @param check - the registry check, with the launcher's last attempt when one is on disk
+ * @param settings - the client the acknowledgement goes to
+ */
+function receiveUpdate(check: PanelUpdateCheck, settings: PanelSettingsClient | undefined): UpdateCard | undefined {
+  const attempt = check.lastAttempt
+  if (attempt === undefined) return offerCard(check)
+  const ack = settings?.ackUpdate
+  if (ack !== undefined) void ack(attempt.at).catch(() => undefined)
+  return attemptCard(attempt, check.current)
+}
+
+function offerCard(check: PanelUpdateCheck): UpdateCard | undefined {
+  if (!check.updateAvailable || check.installable !== true || check.latest === null) return undefined
+  if (sessionStorage.getItem(updateDismissedKey) === check.latest) return undefined
+  return {
+    kind: 'offer',
+    current: check.current,
+    latest: check.latest,
+    ...check.channel === undefined ? {} : { channel: check.channel },
+  }
 }

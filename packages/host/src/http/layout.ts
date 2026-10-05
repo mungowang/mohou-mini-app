@@ -12,6 +12,7 @@ export const httpLayout = {
   about: '/api/about',
   updates: '/api/updates',
   updateInstall: '/api/updates/install',
+  updateAck: '/api/updates/ack',
   providers: '/api/runtime-providers',
   activate: '/api/runtime-providers/activate',
   probe: '/api/runtime-providers/probe',

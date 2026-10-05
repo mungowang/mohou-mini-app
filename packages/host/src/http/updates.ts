@@ -1,9 +1,36 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 
-import { homePackagesDir } from '../host/layout.ts'
+import { homePackagesDir, hostUpdateResultPath } from '../host/layout.ts'
 import { aboutInfo } from './ports.ts'
+
+/** Why an install did not finish. The panel owns the wording of each code. */
+export const updateFailureCodes = ['timeout', 'exit', 'prepare', 'closed', 'leftover', 'verify', 'boot'] as const
+
+export type UpdateFailureCode = (typeof updateFailureCodes)[number]
+
+/**
+ * What the launcher recorded about the last install. `from` is the version that was running
+ * when the attempt started, and `at` is epoch milliseconds.
+ */
+export type UpdateAttempt =
+  | {
+    readonly state: 'done'
+    readonly from?: string
+    readonly to?: string
+    readonly at: number
+  }
+  | {
+    readonly state: 'failed'
+    readonly code: UpdateFailureCode
+    readonly from?: string
+    readonly to?: string
+    readonly rolledBack: boolean
+    readonly exitCode?: number
+    readonly log?: string
+    readonly at: number
+  }
 
 export interface UpdateCheck {
   readonly name: string
@@ -13,6 +40,8 @@ export interface UpdateCheck {
   readonly channel?: 'registry' | 'tarball'
   readonly installable?: boolean
   readonly error?: string
+  /** The last install this machine recorded, when one is on disk. */
+  readonly lastAttempt?: UpdateAttempt
 }
 
 interface PrefixUpdate {
@@ -66,17 +95,46 @@ export async function checkPackageUpdate(
   }
 }
 
+/**
+ * Read the launcher's record of the last install. A missing, unreadable, or malformed file reads as
+ * no attempt: the panel shows nothing rather than a guessed outcome.
+ * @param runtimeRoot - the directory the launcher and Host share
+ */
+export function readUpdateResult(runtimeRoot: string): UpdateAttempt | undefined {
+  let text: string
+  try {
+    text = readFileSync(hostUpdateResultPath(runtimeRoot), 'utf8')
+  } catch {
+    return undefined
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return undefined
+  }
+  return admitUpdateAttempt(value)
+}
+
+/**
+ * Forget the record the panel just showed. `at` names the attempt, so a newer one survives.
+ * @param runtimeRoot - the directory the launcher and Host share
+ * @param at - epoch milliseconds of the attempt the panel displayed
+ */
+export function discardUpdateResult(runtimeRoot: string, at: number): void {
+  const current = readUpdateResult(runtimeRoot)
+  if (current === undefined || current.at !== at) return
+  rmSync(hostUpdateResultPath(runtimeRoot), { force: true })
+}
+
 /** Write `update.json` for the launcher to run after this process exits. */
 export function stagePackageUpdate(version: string, env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): void {
   const prefix = readPrefixUpdate(cwd, env)
   if (prefix === undefined) throw new Error('update install needs an app prefix')
-  if (prefix.channel === 'tarball') {
-    const args = tarballInstallArgs(prefix, version)
-    writeFileSync(path.join(prefix.dir, 'update.json'), `${JSON.stringify({ args })}\n`)
-    return
-  }
-  const args = ['install', `@mohou/shell@${version}`, ...installFlags(), '--registry', prefix.registry ?? 'https://registry.npmjs.org']
-  writeFileSync(path.join(prefix.dir, 'update.json'), `${JSON.stringify({ args })}\n`)
+  const args = prefix.channel === 'tarball'
+    ? tarballInstallArgs(prefix, version)
+    : ['install', `@mohou/shell@${version}`, ...installFlags(), '--registry', prefix.registry ?? 'https://registry.npmjs.org']
+  writeFileSync(path.join(prefix.dir, 'update.json'), `${JSON.stringify({ version, args })}\n`)
 }
 
 function installFlags(): string[] {
@@ -120,6 +178,46 @@ function compareVersion(left: string, right: string): number {
     if (av !== bv) return av > bv ? 1 : -1
   }
   return 0
+}
+
+/** The value a launcher writes. Untrusted at this boundary: a bad shape reads as no attempt. */
+function admitUpdateAttempt(value: unknown): UpdateAttempt | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.at !== 'number' || !Number.isFinite(row.at)) return undefined
+  const from = updateVersion(row.from)
+  const to = updateVersion(row.to)
+  if (row.state === 'done') {
+    return {
+      state: 'done',
+      at: row.at,
+      ...from === undefined ? {} : { from },
+      ...to === undefined ? {} : { to },
+    }
+  }
+  if (row.state !== 'failed') return undefined
+  const code = updateFailureCode(row.code)
+  if (code === undefined) return undefined
+  return {
+    state: 'failed',
+    code,
+    rolledBack: row.rolledBack === true,
+    at: row.at,
+    ...from === undefined ? {} : { from },
+    ...to === undefined ? {} : { to },
+    ...typeof row.exitCode === 'number' && Number.isFinite(row.exitCode) ? { exitCode: row.exitCode } : {},
+    ...typeof row.log === 'string' && row.log.length > 0 ? { log: row.log } : {},
+  }
+}
+
+function updateVersion(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function updateFailureCode(value: unknown): UpdateFailureCode | undefined {
+  return typeof value === 'string' && (updateFailureCodes as readonly string[]).includes(value)
+    ? value as UpdateFailureCode
+    : undefined
 }
 
 function readPrefixUpdate(cwd: string, env: NodeJS.ProcessEnv): PrefixUpdate | undefined {

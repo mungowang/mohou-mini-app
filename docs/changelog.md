@@ -7,6 +7,12 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.18
+
+An update says what it is doing and how it ended. The card that offers a version now also carries the install: it counts the wait up, says the window will restart and not to close it, and after the restart names the outcome — the version now running, or why the attempt did not finish and the version it fell back to, with the install log beside it. Before this, the offer was one line and every failure was one sentence, or on Windows nothing at all.
+
+The launcher writes one record per attempt, and the panel reads it once and acknowledges it. A failed install reports a closed reason — the budget ran out, the installer exited with a code, the prefix was not ready, the window closed, or an earlier attempt was left behind — instead of leaving the reason in a log that the next attempt truncated.
+
 ## 1.0.17
 
 A credential's description can be edited on its own. The stored secret never leaves the store, so the edit form leaves the secret field empty and saving it that way keeps the value that is already there; a new credential still needs one. Nothing reads a secret back to the panel to make this work: the host asks the store for the value it is about to keep.

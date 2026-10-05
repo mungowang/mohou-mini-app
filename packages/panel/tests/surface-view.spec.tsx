@@ -249,24 +249,127 @@ it('asks to install an update found on open', async () => {
       settings={{
         ...settings(),
         checkUpdate: () => Promise.resolve(offer),
-        installUpdate: () => Promise.reject(new Error('no')),
+        installUpdate: () => pending(),
       }}
     />)
   })
   await act(async () => { await Promise.resolve() })
-  expect(host.textContent).toContain('Install 1.1.0 and restart the host?')
+  expect(host.textContent).toContain('Update available')
   await act(async () => {
     ;[...host.querySelectorAll('button')].find(button => button.textContent === 'Install update')?.click()
     await Promise.resolve()
   })
-  expect(host.textContent).toContain('The update could not be installed.')
-  await act(async () => {
-    ;[...host.querySelectorAll('button')].find(button => button.textContent === 'Cancel')?.click()
-  })
-  expect(host.textContent).not.toContain('Install 1.1.0')
-  expect(sessionStorage.getItem('mini-app.update-dismissed')).toBe('1.1.0')
+  expect(host.textContent).toContain('Installing 1.1.0')
+  expect(host.textContent).toContain('0:00 elapsed')
   root.unmount()
+
+  const refused = document.createElement('div')
+  document.body.append(refused)
+  const second = createRoot(refused)
+  await act(async () => {
+    second.render(<PanelSurface
+      client={client()}
+      locale="en"
+      mode="production"
+      shell="standalone"
+      settings={{
+        ...settings(),
+        checkUpdate: () => Promise.resolve(offer),
+        installUpdate: () => Promise.reject(new Error('update install needs an app prefix')),
+      }}
+    />)
+  })
+  await act(async () => { await Promise.resolve() })
+  await act(async () => {
+    ;[...refused.querySelectorAll('button')].find(button => button.textContent === 'Install update')?.click()
+    await Promise.resolve()
+  })
+  expect(refused.textContent).toContain('The update did not finish')
+  expect(refused.textContent).toContain('update install needs an app prefix')
+  await act(async () => {
+    ;[...refused.querySelectorAll('button')].find(button => button.textContent === 'Close')?.click()
+  })
+  expect(refused.textContent).not.toContain('The update did not finish')
+  second.unmount()
   host.remove()
+  refused.remove()
+})
+
+it('shows the outcome the launcher recorded, acknowledges it, and offers again after that', async () => {
+  sessionStorage.clear()
+  const acked: number[] = []
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const check = {
+    name: '@mohou/shell',
+    current: '1.0.16',
+    latest: '1.0.17',
+    updateAvailable: true,
+    installable: true,
+    lastAttempt: {
+      state: 'failed' as const,
+      code: 'timeout' as const,
+      from: '1.0.16',
+      to: '1.0.17',
+      rolledBack: true,
+      log: '/tmp/update.log',
+      at: 1_000,
+    },
+  }
+  await act(async () => {
+    root.render(<PanelSurface
+      client={client()}
+      locale="en"
+      mode="production"
+      shell="standalone"
+      settings={{
+        ...settings(),
+        checkUpdate: () => Promise.resolve(check),
+        ackUpdate: (at) => { acked.push(at); return Promise.resolve() },
+      }}
+    />)
+  })
+  const offerOnly = {
+    name: '@mohou/shell',
+    current: '1.0.16',
+    latest: '1.0.17',
+    updateAvailable: true,
+    installable: true,
+  }
+  await act(async () => { await Promise.resolve() })
+  expect(host.textContent).toContain('The update did not finish')
+  expect(host.textContent).toContain('The install ran past two minutes.')
+  expect(host.textContent).toContain('Back on 1.0.16, still running.')
+  expect(host.textContent).not.toContain('Update available')
+  expect(acked).toEqual([1_000])
+  root.unmount()
+
+  const again = document.createElement('div')
+  document.body.append(again)
+  const next = createRoot(again)
+  await act(async () => {
+    next.render(<PanelSurface
+      client={client()}
+      locale="en"
+      mode="production"
+      shell="standalone"
+      settings={{
+        ...settings(),
+        checkUpdate: () => Promise.resolve(offerOnly),
+      }}
+    />)
+  })
+  await act(async () => { await Promise.resolve() })
+  expect(again.textContent).not.toContain('The update did not finish')
+  expect(again.textContent).toContain('Update available')
+  await act(async () => {
+    ;[...again.querySelectorAll('button')].find(button => button.textContent === 'Cancel')?.click()
+  })
+  expect(sessionStorage.getItem('mini-app.update-dismissed')).toBe('1.0.17')
+  next.unmount()
+  host.remove()
+  again.remove()
 })
 
 function pending<T>(): Promise<T> {

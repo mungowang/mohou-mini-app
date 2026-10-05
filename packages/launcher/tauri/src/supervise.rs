@@ -606,6 +606,75 @@ fn update_snapshot_dir(prefix: &Path) -> PathBuf {
     prefix.join("update-snapshot")
 }
 
+/// The panel reads this after the restart. Host owns the reader and the closed code set.
+const UPDATE_RESULT_FILE: &str = "update-result.json";
+
+/// What the panel shows after the restart. Every attempt ends in exactly one of these.
+pub enum UpdateOutcome<'a> {
+    Done { from: Option<&'a str>, to: Option<&'a str> },
+    Failed {
+        code: &'a str,
+        from: Option<&'a str>,
+        to: Option<&'a str>,
+        rolled_back: bool,
+        exit_code: Option<i32>,
+    },
+}
+
+/// The product version this prefix would start. The panel shows it as the version running now.
+fn installed_version(prefix: &Path) -> Option<String> {
+    let text = fs::read_to_string(prefix.join("node_modules/@mohou/shell/package.json")).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    value.get("version")?.as_str().map(str::to_string)
+}
+
+fn epoch_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Best effort. A record that cannot be written does not change how an install ends.
+fn write_update_result(runtime: &Path, log: &Path, outcome: &UpdateOutcome<'_>) {
+    let _ = fs::create_dir_all(runtime);
+    let body = update_result_body(log, outcome);
+    let _ = fs::write(runtime.join(UPDATE_RESULT_FILE), format!("{body}\n"));
+}
+
+fn update_result_body(log: &Path, outcome: &UpdateOutcome<'_>) -> serde_json::Value {
+    let mut record = serde_json::json!({ "at": epoch_millis(), "log": log.display().to_string() });
+    let object = match record.as_object_mut() {
+        Some(object) => object,
+        None => return record,
+    };
+    match outcome {
+        UpdateOutcome::Done { from, to } => {
+            object.insert("state".to_string(), serde_json::json!("done"));
+            insert_version(object, "from", *from);
+            insert_version(object, "to", *to);
+        }
+        UpdateOutcome::Failed { code, from, to, rolled_back, exit_code } => {
+            object.insert("state".to_string(), serde_json::json!("failed"));
+            object.insert("code".to_string(), serde_json::json!(code));
+            object.insert("rolledBack".to_string(), serde_json::json!(rolled_back));
+            insert_version(object, "from", *from);
+            insert_version(object, "to", *to);
+            if let Some(code) = exit_code {
+                object.insert("exitCode".to_string(), serde_json::json!(code));
+            }
+        }
+    }
+    record
+}
+
+fn insert_version(object: &mut serde_json::Map<String, serde_json::Value>, key: &str, value: Option<&str>) {
+    let version = value.filter(|item| !item.is_empty());
+    if let Some(version) = version {
+        object.insert(key.to_string(), serde_json::json!(version));
+    }
+}
+
 enum InstallWait {
     Finished(Option<i32>),
     TimedOut,
@@ -675,13 +744,20 @@ fn stop_locked_install(prefix: &Path) {
 }
 
 /// A file left by a dead process must not install, and must not block open.
-fn park_leftover_update(prefix: &Path, gui: bool) {
+fn park_leftover_update(prefix: &Path, runtime: &Path, gui: bool) {
     stop_locked_install(prefix);
     restore_update_snapshot(prefix);
     if !update_request(prefix).is_file() {
         return;
     }
     quarantine_update(prefix, "left by a previous process");
+    write_update_result(runtime, &prefix.join("update.log"), &UpdateOutcome::Failed {
+        code: "leftover",
+        from: installed_version(prefix).as_deref(),
+        to: None,
+        rolled_back: true,
+        exit_code: None,
+    });
     tell_user_later(
         "The previous update did not finish. Mohou opened the installed version.",
         gui,
@@ -704,7 +780,7 @@ fn wait_budget(child: &mut Child, budget: Duration, closing: &AtomicBool) -> Ins
 }
 
 /// Sidecar exit 75 in this process is the only install. Failure boots the prefix as it was.
-fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &AtomicU32, app: &AppHandle) {
+fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &AtomicBool, pid: &AtomicU32, app: &AppHandle) {
     let path = update_request(prefix);
     let Ok(text) = fs::read_to_string(&path) else {
         return;
@@ -716,6 +792,10 @@ fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &At
             return;
         }
     };
+    let target = value.get("version").and_then(|item| item.as_str()).map(str::to_string);
+    let from = installed_version(prefix);
+    let log_path = prefix.join("update.log");
+    let record = |outcome: &UpdateOutcome<'_>| write_update_result(runtime, &log_path, outcome);
     let Some(args) = value.get("args").and_then(|item| item.as_array()) else {
         let _ = fs::remove_file(&path);
         return;
@@ -729,30 +809,58 @@ fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &At
         Ok((launch, _)) => launch,
         Err(message) => {
             quarantine_update(prefix, &message);
+            record(&UpdateOutcome::Failed {
+                code: "prepare",
+                from: from.as_deref(),
+                to: target.as_deref(),
+                rolled_back: true,
+                exit_code: None,
+            });
             tell_user_later(&message, gui);
             return;
         }
     };
     if !save_update_snapshot(prefix) {
         quarantine_update(prefix, "could not snapshot the prefix manifest");
+        record(&UpdateOutcome::Failed {
+            code: "prepare",
+            from: from.as_deref(),
+            to: target.as_deref(),
+            rolled_back: true,
+            exit_code: None,
+        });
         tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
         return;
     }
     let args = harden_install_args(args);
-    let log = match fs::File::create(prefix.join("update.log")) {
+    let out = match fs::File::create(&log_path) {
         Ok(file) => file,
         Err(error) => {
             restore_update_snapshot(prefix);
             quarantine_update(prefix, &error.to_string());
+            write_update_result(runtime, &log_path, &UpdateOutcome::Failed {
+                code: "prepare",
+                from: from.as_deref(),
+                to: target.as_deref(),
+                rolled_back: true,
+                exit_code: None,
+            });
             tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
             return;
         }
     };
-    let log_err = match log.try_clone() {
+    let err = match out.try_clone() {
         Ok(file) => file,
         Err(error) => {
             restore_update_snapshot(prefix);
             quarantine_update(prefix, &error.to_string());
+            write_update_result(runtime, &log_path, &UpdateOutcome::Failed {
+                code: "prepare",
+                from: from.as_deref(),
+                to: target.as_deref(),
+                rolled_back: true,
+                exit_code: None,
+            });
             tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
             return;
         }
@@ -762,8 +870,8 @@ fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &At
         .current_dir(prefix)
         .env("PATH", &launch.path)
         .stdin(Stdio::null())
-        .stdout(Stdio::from(log))
-        .stderr(Stdio::from(log_err));
+        .stdout(Stdio::from(out))
+        .stderr(Stdio::from(err));
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -774,6 +882,13 @@ fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &At
         Err(error) => {
             restore_update_snapshot(prefix);
             quarantine_update(prefix, &error.to_string());
+            write_update_result(runtime, &log_path, &UpdateOutcome::Failed {
+                code: "prepare",
+                from: from.as_deref(),
+                to: target.as_deref(),
+                rolled_back: true,
+                exit_code: None,
+            });
             tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
             return;
         }
@@ -789,6 +904,10 @@ fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &At
         InstallWait::Finished(Some(0)) => {
             let _ = fs::remove_dir_all(update_snapshot_dir(prefix));
             let _ = fs::remove_file(&path);
+            write_update_result(runtime, &log_path, &UpdateOutcome::Done {
+                from: from.as_deref(),
+                to: target.as_deref(),
+            });
         }
         other => {
             stop_process(install_pid);
@@ -800,6 +919,20 @@ fn apply_pending_update(prefix: &Path, gui: bool, closing: &AtomicBool, pid: &At
                 InstallWait::Finished(code) => format!("exit {code:?}"),
             };
             quarantine_update(prefix, &note);
+            write_update_result(runtime, &log_path, &UpdateOutcome::Failed {
+                code: match other {
+                    InstallWait::TimedOut => "timeout",
+                    InstallWait::Closed => "closed",
+                    InstallWait::Finished(_) => "exit",
+                },
+                from: from.as_deref(),
+                to: target.as_deref(),
+                rolled_back: true,
+                exit_code: match other {
+                    InstallWait::Finished(code) => code,
+                    InstallWait::TimedOut | InstallWait::Closed => None,
+                },
+            });
             if !matches!(other, InstallWait::Closed) {
                 tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
             }
@@ -858,12 +991,12 @@ pub fn supervise(
             app.exit(0);
             return;
         }
+        let runtime = runtime_dir(&prefix, std::env::var("MINI_APP_RUNTIME").ok().as_deref(), &home_dir());
         if install_after_restart {
-            let runtime = runtime_dir(&prefix, std::env::var("MINI_APP_RUNTIME").ok().as_deref(), &home_dir());
             set_splash(&app, &runtime, Splash::Update);
-            apply_pending_update(&prefix, gui, &closing, &pid, &app);
+            apply_pending_update(&prefix, &runtime, gui, &closing, &pid, &app);
         } else {
-            park_leftover_update(&prefix, gui);
+            park_leftover_update(&prefix, &runtime, gui);
         }
         if closing.load(Ordering::SeqCst) {
             app.exit(0);
@@ -951,9 +1084,69 @@ pub fn supervise(
 
 #[cfg(test)]
 mod tests {
-    use super::{child_stop, find_node, harden_install_args, is_app_bundle, npm_bin, path_from_shell_env, prefix_from_exe, prepend_path, read_shell_cache, restore_update_snapshot, runtime_dir, save_update_snapshot, shell_entry, splash_label, update_snapshot_dir, write_shell_cache, ChildStop, Splash, RESTART_EXIT};
+    use super::{child_stop, find_node, harden_install_args, installed_version, is_app_bundle, npm_bin, path_from_shell_env, prefix_from_exe, prepend_path, read_shell_cache, restore_update_snapshot, runtime_dir, save_update_snapshot, shell_entry, splash_label, update_result_body, update_snapshot_dir, write_shell_cache, write_update_result, ChildStop, Splash, UpdateOutcome, RESTART_EXIT};
     use std::fs;
     use std::path::Path;
+
+    #[test]
+    fn a_result_record_carries_the_code_and_the_versions() {
+        let log = Path::new("/tmp/prefix/update.log");
+        let failed = update_result_body(log, &UpdateOutcome::Failed {
+            code: "exit",
+            from: Some("1.0.16"),
+            to: Some("1.0.17"),
+            rolled_back: true,
+            exit_code: Some(1),
+        });
+        assert_eq!(failed["state"], "failed");
+        assert_eq!(failed["code"], "exit");
+        assert_eq!(failed["from"], "1.0.16");
+        assert_eq!(failed["to"], "1.0.17");
+        assert_eq!(failed["rolledBack"], true);
+        assert_eq!(failed["exitCode"], 1);
+        assert_eq!(failed["log"], "/tmp/prefix/update.log");
+        assert!(failed["at"].as_u64().unwrap() > 0);
+
+        let timed_out = update_result_body(log, &UpdateOutcome::Failed {
+            code: "timeout",
+            from: None,
+            to: None,
+            rolled_back: true,
+            exit_code: None,
+        });
+        assert!(timed_out.get("exitCode").is_none());
+        assert!(timed_out.get("from").is_none());
+        assert!(timed_out.get("to").is_none());
+
+        let done = update_result_body(log, &UpdateOutcome::Done { from: Some("1.0.16"), to: Some("1.0.17") });
+        assert_eq!(done["state"], "done");
+        assert!(done.get("code").is_none());
+        assert!(done.get("rolledBack").is_none());
+    }
+
+    #[test]
+    fn a_result_record_lands_where_the_host_reads_it() {
+        let root = std::env::temp_dir().join(format!("mohou-result-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        write_update_result(&root, Path::new("/tmp/update.log"), &UpdateOutcome::Done { from: Some("1.0.16"), to: Some("1.0.17") });
+        let text = fs::read_to_string(root.join("update-result.json")).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(value["state"], "done");
+        assert_eq!(value["to"], "1.0.17");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_installed_version_comes_from_the_shell_manifest() {
+        let root = std::env::temp_dir().join(format!("mohou-version-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let shell = root.join("node_modules/@mohou/shell");
+        fs::create_dir_all(&shell).unwrap();
+        fs::write(shell.join("package.json"), "{\"name\":\"@mohou/shell\",\"version\":\"1.0.17\"}\n").unwrap();
+        assert_eq!(installed_version(&root).as_deref(), Some("1.0.17"));
+        let _ = fs::remove_dir_all(&root);
+        assert!(installed_version(&root).is_none());
+    }
 
     #[test]
     fn restart_code_is_75_and_a_signal_exits() {

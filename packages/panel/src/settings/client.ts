@@ -70,6 +70,33 @@ export interface PanelAbout {
   }
 }
 
+/** Why an install did not finish. Closed: the panel owns the wording of each code. */
+export const panelUpdateFailureCodes = ['timeout', 'exit', 'prepare', 'closed', 'leftover', 'verify', 'boot'] as const
+
+export type PanelUpdateFailureCode = (typeof panelUpdateFailureCodes)[number]
+
+/**
+ * What the launcher recorded about the last install, in the runtime root.
+ * `from` is the version that was running when the attempt started, and `at` is epoch milliseconds.
+ */
+export type PanelUpdateAttempt =
+  | {
+    readonly state: 'done'
+    readonly from?: string
+    readonly to?: string
+    readonly at: number
+  }
+  | {
+    readonly state: 'failed'
+    readonly code: PanelUpdateFailureCode
+    readonly from?: string
+    readonly to?: string
+    readonly rolledBack: boolean
+    readonly exitCode?: number
+    readonly log?: string
+    readonly at: number
+  }
+
 /** One registry check. `latest` is missing when the registry did not answer. */
 export interface PanelUpdateCheck {
   readonly name: string
@@ -79,6 +106,8 @@ export interface PanelUpdateCheck {
   readonly channel?: 'registry' | 'tarball'
   readonly installable?: boolean
   readonly error?: string
+  /** The last install this machine recorded, when one is on disk. The panel shows it once. */
+  readonly lastAttempt?: PanelUpdateAttempt
 }
 
 /** One registered brain and the vendor/model pairs it publishes. */
@@ -96,6 +125,8 @@ export interface PanelSettingsClient {
   readAbout?(): Promise<PanelAbout>
   checkUpdate?(): Promise<PanelUpdateCheck>
   installUpdate?(version: string): Promise<void>
+  /** Tell Host the launcher's last attempt was shown, so the next check does not open it again. */
+  ackUpdate?(at: number): Promise<void>
   restartHost?(): Promise<void>
   listRuntimes?(): Promise<readonly PanelRuntime[]>
   readSkill?(customDirs?: readonly string[]): Promise<PanelSkillStatus>

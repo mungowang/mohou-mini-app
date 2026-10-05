@@ -13,6 +13,7 @@ import { CredentialSettings } from './credentials-view.tsx'
 import { McpSettings } from './mcp-view.tsx'
 import { SkillInstall } from './skill-install.tsx'
 import { registryChoice, updateRegistryPresets } from './form.ts'
+import { SamplesInstall } from './samples-install.tsx'
 import { loadSettings, reduceSettings, settingsDraft, settingsState } from './state.ts'
 
 /** The rail. Credentials appear only when Host exposes the read call, so a store-less host shows no entry. */
@@ -288,6 +289,12 @@ export function PanelSettings(props: {
               {...client.readAuthorMcp === undefined ? {} : { readAuthorMcp: client.readAuthorMcp }}
               {...client.installAuthorMcp === undefined ? {} : { installAuthorMcp: client.installAuthorMcp }}
               {...client.revealAuthorMcp === undefined ? {} : { revealAuthorMcp: client.revealAuthorMcp }}
+            />
+          ) : null}
+          {section === 'agent' ? (
+            <SamplesInstall
+              label={label}
+              {...client.installSamples === undefined ? {} : { installSamples: client.installSamples }}
             />
           ) : null}
           {section === 'about' ? (

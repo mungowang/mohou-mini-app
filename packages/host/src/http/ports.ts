@@ -12,6 +12,7 @@ import type { McpCheck, McpEditorServer } from '../host/mcp-editor.ts'
 import type { McpLoadFailure } from '../host/mcp.ts'
 import type { AppPin } from '../theme/pin.ts'
 import type { UpdateCheck, UpdateSource } from './updates.ts'
+import type { StartupSampleInstall } from '../apps/startup-seed.ts'
 
 const require = createRequire(import.meta.url)
 
@@ -39,6 +40,8 @@ export interface LoopbackPorts {
   readPolicy(): HostPolicy
   writePolicy(raw: unknown): Promise<{ policy: HostPolicy; restartRequired: boolean }>
   probe(id: string): ReturnType<typeof probeBrain>
+  /** Install the sample apps this product ships that this library does not have. */
+  installSamples(): Promise<StartupSampleInstall>
   providers: readonly RuntimeProvider[]
   listPalettes(): Promise<unknown>
   readPin(appId: string): Promise<AppPin>

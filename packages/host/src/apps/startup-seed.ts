@@ -17,6 +17,11 @@ export const startupSamples = [
   { template: 'lab', appId: 'com.mohou.lab', fallbackName: '模型实验台' },
 ] as const
 
+export interface StartupSampleInstall {
+  readonly installed: readonly string[]
+  readonly skipped: readonly string[]
+}
+
 export type StartupSeedResult =
   | { readonly kind: 'seeded'; readonly appIds: readonly string[] }
   | { readonly kind: 'skipped'; readonly reason: 'marked' | 'has-apps' | 'no-template' }
@@ -94,4 +99,39 @@ async function present(file: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Install the samples that are missing from this library, and leave every app that is already
+ * there alone. The startup seed runs once per runtime root; this is the same content on demand,
+ * for a library that already has apps or has been seeded before.
+ * @param runtimeRoot - host runtime root
+ * @param skillSource - author skill directory that contains `templates/`
+ */
+export async function installStartupSamples(
+  runtimeRoot: string,
+  skillSource?: string,
+): Promise<StartupSampleInstall> {
+  const appsDir = hostAppsDir(runtimeRoot)
+  await mkdir(appsDir, { recursive: true })
+  const installed: string[] = []
+  const skipped: string[] = []
+  for (const sample of startupSamples) {
+    const dest = path.join(appsDir, sample.appId)
+    if (await present(path.join(dest, 'manifest.json'))) {
+      skipped.push(sample.appId)
+      continue
+    }
+    const templateDir = skillSource === undefined || skillSource.length === 0
+      ? undefined
+      : path.join(skillSource, 'templates', sample.template)
+    if (templateDir === undefined || !(await present(path.join(templateDir, 'manifest.json')))) {
+      skipped.push(sample.appId)
+      continue
+    }
+    await cp(templateDir, dest, { recursive: true })
+    await rewriteManifestId(path.join(dest, 'manifest.json'), sample.appId, sample.fallbackName)
+    installed.push(sample.appId)
+  }
+  return { installed, skipped }
 }

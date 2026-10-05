@@ -15,6 +15,7 @@ import { readVendorFile } from './ports.ts'
 import type { LoopbackPorts } from './ports.ts'
 import { authoringTokenMatches } from './guard.ts'
 import { probeBrain, type HostPolicy } from '../host/config.ts'
+import { installStartupSamples } from '../apps/startup-seed.ts'
 import { checkPackageUpdate, discardUpdateResult, readUpdateResult, readUpdateSource, stagePackageUpdate, updateEnv } from './updates.ts'
 import { McpError } from '@mohou/mcp-client'
 
@@ -115,6 +116,7 @@ export function bindLoopback(input: {
     readPolicy: () => input.policy(),
     writePolicy: raw => input.writePolicy(raw),
     probe: id => input.probe(id),
+    installSamples: () => installStartupSamples(input.runtimeRoot, input.authorSkill?.source),
     providers: input.providers,
     listPalettes: () => input.owner.themes.listPalettes(),
     readPin: appId => input.owner.themes.readPin(appId),

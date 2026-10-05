@@ -11,6 +11,7 @@ import {
   type PanelPolicyWrite,
   type PanelAbout,
   type PanelProbe,
+  type PanelSamples,
   type PanelRuntime,
   type PanelAuthorMcpStatus,
   type PanelSkillStatus,
@@ -45,6 +46,10 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
         policy: publicPolicy(result.policy),
         restartRequired: result.restartRequired === true,
       } satisfies PanelPolicyWrite
+    },
+    installSamples: async () => {
+      const body = await sendJson(origin, 'POST', httpLayout.sampleApps, {}, true)
+      return samplesOf(resultOf(body))
     },
     probe: async (id) => {
       const body = await sendJson(origin, 'POST', httpLayout.probe, { id }, true)
@@ -146,6 +151,14 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
 
 function resultOf(body: Record<string, unknown>): Record<string, unknown> {
   return record(body.result)
+}
+
+function samplesOf(value: unknown): PanelSamples {
+  const row = record(value)
+  return {
+    installed: Array.isArray(row.installed) ? row.installed.filter((item): item is string => typeof item === 'string') : [],
+    skipped: Array.isArray(row.skipped) ? row.skipped.filter((item): item is string => typeof item === 'string') : [],
+  }
 }
 
 function probeOf(value: unknown): PanelProbe {

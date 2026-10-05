@@ -99,6 +99,11 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
       return ports.readAuthorSkill(customDirs)
     })
   })
+  app.post(httpLayout.sampleApps, async (c) => {
+    const denied = rejectWithoutToken(c, ports)
+    if (denied !== undefined) return denied
+    return ok(c, () => ports.installSamples())
+  })
   app.post(httpLayout.authorSkill, async (c) => {
     const denied = rejectWithoutToken(c, ports)
     if (denied !== undefined) return denied

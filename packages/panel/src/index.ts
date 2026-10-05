@@ -45,7 +45,30 @@ export {
   type GalleryState,
 } from './gallery/state.ts'
 export { PanelGallery } from './gallery/view.tsx'
-export { panelUpdateFailureCodes, type McpCheckResult, type McpServerDraft, type PanelAbout, type PanelCredential, type PanelCredentials, type PanelMcpFailure, type PanelMcpList, type PanelAuthorMcpAgent, type PanelAuthorMcpStatus, type PanelPolicy, type PanelPolicyWrite, type PanelProbe, type PanelRuntime, type PanelSettingsClient, type PanelSkillAgent, type PanelSkillStatus, type PanelUpdateAttempt, type PanelUpdateCheck, type PanelUpdateFailureCode, type PanelUpdateSource } from './settings/client.ts'
+export { panelUpdateFailureCodes } from './settings/client.ts'
+export type {
+  McpCheckResult,
+  McpServerDraft,
+  PanelAbout,
+  PanelAuthorMcpAgent,
+  PanelAuthorMcpStatus,
+  PanelCredential,
+  PanelCredentials,
+  PanelMcpFailure,
+  PanelMcpList,
+  PanelPolicy,
+  PanelPolicyWrite,
+  PanelProbe,
+  PanelRuntime,
+  PanelSamples,
+  PanelSettingsClient,
+  PanelSkillAgent,
+  PanelSkillStatus,
+  PanelUpdateAttempt,
+  PanelUpdateCheck,
+  PanelUpdateFailureCode,
+  PanelUpdateSource,
+} from './settings/client.ts'
 export { loadSettings, reduceSettings, settingsDraft, settingsState, type SettingsAction, type SettingsState } from './settings/state.ts'
 export { PanelSettings } from './settings/view.tsx'
 export type { HistoryClient, HistoryCommit, HistoryDetail, HistoryFile } from './history/client.ts'

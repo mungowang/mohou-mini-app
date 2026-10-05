@@ -9,6 +9,8 @@ This page owns released version notes. The product version is the `version` fiel
 
 ## 1.0.34
 
+Settings can install the sample apps on demand. The startup samples are seeded once per runtime root, so a library that already had apps — or was seeded before the workbench existed — never received it. Settings → Agent now has one button that asks Host for the samples this library is missing, and reports how many it installed and how many were already there. Nothing present is replaced, and the app the owner edited stays theirs.
+
 A stdio MCP server that closed before it answered reported `MCP error -32000: Connection closed`, and nothing else — the same message for a package npm could not fetch, a rejected token, and a crash at startup. The server's stderr was piped and never read. A failed start now carries its last words, capped and with secrets masked, into the message the check shows, so the next failure names its cause instead of its symptom.
 
 ## 1.0.33

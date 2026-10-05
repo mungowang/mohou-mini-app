@@ -18,6 +18,7 @@ export const httpLayout = {
   probe: '/api/runtime-providers/probe',
   restart: '/api/restart',
   authorSkill: '/api/author-skill',
+  sampleApps: '/api/sample-apps',
   authorSkillReveal: '/api/author-skill/reveal',
   authorMcp: '/api/author-mcp',
   authorMcpReveal: '/api/author-mcp/reveal',

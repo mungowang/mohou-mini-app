@@ -153,6 +153,8 @@ export interface PanelSettingsClient {
   installAuthorMcp?(agentIds: readonly string[], description: string): Promise<PanelAuthorMcpStatus>
   revealAuthorMcp?(dest: string): Promise<void>
   /** Names, descriptions, and whether the store accepts a write. A secret never crosses this. */
+  /** Install the sample apps this product ships that this library does not have. */
+  installSamples?(): Promise<PanelSamples>
   readCredentials?(): Promise<PanelCredentials>
   /**
    * Save one account. An omitted secret keeps the one already stored, which is how the form edits a
@@ -169,6 +171,12 @@ export interface PanelSettingsClient {
 }
 
 /** One stored account, as the editor lists it. No secret: values are write-only. */
+/** What an explicit sample install did: the ids it copied, and the ones already there. */
+export interface PanelSamples {
+  readonly installed: readonly string[]
+  readonly skipped: readonly string[]
+}
+
 export interface PanelCredential {
   readonly name: string
   readonly description: string

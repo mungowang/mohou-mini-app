@@ -25,11 +25,12 @@ async function writeTemplate(skill: string, name: string, id: string, title: str
 }
 
 describe('ensureRuntimeAppsLayout', () => {
-  it('seeds today and board from skill templates once on an empty runtime', async () => {
+  it('seeds every startup sample from the skill templates once on an empty runtime', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-seed-'))
     const skill = await mkdtemp(join(tmpdir(), 'mma-skill-'))
     await writeTemplate(skill, 'today', 'com.example.today', '今日台子')
     await writeTemplate(skill, 'board', 'com.example.board', '阶段看板')
+    await writeTemplate(skill, 'lab', 'com.example.lab', '实验台')
 
     const first = await ensureRuntimeAppsLayout(root, skill)
     expect(first.kind).toBe('seeded')

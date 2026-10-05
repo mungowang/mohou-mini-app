@@ -8,11 +8,13 @@ export const startupSeedMarker = '.startup-seed'
 
 /**
  * Skill facades copied into an empty library.
- * `today` = personal home; `board` = second card so glass featured layout has company.
+ * `today` = personal home; `board` = second card so glass featured layout has company;
+ * `lab` = the model workbench, whose MCP tab names the two servers the MCP section adds.
  */
 export const startupSamples = [
   { template: 'today', appId: 'com.mohou.today', fallbackName: '今日待办' },
   { template: 'board', appId: 'com.mohou.board', fallbackName: 'Board' },
+  { template: 'lab', appId: 'com.mohou.lab', fallbackName: '模型实验台' },
 ] as const
 
 export type StartupSeedResult =

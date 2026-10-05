@@ -14,6 +14,7 @@ Looks (style recipes, not apps) live in [`../references/looks/`](../references/l
 | [runner](./runner/) | the UI *is* the run | Multi-step model work | `ctx.agent` + `streamCall`. terminal |
 | [chores](./chores/) | named buttons, no model | One button on this machine | `ctx.bash` → stdout in `Terminal`. Not a prompt. |
 | [watch](./watch/) | numbers move by themselves | Live status, stop when hidden | `ctx.system.metrics()` + polling that stops when hidden. tape. **Reveal** |
+| [lab](./lab/) | I drive a model or an MCP tool, once, and keep the record | Model workbench, MCP tool picker, a run log | `ctx.llm` vs `ctx.agent` + `ctx.mcp` in one app; a catalog of MCP servers in `shared/mcp.ts`; a run table in SQLite. No Look. |
 | [workbench](./workbench/) | a custom homepage | What to see first, and how other apps are entered | `kind: "workbench"`, `ctx.workbench`. Any layout. This sample is one homepage: a queue and a rail. No Look. |
 
 ## Templates that need a library

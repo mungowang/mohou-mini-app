@@ -1,0 +1,15 @@
+{
+  "id": "com.mohou.lab",
+  "name": "模型实验台",
+  "description": "测 LLM、Agent 和 MCP：流式输出 + 执行步骤跟踪 + 运行记录",
+  "version": "0.1.0",
+  "entry": "ui.tsx",
+  "acronym": "MT",
+  "tags": [
+    "llm",
+    "agent",
+    "mcp",
+    "devtools",
+    "testing"
+  ]
+}

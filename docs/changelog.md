@@ -7,6 +7,12 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.32
+
+The MCP section offers the two servers this product publishes. **Quick add** fills the form for `@mohou/jira-mcp` or `@mohou/gitlab-mcp` — the command, the arguments, and an `env` of `${credential:NAME}` references — and creates those credentials as empty entries, so the next step is the Credentials section rather than a reference that names nothing. Nothing reaches `mcp.json` until the form is saved.
+
+A new install also opens with the model workbench. It joins the two startup samples the skill already seeds (`today`, `board`), so a library shows what the product can do before anything is authored: one app drives Pi's `llm`, `agent`, and MCP calls and keeps a run log in SQLite. Its MCP tab names the same two servers Quick add creates, which is the loop closing.
+
 ## 1.0.31
 
 Settings listed Pi's built-in providers only, so a model from an extension — a Kiro proxy, a hosted gateway — never appeared, and selecting a name from that list could only have ended in `unknown-model`. The list was built from a bare `ModelRuntime`, which never loads the user's extensions, and loading them is what applies the providers and virtual models they register. Pi is opened through its own cwd-bound services now, on both the listing and the running path, so what Settings offers is what a run can select.

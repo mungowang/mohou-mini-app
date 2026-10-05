@@ -1,0 +1,46 @@
+/* name: 玻璃岛屿 */
+/* Look-owned palette: the identity is hue (haze grey-blue light / deep indigo dark) plus a large
+   radius, because liquid glass only reads on big panes. Omit this file to follow the host
+   palette instead — the layout does not depend on these values. */
+:root[data-mode="light"] {
+  --bg: #d5e0ed;
+  --fg: #243044;
+  --surface: #ffffff;
+  --surface-fg: #243044;
+  --border: #c2d0e0;
+  --muted: #c8d5e6;
+  --muted-fg: #5a6b80;
+  --primary: #6b8ab8;
+  --primary-fg: #ffffff;
+  --secondary: #d0dbe8;
+  --secondary-fg: #243044;
+  --accent: #e4ebf4;
+  --accent-fg: #243044;
+  --destructive: #c63f4f;
+  --destructive-fg: #ffffff;
+  --ring: #6b8ab8;
+  --input: #b8c8da;
+  --radius: 28px;
+  --shadow: rgba(60, 85, 120, 0.18);
+}
+:root[data-mode="dark"] {
+  --bg: #0e1128;
+  --fg: #e9edff;
+  --surface: #21264c;
+  --surface-fg: #e9edff;
+  --border: #2e3566;
+  --muted: #1d2046;
+  --muted-fg: #a3b0e6;
+  --primary: #8b94fa;
+  --primary-fg: #12142c;
+  --secondary: #232757;
+  --secondary-fg: #e9edff;
+  --accent: #1d2046;
+  --accent-fg: #e9edff;
+  --destructive: #f97066;
+  --destructive-fg: #20120d;
+  --ring: #8b94fa;
+  --input: #2e3566;
+  --radius: 28px;
+  --shadow: rgba(0, 4, 24, 0.66);
+}

@@ -118,8 +118,16 @@ fn open_window(
     Ok(window)
 }
 
+/// Before Shell prints the loopback origin, its own assets are the only thing the window may
+/// open. Tauri serves those as `tauri://localhost` on macOS and as the wry workaround
+/// `http://tauri.localhost` (or `https://`) on Windows, so a scheme test alone denies the
+/// splash on Windows and the window is white until the panel arrives.
 fn boot_navigation(url: &Url) -> bool {
-    !matches!(url.scheme(), "http" | "https" | "mailto" | "ftp")
+    if url.scheme() == "tauri" {
+        return true;
+    }
+    matches!(url.scheme(), "http" | "https")
+        && url.host_str().is_some_and(|host| host == "tauri.localhost")
 }
 
 /// The window may open only the loopback origin Shell started. No path, query, or fragment.
@@ -200,8 +208,23 @@ fn open_outside(url: &Url) {
 
 #[cfg(test)]
 mod tests {
-    use super::{admit_origin, classify_leave, same_origin, Leave};
+    use super::{admit_origin, boot_navigation, classify_leave, same_origin, Leave};
     use url::Url;
+
+    #[test]
+    fn admits_the_splash_assets_and_nothing_else_before_the_origin() {
+        let url = |text: &str| Url::parse(text).expect("a url");
+        // The splash, on macOS and on Windows.
+        assert!(boot_navigation(&url("tauri://localhost/index.html")));
+        assert!(boot_navigation(&url("http://tauri.localhost/index.html")));
+        assert!(boot_navigation(&url("https://tauri.localhost/")));
+        // Everything else waits for the loopback origin.
+        assert!(!boot_navigation(&url("http://127.0.0.1:9743/")));
+        assert!(!boot_navigation(&url("https://example.com/")));
+        assert!(!boot_navigation(&url("http://tauri.localhost.example.com/")));
+        assert!(!boot_navigation(&url("mailto:someone@example.com")));
+        assert!(!boot_navigation(&url("ftp://example.com/")));
+    }
 
     #[test]
     fn admits_a_loopback_origin_only() {

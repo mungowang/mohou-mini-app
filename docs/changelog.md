@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.27
+
+The splash never appeared on Windows: the window opened white and stayed white until the panel arrived. The pre-origin navigation guard admitted the window's own assets by scheme, and Tauri serves them as `tauri://localhost` on macOS but as the wry workaround `http://tauri.localhost` on Windows — so the splash was admitted on one platform and denied on the other. The guard names that origin on either scheme now, and still refuses everything else until Shell prints the loopback origin. The splash also no longer enters from `opacity: 0` with `fill-mode: both`, so an animation that does not run cannot hide it.
+
 ## 1.0.26
 
 A Windows launch showed three console windows: two that flashed and one that stayed, titled with a Node path, empty, and fatal to close — closing it killed the sidecar and took the app with it. The launcher is a windows-subsystem binary, so Windows handed the console child it started a console of its own, window included. Every process it starts now asks for `CREATE_NO_WINDOW`: the sidecar, the update install, `taskkill`, and the watcher that notices the launcher's death. The processes Node itself starts inherit that hidden console rather than allocating their own, and the sidecar's output stays piped into `launcher.log`.

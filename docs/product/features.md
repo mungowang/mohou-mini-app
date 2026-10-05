@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-10-03
+updated: 2026-10-05
 ---
 
 # Product features
@@ -46,6 +46,7 @@ Adapters that embed this platform in another agent product are out of scope.
 | Runtime | [ctx.llm](runtime/ctx-llm.md) |
 | Runtime | [ctx.agent](runtime/ctx-agent.md) |
 | Runtime | [Model switch keeps the tool set](runtime/model-switch.md) |
+| Runtime | [Kiro](runtime/kiro.md) |
 | MCP client | [ctx.mcp](mcp-client/ctx-mcp.md) |
 | MCP client | [Server config](mcp-client/server-config.md) |
 | MCP server | [Authoring projection](mcp-server/projection.md) |

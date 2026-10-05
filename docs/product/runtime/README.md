@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-09-16
+updated: 2026-10-05
 ---
 
 # Runtime
@@ -13,3 +13,4 @@ The runtime is the brain. Host binds it into `ctx.llm` and `ctx.agent`. Host doe
 - [ctx.llm](ctx-llm.md)
 - [ctx.agent](ctx-agent.md)
 - [Model switch keeps the tool set](model-switch.md)
+- [Kiro](kiro.md)

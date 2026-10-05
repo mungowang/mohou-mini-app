@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.31
+
+Settings listed Pi's built-in providers only, so a model from an extension — a Kiro proxy, a hosted gateway — never appeared, and selecting a name from that list could only have ended in `unknown-model`. The list was built from a bare `ModelRuntime`, which never loads the user's extensions, and loading them is what applies the providers and virtual models they register. Pi is opened through its own cwd-bound services now, on both the listing and the running path, so what Settings offers is what a run can select.
+
 ## 1.0.30
 
 Pi's own installer does not put its packages where npm's global directory is: it writes a tree under its agent directory, beside the shim it installs (`~/.pi/agent/bin/pi.ps1`). Mohou only looked in npm's locations, so a Pi installed the documented way was reported as a peer that cannot be found. The repair now walks Pi's agent directory — `PI_CODING_AGENT_DIR` when set, else `~/.pi/agent` — for a `node_modules` that holds the peers, at any of the shapes an installer may use, and it keeps npm's global directory as the fallback for a Pi installed that way. Both install styles work.

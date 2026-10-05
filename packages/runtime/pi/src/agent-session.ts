@@ -1,9 +1,12 @@
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { ProviderError, type RuntimeAgentOptions, type RuntimeProviderConfig } from '@mohou/runtime-provider'
 
+import { openPiServices } from './services.ts'
+
 /**
  * One Pi coding-agent run. The session is in memory. The conversation is not written.
- * The loader uses Pi's agent directory. No tool allowlist is passed.
+ * The services load Pi's agent directory and the user's extensions, so a model an extension
+ * registered is one this run can select. No tool allowlist is passed.
  * @param config - configured provider and model. Both absent leaves Pi's own default.
  * @param goal - the user turn
  * @param call - cwd, system text, model override, abort, and the observer
@@ -17,23 +20,16 @@ export async function runPiAgent(
   goal: string,
   call: RuntimeAgentOptions | undefined,
 ): Promise<string> {
-  const { createAgentSession, DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager, getAgentDir } = await import('@earendil-works/pi-coding-agent')
-  const agentDir = getAgentDir()
+  const { createAgentSessionFromServices, SessionManager } = await import('@earendil-works/pi-coding-agent')
   const cwd = call?.cwd ?? process.cwd()
   observe(call, { type: 'status', status: 'running' })
-  const runtime = await ModelRuntime.create({ refreshOnCreate: false }).catch(unhealthy)
-  const model = selectedModel(runtime, config, call) ?? piDefaultModel(runtime, SettingsManager.create(cwd, agentDir))
-  const loader = new DefaultResourceLoader({
+  const services = await openPiServices(
     cwd,
-    agentDir,
-    ...call?.system === undefined ? {} : { appendSystemPrompt: [call.system] },
-  })
-  await loader.reload().catch(unhealthy)
-  const { session } = await createAgentSession({
-    cwd,
-    agentDir,
-    modelRuntime: runtime,
-    resourceLoader: loader,
+    call?.system === undefined ? undefined : { appendSystemPrompt: [call.system] },
+  ).catch(unhealthy)
+  const model = selectedModel(services.modelRuntime, config, call) ?? piDefaultModel(services.modelRuntime, services.settingsManager)
+  const { session } = await createAgentSessionFromServices({
+    services,
     sessionManager: SessionManager.inMemory(cwd),
     ...model === undefined ? {} : { model },
   }).catch(unhealthy)

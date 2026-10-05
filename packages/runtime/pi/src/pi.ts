@@ -3,6 +3,7 @@ import type { RuntimeLlmOptions } from '@mohou/runtime-provider'
 import { ProviderError, type ModelListing, type RuntimeProvider, type RuntimeProviderConfig } from '@mohou/runtime-provider'
 
 import { piDefaultModel, runPiAgent, selectedModel } from './agent-session.ts'
+import { openPiServices } from './services.ts'
 import { completionReasoning } from './completion-reasoning.ts'
 
 /**
@@ -45,8 +46,10 @@ export function createPiProvider(): RuntimeProvider {
       return running
     },
     async models() {
-      const runtime = await openRuntime().catch(() => undefined)
-      return runtime === undefined ? [] : listings(runtime.getModels())
+      // Services, not a bare runtime: they load the user's extensions, which is how a provider an
+      // extension registered reaches this list at all.
+      const services = await openPiServices(process.cwd()).catch(() => undefined)
+      return services === undefined ? [] : listings(services.modelRuntime.getModels())
     },
     async llm(prompt, call) {
       return complete(config, running, prompt, call)
@@ -60,11 +63,6 @@ export function createPiProvider(): RuntimeProvider {
   }
 }
 
-async function openRuntime() {
-  const { ModelRuntime } = await import('@earendil-works/pi-coding-agent')
-  return ModelRuntime.create({ refreshOnCreate: false })
-}
-
 async function complete(
   config: RuntimeProviderConfig,
   running: boolean,
@@ -76,11 +74,11 @@ async function complete(
   if (prompt.length === 0) {
     throw new ProviderError('empty-completion', 'llm returned an empty completion')
   }
-  const { SettingsManager, getAgentDir } = await import('@earendil-works/pi-coding-agent')
-  const runtime = await openRuntime().catch((error: unknown) => {
+  const services = await openPiServices(process.cwd()).catch((error: unknown) => {
     throw new ProviderError('provider-unhealthy', 'pi completion failed', { cause: error })
   })
-  const model = selectedModel(runtime, config, call) ?? piDefaultModel(runtime, SettingsManager.create(process.cwd(), getAgentDir()))
+  const runtime = services.modelRuntime
+  const model = selectedModel(runtime, config, call) ?? piDefaultModel(runtime, services.settingsManager)
   if (model === undefined) throw new ProviderError('unknown-model', 'pi model selection is incomplete')
   const reasoning = await completionReasoning(model)
   const context = {

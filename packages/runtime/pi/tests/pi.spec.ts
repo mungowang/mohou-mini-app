@@ -5,8 +5,8 @@ import { createPiProvider } from '../src/pi.ts'
 const piSession = vi.hoisted(() => ({
   calls: [] as Array<Record<string, unknown>>,
   completions: [] as Array<Record<string, unknown>>,
-  loaderOptions: [] as Array<Record<string, unknown>>,
-  runtimeOptions: [] as unknown[],
+  serviceOptions: [] as Array<Record<string, unknown>>,
+  serviceCalls: [] as Array<Record<string, unknown>>,
   disposed: 0,
   completion: { stopReason: 'stop', content: [{ type: 'text', text: ' hi ' }] } as { stopReason: string; content: unknown },
   failComplete: false,
@@ -17,6 +17,8 @@ const piSession = vi.hoisted(() => ({
   defaultProvider: 'rocket' as string | undefined,
   defaultModel: 'grok-4.5' as string | undefined,
   listed: [{ provider: 'rocket', id: 'grok-4.5' }] as Array<{ provider: string; id: string }>,
+  /** What a provider an extension registered adds to the same runtime. */
+  listedWithExtensions: [] as Array<{ provider: string; id: string }>,
   streamDeltas: ['hi'] as string[],
 }))
 
@@ -30,11 +32,16 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
       getDefaultModel: () => piSession.defaultModel,
     }),
   },
-  ModelRuntime: {
-    create: async (options: unknown) => {
-      piSession.runtimeOptions.push(options)
-      if (piSession.failCreate) throw new Error('runtime')
-      return {
+  getAgentDir: () => '/pi/agent',
+  createAgentSessionServices: async (options: Record<string, unknown>) => {
+    piSession.serviceOptions.push(options)
+    if (piSession.failCreate) throw new Error('services')
+    return {
+      cwd: options.cwd,
+      agentDir: '/pi/agent',
+      diagnostics: [],
+      // A real runtime lists the built-ins and whatever the user's extensions registered into it.
+      modelRuntime: {
         getModel: (provider: string, id: string) => {
           if (id === 'missing') return undefined
           if (id === 'reasoner') return { provider, id, reasoning: true }
@@ -42,7 +49,7 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
           if (id === 'quiet') return { provider, id, reasoning: true, thinkingLevelMap: { off: null, minimal: null, low: 'light' } }
           return { provider, id }
         },
-        getModels: () => piSession.listed,
+        getModels: () => [...piSession.listed, ...piSession.listedWithExtensions],
         completeSimple: async (model: unknown, context: unknown, options: unknown) => {
           piSession.completions.push({ model, context, options })
           piSession.beforeComplete?.()
@@ -60,40 +67,48 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
             result: async () => piSession.completion,
           }
         },
-      }
-    },
+      },
+      settingsManager: {
+        getDefaultProvider: () => piSession.defaultProvider,
+        getDefaultModel: () => piSession.defaultModel,
+      },
+      resourceLoader: { reload: () => Promise.resolve() },
+    }
   },
-  getAgentDir: () => '/pi/agent',
-  DefaultResourceLoader: class {
-    constructor(options: Record<string, unknown>) {
-      piSession.loaderOptions.push(options)
-    }
-
-    reload(): Promise<void> {
-      return Promise.resolve()
-    }
+  createAgentSessionFromServices: async (options: Record<string, unknown>) => {
+    piSession.serviceCalls.push(options)
+    return mockAgentSession()
   },
   createAgentSession: async (options: Record<string, unknown>) => {
     piSession.calls.push(options)
-    const listeners: Array<(event: Record<string, unknown>) => void> = []
-    return {
-      session: {
-        get messages() {
-          return piSession.messages
-        },
-        subscribe(listener: (event: Record<string, unknown>) => void) {
-          listeners.push(listener)
-          return () => {}
-        },
-        prompt: (goal: string) => piSession.prompt(goal, listeners),
-        abort: () => Promise.resolve(),
-        dispose: () => {
-          piSession.disposed += 1
-        },
-      },
-    }
+    return mockAgentSession()
   },
 }))
+
+function mockAgentSession() {
+  const listeners: Array<(event: Record<string, unknown>) => void> = []
+  return {
+    session: {
+      get messages() {
+        return piSession.messages
+      },
+      subscribe(listener: (event: Record<string, unknown>) => void) {
+        listeners.push(listener)
+        return () => {}
+      },
+      prompt: (goal: string) => piSession.prompt(goal, listeners),
+      abort: () => Promise.resolve(),
+      dispose: () => {
+        piSession.disposed += 1
+      },
+    },
+  }
+}
+
+/** Configure the provider for the extension model, the way a saved policy would. */
+function piConfiguration(pi: ReturnType<typeof createPiProvider>): void {
+  pi.configure?.({ provider: 'kiro-proxy', model: 'kiro-sonnet' })
+}
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -102,8 +117,8 @@ afterEach(() => {
 beforeEach(() => {
   piSession.calls.length = 0
   piSession.completions.length = 0
-  piSession.loaderOptions.length = 0
-  piSession.runtimeOptions.length = 0
+  piSession.serviceOptions.length = 0
+  piSession.serviceCalls.length = 0
   piSession.disposed = 0
   piSession.failCreate = false
   piSession.failComplete = false
@@ -112,6 +127,7 @@ beforeEach(() => {
   piSession.defaultProvider = 'rocket'
   piSession.defaultModel = 'grok-4.5'
   piSession.listed = [{ provider: 'rocket', id: 'grok-4.5' }]
+  piSession.listedWithExtensions = []
   piSession.streamDeltas = ['hi']
   piSession.messages = [
     { role: 'user', content: 'goal' },
@@ -142,7 +158,7 @@ describe('createPiProvider', () => {
       { provider: 'rocket', models: ['grok-4.5', 'grok-4.6'] },
       { provider: 'other', models: ['m'] },
     ])
-    expect(piSession.runtimeOptions[0]).toEqual({ refreshOnCreate: false })
+    expect(piSession.serviceOptions).toHaveLength(1)
     await pi.start()
     expect(await pi.llm('hello', { provider: 'rocket', model: 'grok-4.5' })).toBe('hi')
     expect(piSession.completions[0]?.model).toEqual({ provider: 'rocket', id: 'grok-4.5' })
@@ -152,6 +168,23 @@ describe('createPiProvider', () => {
     expect(piSession.completions[0]?.context).not.toHaveProperty('tools')
     await pi.stop()
     await expect(pi.llm('hello')).rejects.toMatchObject({ code: 'provider-unhealthy' })
+  })
+
+  it('lists and selects a model that one of the user\'s extensions registered', async () => {
+    const pi = createPiProvider()
+    // Pi's built-ins come from the bare runtime; the services add what the extensions registered.
+    piSession.listedWithExtensions = [{ provider: 'kiro-proxy', id: 'kiro-sonnet' }]
+    expect(await pi.models?.()).toEqual([
+      { provider: 'rocket', models: ['grok-4.5'] },
+      { provider: 'kiro-proxy', models: ['kiro-sonnet'] },
+    ])
+    await pi.start()
+    expect(await pi.llm('hello', { provider: 'kiro-proxy', model: 'kiro-sonnet' })).toBe('hi')
+    expect(piSession.completions[0]?.model).toEqual({ provider: 'kiro-proxy', id: 'kiro-sonnet' })
+    // The agent path resolves the same way, so a listed model is one a run can select.
+    piConfiguration(pi)
+    expect(await pi.agent?.('goal')).toBe('ok')
+    expect(piSession.serviceCalls[0]?.model).toEqual({ provider: 'kiro-proxy', id: 'kiro-sonnet' })
   })
 
   it('emits text deltas only when stream is true', async () => {
@@ -221,7 +254,6 @@ describe('createPiProvider', () => {
     piSession.completions.length = 0
     await pi.llm('hello', { provider: 'rocket', model: 'quiet' })
     expect(piSession.completions[0]?.options).toMatchObject({ reasoning: 'low' })
-    expect(piSession.runtimeOptions[0]).toEqual({ refreshOnCreate: false })
     await expect(pi.agent?.('goal', {
       onEvent() {
         throw new Error('observer')
@@ -254,11 +286,11 @@ describe('createPiProvider', () => {
         else seen.push(event.type)
       },
     })).toBe('ok')
-    expect(piSession.calls[0]).not.toHaveProperty('tools')
-    expect(piSession.calls[0]?.sessionManager).toEqual({ memory: true, cwd: '/tmp/app' })
-    expect(piSession.loaderOptions[0]).toMatchObject({ cwd: '/tmp/app', agentDir: '/pi/agent', appendSystemPrompt: ['extra'] })
-    expect(piSession.runtimeOptions[0]).toEqual({ refreshOnCreate: false })
-    expect(piSession.calls[0]?.model).toEqual({ provider: 'rocket', id: 'grok-4.5' })
+    expect(piSession.serviceCalls[0]).not.toHaveProperty('tools')
+    expect(piSession.serviceCalls[0]?.sessionManager).toEqual({ memory: true, cwd: '/tmp/app' })
+    // The appended system prompt rides the services, which is what loads the user's extensions.
+    expect(piSession.serviceOptions[0]).toMatchObject({ cwd: '/tmp/app', agentDir: '/pi/agent', resourceLoaderOptions: { appendSystemPrompt: ['extra'] } })
+    expect(piSession.serviceCalls[0]?.model).toEqual({ provider: 'rocket', id: 'grok-4.5' })
     expect(seen).toContain('start:jira')
     expect(seen).toContain('end:jira')
     expect(seen).toContain('text-delta')
@@ -270,12 +302,12 @@ describe('createPiProvider', () => {
     const pi = createPiProvider()
     await pi.start()
     await pi.agent('goal')
-    expect(piSession.calls[0]?.model).toEqual({ provider: 'rocket', id: 'grok-4.5' })
-    expect(piSession.loaderOptions[0]).not.toHaveProperty('appendSystemPrompt')
+    expect(piSession.serviceCalls[0]?.model).toEqual({ provider: 'rocket', id: 'grok-4.5' })
+    expect(piSession.serviceOptions[0]).not.toHaveProperty('resourceLoaderOptions')
     piSession.defaultProvider = undefined
     piSession.defaultModel = undefined
     await pi.agent('goal')
-    expect(piSession.calls[1]).not.toHaveProperty('model')
+    expect(piSession.serviceCalls[1]).not.toHaveProperty('model')
   })
 
   it('rejects an incomplete or unknown model and an empty result', async () => {

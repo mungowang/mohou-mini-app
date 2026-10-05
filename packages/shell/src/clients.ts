@@ -65,6 +65,7 @@ function panelPolicy(policy: HostPolicy): OwnerPolicy {
     llm: policy.llm,
     runtimeProvider: { id: policy.runtimeProvider.id },
     ...policy.defaultWorkbenchId === undefined ? {} : { defaultWorkbenchId: policy.defaultWorkbenchId },
+    ...policy.updateRegistry === undefined ? {} : { updateRegistry: policy.updateRegistry },
   }
 }
 

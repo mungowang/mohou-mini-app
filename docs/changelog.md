@@ -7,6 +7,12 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.22
+
+The update registry can be an owner's mirror now, because the public registry is slow in some networks. Settings → Network offers the packaged default, Alibaba npmmirror, and Tencent Cloud, with a custom url behind it; it must be https and carry no credentials, and a bad value never reaches the file. Only this product's own update check and install use it — one `--registry` argument on our own npm child — so the owner's `~/.npmrc` and an app's own dependency installs are untouched. The about chip names the registry in force, so a mirror is visible before an install starts.
+
+Two fixes ride along: a check that answers with an older version is no longer offered as an update (a mirror syncs late, and a downgrade is not an update), and the check budget is eight seconds instead of three, which a mirror's first response often exceeded.
+
 ## 1.0.21
 
 The about block says where an update would come from. A chip carries the registry host, or the local package folder with the home directory collapsed to `~`; a source tree with no install prefix says that instead. The fact is read from the install prefix, so it is on screen when a registry is slow or unreachable, and the offer card shows the same chip before an install starts. A check that cannot reach its registry still names it.

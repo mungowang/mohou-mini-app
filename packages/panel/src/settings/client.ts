@@ -8,6 +8,8 @@ export interface PanelPolicy {
   readonly llm: { readonly provider: string; readonly model: string } | null
   readonly runtimeProvider: { readonly id: string }
   readonly defaultWorkbenchId?: string
+  /** Registry for this product's own update check and install. Empty follows the packaged default. */
+  readonly updateRegistry?: string
 }
 
 export interface PanelPolicyWrite {

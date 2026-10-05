@@ -1,4 +1,4 @@
-import { admitPanelPort, panelLanguageFields } from './form.ts'
+import { admitPanelPort, admitUpdateRegistry, panelLanguageFields } from './form.ts'
 import type { PanelPolicy, PanelPolicyWrite, PanelSettingsClient } from './client.ts'
 
 export interface SettingsState {
@@ -7,12 +7,14 @@ export interface SettingsState {
   readonly palette: string
   readonly locale: string
   readonly port: string
+  readonly registry: string
   readonly providerId: string
   readonly modelProvider: string
   readonly model: string
   readonly workbenchId: string
   readonly dirty: boolean
   readonly portError: boolean
+  readonly registryError: boolean
   readonly saveError: boolean
   readonly saveMessage?: string
   readonly pending?: 'close' | 'restore'
@@ -31,6 +33,7 @@ export type SettingsAction =
   | { readonly type: 'edit-palette'; readonly palette: string }
   | { readonly type: 'edit-locale'; readonly locale: string }
   | { readonly type: 'edit-port'; readonly port: string }
+  | { readonly type: 'edit-registry'; readonly registry: string }
   | { readonly type: 'edit-provider'; readonly providerId: string }
   | { readonly type: 'edit-model'; readonly provider: string; readonly model: string }
   | { readonly type: 'edit-workbench'; readonly workbenchId: string }
@@ -38,6 +41,9 @@ export type SettingsAction =
   /** Host policy written elsewhere (theme menu). Keeps appearance fields in sync. */
   | { readonly type: 'host-policy'; readonly policy: PanelPolicy }
   | { readonly type: 'port-invalid' }
+  | { readonly type: 'registry-invalid' }
+  /** The form could not be built at all (an unsupported locale). */
+  | { readonly type: 'save-blocked' }
   | { readonly type: 'save-failed'; readonly message?: string }
   | { readonly type: 'escape' }
   | { readonly type: 'restore' }
@@ -52,12 +58,14 @@ export function settingsState(): SettingsState {
     palette: '',
     locale: 'en',
     port: '',
+    registry: '',
     providerId: '',
     modelProvider: '',
     model: '',
     workbenchId: 'default',
     dirty: false,
     portError: false,
+    registryError: false,
     saveError: false,
     closed: false,
     restartRequired: false,
@@ -85,6 +93,8 @@ export function reduceSettings(state: SettingsState, action: SettingsAction): Se
       return { ...state, locale: action.locale, dirty: true, saveError: false }
     case 'edit-port':
       return { ...state, port: action.port, dirty: true, portError: false, saveError: false }
+    case 'edit-registry':
+      return { ...state, registry: action.registry, dirty: true, registryError: false, saveError: false }
     case 'edit-provider':
       return { ...state, providerId: action.providerId, dirty: true, saveError: false }
     case 'edit-model':
@@ -126,6 +136,10 @@ export function reduceSettings(state: SettingsState, action: SettingsAction): Se
     }
     case 'port-invalid':
       return { ...state, portError: true, dirty: true }
+    case 'registry-invalid':
+      return { ...state, registryError: true, dirty: true }
+    case 'save-blocked':
+      return { ...omitSaveMessage(state), saveError: true, dirty: true }
     case 'save-failed':
       return {
         ...omitSaveMessage(state),
@@ -159,14 +173,19 @@ export function reduceSettings(state: SettingsState, action: SettingsAction): Se
 }
 
 /** Policy to write, or a port error that must not be sent. */
-export function settingsDraft(state: SettingsState): { ok: true; policy: PanelPolicy } | { ok: false } {
+export function settingsDraft(state: SettingsState): {
+  ok: true
+  policy: PanelPolicy
+} | { ok: false; key: 'port-invalid' | 'registry-invalid' | 'save-blocked' } {
   const port = admitPanelPort(Number(state.port))
-  if (!port.ok) return { ok: false }
+  if (!port.ok) return { ok: false, key: 'port-invalid' }
+  const registry = admitUpdateRegistry(state.registry)
+  if (!registry.ok) return { ok: false, key: 'registry-invalid' }
   let language: ReturnType<typeof panelLanguageFields>
   try {
     language = panelLanguageFields(state.locale)
   } catch {
-    return { ok: false }
+    return { ok: false, key: 'save-blocked' }
   }
   return {
     ok: true,
@@ -178,6 +197,7 @@ export function settingsDraft(state: SettingsState): { ok: true; policy: PanelPo
       hostPort: port.port,
       llm: state.modelProvider === '' && state.model === '' ? null : { provider: state.modelProvider, model: state.model },
       runtimeProvider: { id: state.providerId },
+      updateRegistry: registry.registry,
       ...state.workbenchId === 'default' ? {} : { defaultWorkbenchId: state.workbenchId },
     },
   }
@@ -198,12 +218,14 @@ function fromPolicy(policy: PanelPolicy): SettingsState {
     palette: policy.palette,
     locale: policy.locale,
     port: String(policy.hostPort),
+    registry: policy.updateRegistry ?? '',
     providerId: policy.runtimeProvider.id,
     modelProvider: policy.llm?.provider ?? '',
     model: policy.llm?.model ?? '',
     workbenchId: policy.defaultWorkbenchId ?? 'default',
     dirty: false,
     portError: false,
+    registryError: false,
     saveError: false,
     closed: false,
     restartRequired: false,

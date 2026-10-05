@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { checkPackageUpdate, discardUpdateResult, newestTarball, readUpdateResult, readUpdateSource, stagePackageUpdate } from '../src/http/updates.ts'
+import { checkPackageUpdate, discardUpdateResult, newestTarball, readUpdateResult, readUpdateSource, stagePackageUpdate, updateEnv } from '../src/http/updates.ts'
 import { hostUpdateResultPath } from '../src/host/layout.ts'
 
 afterEach(() => {
@@ -95,6 +95,43 @@ describe('checkPackageUpdate', () => {
     expect(same.channel).toBe('registry')
     expect(same.installable).toBe(true)
     expect(same.registry).toBe('https://registry.npmjs.org')
+  })
+})
+
+describe('the update registry override', () => {
+  it('lets the environment win over the prefix, and only offers a newer version', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mirror-'))
+    await writeFile(join(root, 'package.json'), JSON.stringify({
+      name: 'mohou-app',
+      mohou: { channel: 'registry', registry: 'https://registry.npmjs.org' },
+      dependencies: {},
+    }))
+    expect(readUpdateSource({}, root)).toEqual({ channel: 'registry', registry: 'https://registry.npmjs.org' })
+    expect(readUpdateSource({ MINI_APP_NPM_REGISTRY: 'https://registry.npmmirror.com' }, root))
+      .toEqual({ channel: 'registry', registry: 'https://registry.npmmirror.com' })
+    expect(readUpdateSource({ MINI_APP_NPM_REGISTRY: '  ' }, root))
+      .toEqual({ channel: 'registry', registry: 'https://registry.npmjs.org' })
+
+    expect(updateEnv({}, { HOME: '/tmp/home' })).toEqual({ HOME: '/tmp/home' })
+    expect(updateEnv({ updateRegistry: '' }, { HOME: '/tmp/home' })).toEqual({ HOME: '/tmp/home' })
+    expect(updateEnv({ updateRegistry: ' https://registry.npmmirror.com ' }, {}))
+      .toEqual({ MINI_APP_NPM_REGISTRY: 'https://registry.npmmirror.com' })
+
+    const asked: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      asked.push(url)
+      return { ok: true, json: async () => ({ version: '1.0.19' }) }
+    }))
+    const older = await checkPackageUpdate(
+      { name: '@mohou/shell', current: '1.0.20', platform: 'darwin', private: false },
+      updateEnv({ updateRegistry: 'https://registry.npmmirror.com' }),
+      root,
+    )
+    expect(asked[0]).toBe('https://registry.npmmirror.com/@mohou/shell/latest')
+    expect(older.registry).toBe('https://registry.npmmirror.com')
+    // A mirror that syncs late reports an older version. That is not an update to install.
+    expect(older.latest).toBe('1.0.19')
+    expect(older.updateAvailable).toBe(false)
   })
 })
 

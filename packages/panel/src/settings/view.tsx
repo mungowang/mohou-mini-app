@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Loader2, Pencil, RefreshCw } from 'lucide-react'
-import { useEffect, useReducer, useState, type ReactNode } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 
 import { galleryCardStyles, type GalleryCardStyle } from '../gallery/list.ts'
 import { isPanelLocale, panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
@@ -12,6 +12,7 @@ import { UpdateSourceChip } from './update-source.tsx'
 import { CredentialSettings } from './credentials-view.tsx'
 import { McpSettings } from './mcp-view.tsx'
 import { SkillInstall } from './skill-install.tsx'
+import { registryChoice, updateRegistryPresets } from './form.ts'
 import { loadSettings, reduceSettings, settingsDraft, settingsState } from './state.ts'
 
 /** The rail. Credentials appear only when Host exposes the read call, so a store-less host shows no entry. */
@@ -105,6 +106,8 @@ export function PanelSettings(props: {
       return
     }
     props.onPolicy?.(written)
+    // The about chip reads the source once; a saved registry changes it.
+    setAbout(undefined)
     setSaveFeedback('saved')
     window.setTimeout(() => setSaveFeedback('idle'), 2000)
   }
@@ -249,6 +252,7 @@ export function PanelSettings(props: {
                   </div>
                 )}
                 {state.portError ? <p className="text-xs text-muted-foreground">{label('port-invalid')}</p> : null}
+                <RegistryField state={state} dispatch={dispatch} label={label} />
               </div>
             </section>
           ) : null}
@@ -548,6 +552,67 @@ function cardKey(style: GalleryCardStyle): 'card-hero' | 'card-stamp' | 'card-et
   return 'card-hero'
 }
 
+/**
+ * The update registry: a preset, or the owner's own url. Only this product's own update
+ * check and install use it; `~/.npmrc` and app dependency installs are untouched.
+ * @param props - the form state, its dispatch, and the label lookup
+ */
+function RegistryField(props: {
+  readonly state: ReturnType<typeof settingsState>
+  readonly dispatch: (action: Parameters<typeof reduceSettings>[1]) => void
+  readonly label: (key: string) => string
+}): ReactNode {
+  const choice = registryChoice(props.state.registry)
+  // A stored url that matches a preset is that preset. Choosing "custom" is a form mode,
+  // so it lives here rather than in the value.
+  const [custom, setCustom] = useState(choice === 'custom')
+  const seen = useRef(props.state.registry)
+  useEffect(() => {
+    // Only a value that changed elsewhere (a restore, another writer) leaves custom mode.
+    if (seen.current === props.state.registry) return
+    seen.current = props.state.registry
+    if (choice !== 'custom') setCustom(false)
+  }, [choice, props.state.registry])
+  const shown = custom ? 'custom' : choice
+  return (
+    <div className="mt-2 flex flex-col gap-2">
+      <label className="text-sm text-muted-foreground" htmlFor="settings-update-registry">{props.label('update-registry')}</label>
+      <p className="m-0 max-w-xl text-xs leading-5 text-muted-foreground">{props.label('update-registry-hint')}</p>
+      <select
+        id="settings-update-registry"
+        data-field="update-registry"
+        className="h-9 max-w-md rounded-lg border bg-card px-3 text-sm outline-none"
+        value={shown}
+        onChange={(event) => {
+          const picked = event.target.value
+          setCustom(picked === 'custom')
+          props.dispatch({
+            type: 'edit-registry',
+            registry: picked === 'default'
+              ? ''
+              : picked === 'custom' ? props.state.registry : updateRegistryPresets[picked as keyof typeof updateRegistryPresets],
+          })
+        }}
+      >
+        <option value="default">{props.label('update-registry-default')}</option>
+        <option value="npmmirror">{`${props.label('update-registry-npmmirror')} · ${updateRegistryPresets.npmmirror}`}</option>
+        <option value="tencent">{`${props.label('update-registry-tencent')} · ${updateRegistryPresets.tencent}`}</option>
+        <option value="custom">{props.label('update-registry-custom')}</option>
+      </select>
+      {shown !== 'custom' ? null : (
+        <input
+          data-field="update-registry-custom"
+          className="h-9 max-w-md rounded-lg border bg-card px-3 font-mono text-sm outline-none"
+          placeholder="https://registry.example.com/"
+          value={props.state.registry}
+          onChange={event => props.dispatch({ type: 'edit-registry', registry: event.target.value })}
+        />
+      )}
+      {props.state.registryError ? <p className="m-0 text-xs text-destructive">{props.label('update-registry-invalid')}</p> : null}
+    </div>
+  )
+}
+
 async function saveSettings(
   client: PanelSettingsClient,
   state: ReturnType<typeof settingsState>,
@@ -555,7 +620,7 @@ async function saveSettings(
 ): Promise<PanelPolicy | undefined> {
   const draft = settingsDraft(state)
   if (!draft.ok) {
-    dispatch({ type: 'port-invalid' })
+    dispatch({ type: draft.key })
     return undefined
   }
   try {

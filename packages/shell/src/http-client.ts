@@ -249,6 +249,7 @@ function publicPolicy(value: unknown): PanelPolicy {
   const policy = record(value)
   const llm = policy.llm
   const desk = optionalText(policy.defaultWorkbenchId)
+  const updateRegistry = optionalText(policy.updateRegistry)
   return {
     theme: policy.theme === 'dark' || policy.theme === 'system' ? policy.theme : 'light',
     palette: typeof policy.palette === 'string' ? policy.palette : '',
@@ -258,6 +259,7 @@ function publicPolicy(value: unknown): PanelPolicy {
     llm: llmOf(llm),
     runtimeProvider: { id: text(record(policy.runtimeProvider).id) },
     ...desk === undefined ? {} : { defaultWorkbenchId: desk },
+    ...updateRegistry === undefined ? {} : { updateRegistry },
   }
 }
 

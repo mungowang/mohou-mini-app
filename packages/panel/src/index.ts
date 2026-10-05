@@ -10,7 +10,7 @@ export {
   type PanelLabelMode,
   type PanelLocale,
 } from './labels.ts'
-export { admitPanelPort, panelLanguageFields, panelPortBound, type PanelPortResult } from './settings/form.ts'
+export { admitPanelPort, admitUpdateRegistry, panelLanguageFields, panelPortBound, registryChoice, updateRegistryPresets, type PanelPortResult, type PanelRegistryChoice, type PanelRegistryResult } from './settings/form.ts'
 export {
   filterGallery,
   galleryCardStyles,

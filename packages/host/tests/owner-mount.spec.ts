@@ -141,6 +141,41 @@ describe('mountOwner', () => {
     expect(JSON.parse(noRemoveName.body)).toMatchObject({ error: { code: 'credential-invalid' } })
   })
 
+  it('writes an update registry the owner chose, and ignores one that is not text', async () => {
+    const app = new Hono<HostEnv>()
+    const written: Array<Record<string, unknown>> = []
+    let stored = {
+      runtimeRoot: '/tmp',
+      hostPort: 9743,
+      theme: 'light',
+      palette: 'default',
+      locale: 'en',
+      chatLanguage: 'en',
+      llm: null,
+      runtimeProvider: { id: 'echo' },
+    }
+    mountOwner(app, basePorts({
+      readPolicy: () => stored as never,
+      writePolicy: async (policy: unknown) => {
+        stored = policy as typeof stored
+        written.push(stored)
+        return { policy: stored as never, restartRequired: false }
+      },
+    }))
+    const body = { method: 'POST', headers: { 'content-type': 'application/json' } }
+    const mirror = await request(app, httpLayout.hostConfig, {
+      ...body,
+      body: JSON.stringify({ updateRegistry: '  https://registry.npmmirror.com  ' }),
+    })
+    expect(mirror.status).toBe(200)
+    expect(written.at(-1)?.updateRegistry).toBe('https://registry.npmmirror.com')
+    // An empty value means the packaged default; anything else never clobbers what is stored.
+    await request(app, httpLayout.hostConfig, { ...body, body: JSON.stringify({ updateRegistry: '' }) })
+    expect(written.at(-1)?.updateRegistry).toBe('')
+    await request(app, httpLayout.hostConfig, { ...body, body: JSON.stringify({ updateRegistry: 42 }) })
+    expect(written.at(-1)?.updateRegistry).toBe('')
+  })
+
   it('answers the about block with the update source', async () => {
     const app = new Hono<HostEnv>()
     mountOwner(app, basePorts({ updateSource: async () => ({ channel: 'tarball', tarballDir: '/tmp/packs' }) }))

@@ -5,6 +5,12 @@ import path from 'node:path'
 import { homePackagesDir, hostUpdateResultPath } from '../host/layout.ts'
 import { aboutInfo } from './ports.ts'
 
+/**
+ * Ask the install channel once. A dev tree with no prefix still asks the registry and cannot install.
+ * The budget is host policy, not a locked number: a mirror's first response is often slow.
+ */
+export const updateCheckTimeoutMs = 8_000
+
 /** Why an install did not finish. The panel owns the wording of each code. */
 export const updateFailureCodes = ['timeout', 'exit', 'prepare', 'closed', 'leftover', 'verify', 'boot'] as const
 
@@ -91,7 +97,7 @@ export async function checkPackageUpdate(
   const name = prefix === undefined ? about.name : '@mohou/shell'
   try {
     const response = await fetch(`${registry.replace(/\/$/, '')}/${name}/latest`, {
-      signal: AbortSignal.timeout(3_000),
+      signal: AbortSignal.timeout(updateCheckTimeoutMs),
     })
     if (!response.ok) return {
       ...empty,
@@ -109,7 +115,8 @@ export async function checkPackageUpdate(
       channel: prefix?.channel ?? 'registry',
       ...prefix === undefined ? {} : { registry: prefix.registry ?? 'https://registry.npmjs.org' },
       installable: prefix !== undefined,
-      updateAvailable: latest !== null && latest !== about.current,
+      // Newer only. A mirror syncs late, and an older `latest` is not an update.
+      updateAvailable: latest !== null && compareVersion(latest, about.current) > 0,
     }
   } catch (error) {
     return {
@@ -122,10 +129,16 @@ export async function checkPackageUpdate(
   }
 }
 
+export function updateEnv(policy: { readonly updateRegistry?: string }, env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const registry = policy.updateRegistry?.trim()
+  return registry === undefined || registry.length === 0 ? env : { ...env, MINI_APP_NPM_REGISTRY: registry }
+}
+
 /**
  * Where this install would update from. Reads the install prefix; asks no registry, so a
  * panel can show the source while the network is slow or down.
- * @param env - process environment; `MINI_APP_TARBALL_DIR` overrides the package folder
+ * @param env - process environment; `MINI_APP_TARBALL_DIR` overrides the package folder, and
+ *   `MINI_APP_NPM_REGISTRY` overrides the prefix's registry (that is how the policy reaches us)
  * @param cwd - directory the sidecar runs in
  */
 export function readUpdateSource(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): UpdateSource {
@@ -272,10 +285,13 @@ function readPrefixUpdate(cwd: string, env: NodeJS.ProcessEnv): PrefixUpdate | u
   const packages = Object.keys(parsed.dependencies ?? {}).filter(name => name.startsWith('@mohou/'))
   const override = env.MINI_APP_TARBALL_DIR
   const tarballDir = override !== undefined && override.length > 0 ? override : parsed.mohou?.tarballDir
+  const registry = env.MINI_APP_NPM_REGISTRY?.trim()
   return {
     dir,
     channel,
-    ...typeof parsed.mohou?.registry === 'string' ? { registry: parsed.mohou.registry } : {},
+    ...registry !== undefined && registry.length > 0
+      ? { registry }
+      : typeof parsed.mohou?.registry === 'string' ? { registry: parsed.mohou.registry } : {},
     ...tarballDir === undefined ? {} : { tarballDir },
     packages: packages.length === 0 ? ['@mohou/shell'] : packages,
   }

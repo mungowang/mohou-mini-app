@@ -25,6 +25,12 @@ export interface HostPolicy {
   }
   /** Absent, or `default`, means the builtin library. Not required to boot. */
   defaultWorkbenchId?: string
+  /**
+   * Registry for this product's own update check and install, when the owner wants a mirror.
+   * Absent or empty follows the install prefix's build-time value. Our own npm children only:
+   * `~/.npmrc` and an app's own dependency installs are untouched.
+   */
+  updateRegistry?: string
 }
 
 /** Seed numbers and names. Host policy, not a locked product value. */

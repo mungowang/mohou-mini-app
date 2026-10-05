@@ -30,11 +30,15 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 export function mergePolicy(current: unknown, body: Record<string, unknown>): Record<string, unknown> {
   const base = isRecord(current) ? current : {}
   const runtimeRoot = typeof base.runtimeRoot === 'string' ? base.runtimeRoot : undefined
+  const { updateRegistry: rawRegistry, ...rest } = body
+  const updateRegistry = typeof rawRegistry === 'string' ? rawRegistry.trim() : undefined
   const provider = isRecord(body.runtimeProvider) ? body.runtimeProvider : undefined
   const previous = isRecord(base.runtimeProvider) ? base.runtimeProvider : undefined
   return {
     ...base,
-    ...body,
+    ...rest,
+    // An empty string means "the packaged default". A non-string never clobbers the stored value.
+    ...updateRegistry === undefined ? {} : { updateRegistry },
     ...runtimeRoot === undefined ? {} : { runtimeRoot },
     ...provider === undefined || previous === undefined ? {} : {
       runtimeProvider: {

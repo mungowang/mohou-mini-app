@@ -6,7 +6,7 @@
  * Writes: artifacts/npm/*.tgz, artifacts/local-app/**
  * Run as: pnpm dist:local
  */
-import { execFileSync, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import {
   chmodSync,
   cpSync,
@@ -20,6 +20,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { fileDependencies } from '../pack/prefix-deps.mjs'
+import { runCommand } from '../build/run-command.mjs'
 import { syncSkillIntoShell } from '../sync/skill-into-shell.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -28,8 +29,7 @@ const outDir = join(root, 'artifacts', 'local-app')
 const prefix = join(outDir, 'prefix')
 
 function run(cmd, args, opts = {}) {
-  console.log(`$ ${cmd} ${args.join(' ')}`)
-  execFileSync(cmd, args, { cwd: root, stdio: 'inherit', ...opts })
+  return runCommand(cmd, args, { cwd: root, ...opts })
 }
 
 function shellVersion() {

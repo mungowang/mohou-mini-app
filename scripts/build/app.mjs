@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { fileDependencies } from '../pack/prefix-deps.mjs'
+import { runCommand } from './run-command.mjs'
 import { syncSkillIntoShell } from '../sync/skill-into-shell.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -39,17 +40,8 @@ const contents = join(appRoot, 'Contents')
 const macos = join(contents, 'MacOS')
 const resources = join(contents, 'Resources')
 
-function commandName(cmd) {
-  if (process.platform !== 'win32') return cmd
-  if (cmd === 'npm' || cmd === 'pnpm') return `${cmd}.cmd`
-  if (cmd === 'cargo' || cmd === 'tar') return `${cmd}.exe`
-  return cmd
-}
-
 function run(cmd, args, opts = {}) {
-  const executable = commandName(cmd)
-  console.log(`$ ${executable} ${args.join(' ')}`)
-  execFileSync(executable, args, { cwd: root, stdio: 'inherit', ...opts })
+  return runCommand(cmd, args, { cwd: root, ...opts })
 }
 
 /** Artifact id. CI builds macOS-arm64 and windows-x64. */

@@ -89,8 +89,22 @@ describe('McpSettings', () => {
       checkMcp: server => Promise.resolve({
         ok: true,
         tools: [
-          { name: 'a', description: 'one' },
-          { name: 'b' },
+          {
+            name: 'a',
+            description: 'one',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'The issue key' },
+                opts: { type: ['string', 'number'] },
+                list: { items: { type: 'string' } },
+                mystery: {},
+              },
+              required: ['id'],
+            },
+            outputSchema: { type: 'object', properties: { summary: { type: 'string' } } },
+          },
+          { name: 'b', inputSchema: { type: 'object' } },
           { name: 'c' },
           { name: 'd' },
           { name: 'e' },
@@ -130,6 +144,25 @@ describe('McpSettings', () => {
       toolA?.click()
     })
     expect(host.textContent).toContain('one')
+    expect(host.textContent).toContain('Input')
+    expect(host.textContent).toContain('id')
+    expect(host.textContent).toContain('string')
+    expect(host.textContent).toContain('required')
+    expect(host.textContent).toContain('The issue key')
+    expect(host.textContent).toContain('opts')
+    expect(host.textContent).toContain('string | number')
+    expect(host.textContent).toContain('list')
+    expect(host.textContent).toContain('array')
+    expect(host.textContent).toContain('mystery')
+    expect(host.textContent).toContain('any')
+    expect(host.textContent).toContain('Output')
+    expect(host.textContent).toContain('summary')
+    expect(host.querySelector('pre')?.textContent).toContain('"type": "object"')
+    const toolB = [...host.querySelectorAll('button')].find(button => button.textContent === 'b')
+    await act(async () => {
+      toolB?.click()
+    })
+    expect(host.textContent).toContain('This schema declares no fields.')
     await act(async () => { closeOverlay(host) })
     const add = [...host.querySelectorAll('button')].find(button => button.textContent === 'Add server')
     await act(async () => {

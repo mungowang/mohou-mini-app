@@ -188,10 +188,18 @@ export interface McpServerDraft {
   readonly headers?: Readonly<Record<string, string>>
 }
 
+/** One tool a check listed, with the schemas the server declared. */
+export interface McpToolRow {
+  readonly name: string
+  readonly description?: string
+  readonly inputSchema?: Record<string, unknown>
+  readonly outputSchema?: Record<string, unknown>
+}
+
 /** Result of trying one server without saving. */
 export interface McpCheckResult {
   readonly ok: boolean
-  readonly tools: readonly { readonly name: string; readonly description?: string }[]
+  readonly tools: readonly McpToolRow[]
   readonly code?: string
   readonly message?: string
 }

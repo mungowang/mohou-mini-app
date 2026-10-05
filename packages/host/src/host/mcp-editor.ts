@@ -22,7 +22,14 @@ export interface McpEditorServer {
 
 export interface McpCheck {
   readonly ok: boolean
-  readonly tools: readonly { readonly name: string; readonly description?: string }[]
+  readonly tools: readonly {
+    readonly name: string
+    readonly description?: string
+    /** The protocol requires this one. */
+    readonly inputSchema?: Record<string, unknown>
+    /** Only a server that declares one sends it. */
+    readonly outputSchema?: Record<string, unknown>
+  }[]
   readonly code?: string
   readonly message?: string
 }
@@ -116,6 +123,8 @@ export async function checkMcpEditor(
       tools: tools.map(tool => ({
         name: tool.name,
         ...tool.description === undefined ? {} : { description: tool.description },
+        inputSchema: tool.inputSchema,
+        ...tool.outputSchema === undefined ? {} : { outputSchema: tool.outputSchema },
       })),
     }
   } catch (error) {

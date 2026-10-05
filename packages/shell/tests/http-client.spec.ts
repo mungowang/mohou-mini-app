@@ -126,6 +126,10 @@ describe('httpPanelClients', () => {
     expect(servers?.servers[0]).toMatchObject({ id: 'sse', transport: 'sse', description: 'd', args: ['a'] })
     expect(servers?.unresolved[0]).toMatchObject({ id: 'git', code: 'mcp-reference-unknown' })
     expect((await client.checkMcp?.({ id: 'sse' }))).toMatchObject({ ok: false, code: 'mcp-start-failed', message: 'down' })
+    expect((await client.checkMcp?.({ id: 'sse' }))?.tools).toEqual([
+      { name: 'ping', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } },
+      { name: 'bare' },
+    ])
     expect((await client.readAbout?.())?.authoring.tools[0]?.name).toBe('mini_app_register')
     expect((await client.readSkill?.())?.customs[0]?.dir).toBe('/tmp/skills')
     expect((await client.readAuthorMcp?.())?.agents[0]?.id).toBe('pi')
@@ -257,7 +261,21 @@ describe('httpPanelClients', () => {
 function dense(url: string): unknown {
   if (url.includes('/probe')) return { ok: true, result: { healthy: true } }
   if (url.includes('/api/credentials')) return { ok: true, result: { credentials: [{ name: 'github', description: 'GitHub' }], writable: true } }
-  if (url.includes('/check')) return { ok: true, result: { ok: false, tools: [{ name: 'ping' }, { nope: true }], code: 'mcp-start-failed', message: 'down' } }
+  if (url.includes('/check')) {
+    return {
+      ok: true,
+      result: {
+        ok: false,
+        tools: [
+          { name: 'ping', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } },
+          { nope: true },
+          { name: 'bare', inputSchema: 'text', outputSchema: [1] },
+        ],
+        code: 'mcp-start-failed',
+        message: 'down',
+      },
+    }
+  }
   if (url.includes('/about')) return { ok: true, name: 'host', current: '1', platform: 'darwin', authoring: { url: 'http://x', token: 't', tools: [{ name: 'mini_app_register', description: 'create' }, { description: 'skip' }] } }
   if (url.includes('/author-skill')) return { ok: true, result: { skillId: 's', version: '', agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/x', skillsDir: '/tmp', homePresent: false, installed: false }], customs: [{ dir: '/tmp/skills', dest: '/tmp/skills/s', installed: true, version: '1.0.0', updateAvailable: true }] } }
   if (url.includes('/author-mcp')) return { ok: true, result: { agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/mcp.json', homePresent: false, installed: false, updateAvailable: false }, { id: 'skip' }] } }

@@ -276,6 +276,8 @@ function ToolsDialog(props: {
                 <p className="m-0 text-xs text-muted-foreground">{props.label('mcp-tools')}</p>
                 <h6 className="mt-2 text-xl font-semibold tracking-tight">{tool.name}</h6>
                 <p className="mt-4 text-sm leading-7 whitespace-pre-wrap text-muted-foreground">{tool.description ?? props.label('mcp-tool-empty')}</p>
+                {tool.inputSchema === undefined ? null : <SchemaBlock caption={props.label('mcp-schema-input')} schema={tool.inputSchema} label={props.label} />}
+                {tool.outputSchema === undefined ? null : <SchemaBlock caption={props.label('mcp-schema-output')} schema={tool.outputSchema} label={props.label} />}
               </>
             )}
           </section>
@@ -283,6 +285,73 @@ function ToolsDialog(props: {
       </div>
     </Dialog>
   )
+}
+
+/**
+ * One declared schema: its top-level fields, then the schema the server sent.
+ * @param props - caption, schema, and the label lookup
+ */
+function SchemaBlock(props: {
+  readonly caption: string
+  readonly schema: Record<string, unknown>
+  readonly label: (key: string) => string
+}): ReactNode {
+  const fields = schemaFields(props.schema)
+  return (
+    <section className="mt-6">
+      <p className="m-0 text-xs text-muted-foreground">{props.caption}</p>
+      {fields.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">{props.label('mcp-schema-no-fields')}</p>
+      ) : (
+        <ul className="mt-2 list-none space-y-2 p-0">
+          {fields.map(field => (
+            <li key={field.name} className="rounded-lg border p-3">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-mono text-sm">{field.name}</span>
+                <span className="text-[11px] text-muted-foreground">{field.type}</span>
+                {field.required ? <span className="rounded-full border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">{props.label('mcp-schema-required')}</span> : null}
+              </div>
+              {field.description === undefined ? null : <p className="mt-1.5 mb-0 text-xs leading-6 text-muted-foreground">{field.description}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <pre className="mt-3 max-h-64 overflow-auto rounded-lg border bg-muted/40 p-3 font-mono text-[11px] leading-5 break-all whitespace-pre-wrap">{JSON.stringify(props.schema, null, 2)}</pre>
+    </section>
+  )
+}
+
+/** The top-level fields of an object schema, in the order the server declared them. */
+function schemaFields(schema: Record<string, unknown>): readonly { name: string; type: string; required: boolean; description?: string }[] {
+  const properties = recordValue(schema.properties)
+  if (properties === undefined) return []
+  const required = Array.isArray(schema.required) ? schema.required.filter((item): item is string => typeof item === 'string') : []
+  return Object.entries(properties).flatMap(([name, value]) => {
+    const field = recordValue(value)
+    if (field === undefined) return []
+    return [{
+      name,
+      type: fieldType(field),
+      required: required.includes(name),
+      ...typeof field.description === 'string' && field.description.length > 0 ? { description: field.description } : {},
+    }]
+  })
+}
+
+function recordValue(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+}
+
+function fieldType(field: Record<string, unknown>): string {
+  const declared = field.type
+  if (typeof declared === 'string') return declared
+  if (Array.isArray(declared)) {
+    const names = declared.filter((item): item is string => typeof item === 'string')
+    if (names.length > 0) return names.join(' | ')
+  }
+  if (field.properties !== undefined) return 'object'
+  if (field.items !== undefined) return 'array'
+  return 'any'
 }
 
 function EditorDialog(props: {

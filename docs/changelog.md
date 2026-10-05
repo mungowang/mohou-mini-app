@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.20
+
+A tool in the MCP server dialog is a reference now instead of one paragraph. The panel shows the schemas the server declared: every top-level input field with its type, whether it is required, and its description, the schema itself as JSON, and an output section when the server sends one. The input schema was already answered to the agent by `mini_app_mcp_tools`; the panel's check was the copy that dropped it.
+
 ## 1.0.18
 
 An update says what it is doing and how it ended. The card that offers a version now also carries the install: it counts the wait up, says the window will restart and not to close it, and after the restart names the outcome — the version now running, or why the attempt did not finish and the version it fell back to, with the install log beside it. Before this, the offer was one line and every failure was one sentence, or on Windows nothing at all.

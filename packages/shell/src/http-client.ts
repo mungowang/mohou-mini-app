@@ -402,7 +402,15 @@ function mcpServer(value: unknown): McpServerDraft {
 function mcpCheck(value: Record<string, unknown>): McpCheckResult {
   const tools = Array.isArray(value.tools) ? value.tools.flatMap((item) => {
     const row = record(item)
-    return typeof row.name === 'string' ? [{ name: row.name, ...typeof row.description === 'string' ? { description: row.description } : {} }] : []
+    if (typeof row.name !== 'string') return []
+    const input = mcpSchema(row.inputSchema)
+    const output = mcpSchema(row.outputSchema)
+    return [{
+      name: row.name,
+      ...typeof row.description === 'string' ? { description: row.description } : {},
+      ...input === undefined ? {} : { inputSchema: input },
+      ...output === undefined ? {} : { outputSchema: output },
+    }]
   }) : []
   return {
     ok: value.ok === true,
@@ -410,6 +418,11 @@ function mcpCheck(value: Record<string, unknown>): McpCheckResult {
     ...typeof value.code === 'string' ? { code: value.code } : {},
     ...typeof value.message === 'string' ? { message: value.message } : {},
   }
+}
+
+/** A schema is a JSON object. A row that carries anything else reads as no schema. */
+function mcpSchema(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
 }
 
 function stringMap(value: unknown, field: 'env' | 'headers'): { env: Record<string, string> } | { headers: Record<string, string> } | Record<string, never> {

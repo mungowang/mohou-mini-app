@@ -53,7 +53,7 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 | `POST /api/author-mcp/reveal` | Panel | open one assistant MCP file |
 | `GET /api/mcp-servers` | Panel | servers in `mcp.json`, and `unresolved` for the ones the live client left out |
 | `POST /api/mcp-servers` | Panel, token | replace `mcp.json`, put the resolved servers live, and answer `unresolved` |
-| `POST /api/mcp-servers/check` | Panel, token | start one server and list tools; does not write |
+| `POST /api/mcp-servers/check` | Panel, token | start one server and list its tools with the input schema and, when the server declares one, the output schema; does not write |
 | `POST /api/mcp-servers/admit` | Panel | parse pasted text into server drafts |
 | `GET /api/mcp-servers/import/:source` | Panel | read one import file Shell named |
 | `GET /api/tools` | authoring client | authoring tool names and input schemas |

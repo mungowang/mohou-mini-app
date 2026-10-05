@@ -103,14 +103,29 @@ export class McpClient {
    * List tools on one server. Opens the session if needed.
    * @param serverId - key in the resolved config
    */
-  async listTools(serverId: string): Promise<Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>> {
+  async listTools(serverId: string): Promise<Array<{
+    name: string
+    description?: string
+    inputSchema: Record<string, unknown>
+    outputSchema?: Record<string, unknown>
+  }>> {
     this.beginAttempt(serverId)
     return this.withSession(serverId, async (client) => {
-      const tools: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }> = []
+      const tools: Array<{
+        name: string
+        description?: string
+        inputSchema: Record<string, unknown>
+        outputSchema?: Record<string, unknown>
+      }> = []
       let cursor: string | undefined
       do {
         const page = await client.listTools(cursor === undefined ? undefined : { cursor }) as {
-          tools: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>
+          tools: Array<{
+            name: string
+            description?: string
+            inputSchema: Record<string, unknown>
+            outputSchema?: Record<string, unknown>
+          }>
           nextCursor?: string
         }
         tools.push(...page.tools)

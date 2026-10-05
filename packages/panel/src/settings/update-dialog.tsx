@@ -4,11 +4,12 @@ import { Loader2 } from 'lucide-react'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import { Dialog } from '../ui/dialog.tsx'
 
-import type { PanelUpdateAttempt, PanelUpdateFailureCode } from './client.ts'
+import type { PanelUpdateAttempt, PanelUpdateFailureCode, PanelUpdateSource } from './client.ts'
+import { UpdateSourceChip } from './update-source.tsx'
 
 /** The one update card. The on-open check and the settings check open this card. */
 export type UpdateCard =
-  | { readonly kind: 'offer'; readonly current: string; readonly latest: string; readonly channel?: 'registry' | 'tarball' }
+  | { readonly kind: 'offer'; readonly current: string; readonly latest: string; readonly channel?: 'registry' | 'tarball'; readonly source?: PanelUpdateSource }
   | { readonly kind: 'installing'; readonly version: string; readonly startedAt: number }
   | { readonly kind: 'failed'; readonly reason: UpdateReason; readonly target?: string; readonly back?: string; readonly log?: string }
   | { readonly kind: 'done'; readonly version: string }
@@ -96,6 +97,9 @@ function Offer(props: {
           </span>
         )}
       </div>
+      {props.card.source === undefined ? null : (
+        <div className="mt-3"><UpdateSourceChip source={props.card.source} label={props.label} /></div>
+      )}
       <p className="mt-4 text-sm text-muted-foreground">{props.label('update-card-note')}</p>
       <div className="mt-5 flex justify-end gap-2">
         <button type="button" className="h-8 rounded-lg border px-3 text-sm" onClick={props.onClose}>{props.label('cancel')}</button>

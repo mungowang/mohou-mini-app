@@ -37,8 +37,8 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 | `POST /api/apps/:appId/storage/restore` | Panel | restores the storage backup |
 | `GET /api/apps/:appId/theme` | Panel | current pin, whether `theme.css` parsed, and that file's name and swatch when it did |
 | `POST /api/apps/:appId/theme` | Panel | saves or clears the pin |
-| `GET /api/about` | Panel | process name, environment, package versions, and the authoring MCP url plus token |
-| `GET /api/updates` | Panel | `{ name, current, latest, updateAvailable, channel?, installable?, error?, lastAttempt? }`. `lastAttempt` is the launcher's record of the last install: `{ state, code?, from?, to?, rolledBack?, exitCode?, log?, at }` |
+| `GET /api/about` | Panel | process name, environment, package versions, the authoring MCP url plus token, and `source`: where an update would install from (`{ channel: 'registry', registry }`, `{ channel: 'tarball', tarballDir }`, or `{ channel: 'none' }` for a source tree). Reads the prefix; asks no registry |
+| `GET /api/updates` | Panel | `{ name, current, latest, updateAvailable, channel?, registry?, tarballDir?, installable?, error?, lastAttempt? }`. `lastAttempt` is the launcher's record of the last install: `{ state, code?, from?, to?, rolledBack?, exitCode?, log?, at }` |
 | `POST /api/updates/install` | Panel, token | stage `update.json` in the install prefix, then restart the sidecar |
 | `POST /api/updates/ack` | Panel | drop the acknowledged `lastAttempt` record; `{ at }` names the attempt, so a newer one survives |
 | `GET /api/runtime-providers` | Panel | registered providers and their settings fields |

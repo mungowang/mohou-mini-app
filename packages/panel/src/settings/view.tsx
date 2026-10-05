@@ -7,7 +7,8 @@ import { Dialog } from '../ui/dialog.tsx'
 import type { PaletteChip } from '../theme/client.ts'
 import { applyDocumentMode, paintHostStyle } from '../theme/menu.tsx'
 import { AuthorMcpInstall } from './author-mcp-view.tsx'
-import type { PanelAbout, PanelAuthorMcpStatus, PanelPolicy, PanelRuntime, PanelSettingsClient, PanelSkillStatus, PanelUpdateCheck } from './client.ts'
+import type { PanelAbout, PanelAuthorMcpStatus, PanelPolicy, PanelRuntime, PanelSettingsClient, PanelSkillStatus, PanelUpdateCheck, PanelUpdateSource } from './client.ts'
+import { UpdateSourceChip } from './update-source.tsx'
 import { CredentialSettings } from './credentials-view.tsx'
 import { McpSettings } from './mcp-view.tsx'
 import { SkillInstall } from './skill-install.tsx'
@@ -48,6 +49,7 @@ export function PanelSettings(props: {
   const [runtimes, setRuntimes] = useState<readonly PanelRuntime[]>([])
   const [runtimeBusy, setRuntimeBusy] = useState(false)
   const [update, setUpdate] = useState<PanelUpdateCheck | 'checking' | 'failed' | undefined>(undefined)
+  const [about, setAbout] = useState<PanelAbout | undefined>(undefined)
   const [restarting, setRestarting] = useState(false)
   const [portUnlocked, setPortUnlocked] = useState(false)
   useEffect(() => {
@@ -61,6 +63,13 @@ export function PanelSettings(props: {
     if (props.hostPolicy === undefined) return
     dispatch({ type: 'host-policy', policy: props.hostPolicy })
   }, [props.hostPolicy])
+  useEffect(() => {
+    // The source is a fact about this install, not a network answer, so it loads with the block.
+    if (section !== 'about' || about !== undefined) return
+    const read = props.client?.readAbout
+    if (read === undefined) return
+    void read().then(setAbout, () => undefined)
+  }, [section, about, props.client])
   useEffect(() => {
     if (state.closed) props.onClose?.()
   }, [state.closed])
@@ -281,6 +290,7 @@ export function PanelSettings(props: {
             <AboutSection
               update={update}
               label={label}
+              {...about?.source === undefined ? {} : { source: about.source }}
               {...props.versions === undefined ? {} : { versions: props.versions }}
               {...client.checkUpdate === undefined ? {} : { onCheck: () => { void readUpdate(client, setUpdate, props.onUpdateOffer) } }}
             />
@@ -445,6 +455,7 @@ function AgentSection(props: {
 function AboutSection(props: {
   readonly versions?: string
   readonly update: PanelUpdateCheck | 'checking' | 'failed' | undefined
+  readonly source?: PanelUpdateSource
   readonly label: (key: string) => string
   readonly onCheck?: () => void
 }): ReactNode {
@@ -462,6 +473,9 @@ function AboutSection(props: {
         <ul className="mb-4 font-mono text-sm text-muted-foreground">
           {lines.map(line => <li key={line}>{line}</li>)}
         </ul>
+      )}
+      {props.source === undefined ? null : (
+        <div className="mb-4"><UpdateSourceChip source={props.source} label={props.label} /></div>
       )}
       {props.onCheck === undefined ? null : (
         <button type="button" className="h-8 rounded-lg border px-3 text-sm hover:bg-muted" onClick={props.onCheck}>{props.label('update')}</button>

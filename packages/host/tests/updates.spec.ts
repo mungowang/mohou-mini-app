@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { checkPackageUpdate, discardUpdateResult, newestTarball, readUpdateResult, stagePackageUpdate } from '../src/http/updates.ts'
+import { checkPackageUpdate, discardUpdateResult, newestTarball, readUpdateResult, readUpdateSource, stagePackageUpdate } from '../src/http/updates.ts'
 import { hostUpdateResultPath } from '../src/host/layout.ts'
 
 afterEach(() => {
@@ -67,6 +67,7 @@ describe('checkPackageUpdate', () => {
     expect(found.updateAvailable).toBe(true)
     expect(found.channel).toBe('tarball')
     expect(found.installable).toBe(true)
+    expect(found.tarballDir).toBe(packs)
     stagePackageUpdate('1.2.0', {}, root)
     const staged = JSON.parse(await readFile(join(root, 'update.json'), 'utf8')) as { version: string; args: string[] }
     expect(staged.version).toBe('1.2.0')
@@ -93,6 +94,37 @@ describe('checkPackageUpdate', () => {
     )
     expect(same.channel).toBe('registry')
     expect(same.installable).toBe(true)
+    expect(same.registry).toBe('https://registry.npmjs.org')
+  })
+})
+
+describe('readUpdateSource', () => {
+  it('reads the prefix without asking any registry', async () => {
+    expect(readUpdateSource({}, await mkdtemp(join(tmpdir(), 'mma-nosrc-')))).toEqual({ channel: 'none' })
+
+    const root = await mkdtemp(join(tmpdir(), 'mma-src-'))
+    const packs = join(root, 'packs')
+    await writeFile(join(root, 'package.json'), JSON.stringify({
+      name: 'mohou-app',
+      mohou: { channel: 'tarball', tarballDir: packs },
+      dependencies: { '@mohou/shell': 'file:x.tgz' },
+    }))
+    expect(readUpdateSource({}, root)).toEqual({ channel: 'tarball', tarballDir: packs })
+    const override = join(root, 'other')
+    expect(readUpdateSource({ MINI_APP_TARBALL_DIR: override }, root)).toEqual({ channel: 'tarball', tarballDir: override })
+
+    await writeFile(join(root, 'package.json'), JSON.stringify({
+      name: 'mohou-app',
+      mohou: { channel: 'registry' },
+      dependencies: {},
+    }))
+    expect(readUpdateSource({}, root)).toEqual({ channel: 'registry', registry: 'https://registry.npmjs.org' })
+    await writeFile(join(root, 'package.json'), JSON.stringify({
+      name: 'mohou-app',
+      mohou: { channel: 'registry', registry: 'https://registry.npmmirror.com' },
+      dependencies: {},
+    }))
+    expect(readUpdateSource({}, root)).toEqual({ channel: 'registry', registry: 'https://registry.npmmirror.com' })
   })
 })
 

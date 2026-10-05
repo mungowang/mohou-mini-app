@@ -58,11 +58,22 @@ export interface PanelAuthorMcpStatus {
   readonly agents: readonly PanelAuthorMcpAgent[]
 }
 
+/**
+ * Where this install updates from. `none` is a source tree with no install prefix.
+ * A registry names its host; a tarball channel names its drop folder.
+ */
+export type PanelUpdateSource =
+  | { readonly channel: 'registry'; readonly registry: string }
+  | { readonly channel: 'tarball'; readonly tarballDir: string }
+  | { readonly channel: 'none' }
+
 /** Owner about block, including the authoring MCP snippet. */
 export interface PanelAbout {
   readonly name: string
   readonly current: string
   readonly platform: string
+  /** Where an update would come from. */
+  readonly source?: PanelUpdateSource
   readonly authoring: {
     readonly url: string
     readonly token: string
@@ -105,6 +116,10 @@ export interface PanelUpdateCheck {
   readonly updateAvailable: boolean
   readonly channel?: 'registry' | 'tarball'
   readonly installable?: boolean
+  /** The host an update would install from, when the prefix names one. */
+  readonly registry?: string
+  /** The folder a tarball update would install from. */
+  readonly tarballDir?: string
   readonly error?: string
   /** The last install this machine recorded, when one is on disk. The panel shows it once. */
   readonly lastAttempt?: PanelUpdateAttempt

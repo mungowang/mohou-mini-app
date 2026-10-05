@@ -61,6 +61,7 @@ function basePorts(extra: Record<string, unknown> = {}): LoopbackPorts {
     subscribeApp: () => () => undefined,
     checkUpdate: async () => ({ name: 'Mohou', current: '1.0.0', latest: '1.0.0', updateAvailable: false }),
     ackUpdate: async () => undefined,
+    updateSource: async () => ({ channel: 'none' as const }),
     readMcp: async () => ({ servers: [], unresolved: [] }),
     writeMcp: async () => undefined,
     checkMcp: async () => ({ ok: true, tools: [] }),
@@ -138,6 +139,17 @@ describe('mountOwner', () => {
     })
     expect(noRemoveName.status).toBe(400)
     expect(JSON.parse(noRemoveName.body)).toMatchObject({ error: { code: 'credential-invalid' } })
+  })
+
+  it('answers the about block with the update source', async () => {
+    const app = new Hono<HostEnv>()
+    mountOwner(app, basePorts({ updateSource: async () => ({ channel: 'tarball', tarballDir: '/tmp/packs' }) }))
+    const answer = await request(app, httpLayout.about)
+    expect(answer.status).toBe(200)
+    expect(JSON.parse(answer.body)).toMatchObject({
+      ok: true,
+      source: { channel: 'tarball', tarballDir: '/tmp/packs' },
+    })
   })
 
   it('acknowledges the launcher record by attempt time', async () => {

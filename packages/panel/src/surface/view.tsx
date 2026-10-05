@@ -8,6 +8,7 @@ import type { HistoryClient } from '../history/client.ts'
 import { isPanelLocale, panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import type { PanelPolicy, PanelSettingsClient, PanelUpdateCheck } from '../settings/client.ts'
 import { attemptCard, UpdateDialog, type UpdateCard } from '../settings/update-dialog.tsx'
+import { checkSource } from '../settings/update-source.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { PanelSettings } from '../settings/view.tsx'
 import type { StorageClient } from '../storage/client.ts'
@@ -246,10 +247,12 @@ function receiveUpdate(check: PanelUpdateCheck, settings: PanelSettingsClient | 
 function offerCard(check: PanelUpdateCheck): UpdateCard | undefined {
   if (!check.updateAvailable || check.installable !== true || check.latest === null) return undefined
   if (sessionStorage.getItem(updateDismissedKey) === check.latest) return undefined
+  const source = checkSource(check)
   return {
     kind: 'offer',
     current: check.current,
     latest: check.latest,
     ...check.channel === undefined ? {} : { channel: check.channel },
+    ...source === undefined ? {} : { source },
   }
 }

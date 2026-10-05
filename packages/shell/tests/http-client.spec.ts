@@ -131,6 +131,7 @@ describe('httpPanelClients', () => {
       { name: 'bare' },
     ])
     expect((await client.readAbout?.())?.authoring.tools[0]?.name).toBe('mini_app_register')
+    expect((await client.readAbout?.())?.source).toEqual({ channel: 'registry', registry: 'https://registry.npmmirror.com' })
     expect((await client.readSkill?.())?.customs[0]?.dir).toBe('/tmp/skills')
     expect((await client.readAuthorMcp?.())?.agents[0]?.id).toBe('pi')
     expect((await client.listRuntimes?.())?.[0]?.label).toBe('Echo')
@@ -160,6 +161,21 @@ describe('httpPanelClients', () => {
     expect(credentialRead?.[1].headers?.authorization).toBe('Bearer t')
     const readMcp = calls.find(([url, init]) => String(url).endsWith('/api/mcp-servers') && init.method === 'GET')
     expect(readMcp?.[1].headers?.authorization).toBeUndefined()
+  })
+
+  it('drops an update source that names an incomplete one', async () => {
+    const answer = (source: unknown) => vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, name: 'h', current: '1', platform: 'd', source, authoring: { url: 'u', token: 't', tools: [] } }),
+    }))
+    vi.stubGlobal('fetch', answer({ channel: 'registry' }))
+    expect((await httpPanelClients('http://127.0.0.1').readAbout?.())?.source).toBeUndefined()
+    vi.stubGlobal('fetch', answer({ channel: 'tarball', tarballDir: '' }))
+    expect((await httpPanelClients('http://127.0.0.1').readAbout?.())?.source).toBeUndefined()
+    vi.stubGlobal('fetch', answer({ channel: 'npm' }))
+    expect((await httpPanelClients('http://127.0.0.1').readAbout?.())?.source).toBeUndefined()
+    vi.stubGlobal('fetch', answer({ channel: 'none' }))
+    expect((await httpPanelClients('http://127.0.0.1').readAbout?.())?.source).toEqual({ channel: 'none' })
   })
 
   it('drops a recorded attempt this panel does not understand', async () => {
@@ -276,7 +292,16 @@ function dense(url: string): unknown {
       },
     }
   }
-  if (url.includes('/about')) return { ok: true, name: 'host', current: '1', platform: 'darwin', authoring: { url: 'http://x', token: 't', tools: [{ name: 'mini_app_register', description: 'create' }, { description: 'skip' }] } }
+  if (url.includes('/about')) {
+    return {
+      ok: true,
+      name: 'host',
+      current: '1',
+      platform: 'darwin',
+      source: { channel: 'registry', registry: 'https://registry.npmmirror.com' },
+      authoring: { url: 'http://x', token: 't', tools: [{ name: 'mini_app_register', description: 'create' }, { description: 'skip' }] },
+    }
+  }
   if (url.includes('/author-skill')) return { ok: true, result: { skillId: 's', version: '', agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/x', skillsDir: '/tmp', homePresent: false, installed: false }], customs: [{ dir: '/tmp/skills', dest: '/tmp/skills/s', installed: true, version: '1.0.0', updateAvailable: true }] } }
   if (url.includes('/author-mcp')) return { ok: true, result: { agents: [{ id: 'pi', label: 'Pi', dest: '/tmp/mcp.json', homePresent: false, installed: false, updateAvailable: false }, { id: 'skip' }] } }
   if (url.includes('/runtime-providers')) return { providers: [{ id: 'echo', label: 'Echo', models: [{ provider: 'echo', models: ['m'] }] }] }

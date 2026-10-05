@@ -32,6 +32,15 @@ export type UpdateAttempt =
     readonly at: number
   }
 
+/**
+ * Where this install updates from. `none` is a source tree with no install prefix,
+ * which cannot install anything.
+ */
+export type UpdateSource =
+  | { readonly channel: 'registry'; readonly registry: string }
+  | { readonly channel: 'tarball'; readonly tarballDir: string }
+  | { readonly channel: 'none' }
+
 export interface UpdateCheck {
   readonly name: string
   readonly current: string
@@ -39,6 +48,9 @@ export interface UpdateCheck {
   readonly updateAvailable: boolean
   readonly channel?: 'registry' | 'tarball'
   readonly installable?: boolean
+  /** Set when the install prefix names one, so a panel can say where an update comes from. */
+  readonly registry?: string
+  readonly tarballDir?: string
   readonly error?: string
   /** The last install this machine recorded, when one is on disk. */
   readonly lastAttempt?: UpdateAttempt
@@ -62,12 +74,14 @@ export async function checkPackageUpdate(
   if (about.name.length === 0) return { ...empty, error: 'package name is missing' }
   const prefix = readPrefixUpdate(cwd, env)
   if (prefix?.channel === 'tarball') {
-    const latest = newestTarball(prefix.tarballDir ?? homePackagesDir(homedir()), 'shell')
+    const tarballDir = prefix.tarballDir ?? homePackagesDir(homedir())
+    const latest = newestTarball(tarballDir, 'shell')
     return {
       name: '@mohou/shell',
       current: about.current,
       latest,
       channel: 'tarball',
+      tarballDir,
       installable: true,
       updateAvailable: latest !== null && compareVersion(latest, about.current) > 0,
     }
@@ -79,7 +93,13 @@ export async function checkPackageUpdate(
     const response = await fetch(`${registry.replace(/\/$/, '')}/${name}/latest`, {
       signal: AbortSignal.timeout(3_000),
     })
-    if (!response.ok) return { ...empty, name, ...prefix === undefined ? {} : { channel: prefix.channel }, installable: prefix !== undefined, error: `package registry returned ${response.status}` }
+    if (!response.ok) return {
+      ...empty,
+      name,
+      ...prefix === undefined ? {} : { channel: prefix.channel, registry: prefix.registry ?? 'https://registry.npmjs.org' },
+      installable: prefix !== undefined,
+      error: `package registry returned ${response.status}`,
+    }
     const body = await response.json() as { version?: unknown }
     const latest = typeof body.version === 'string' ? body.version : null
     return {
@@ -87,12 +107,32 @@ export async function checkPackageUpdate(
       current: about.current,
       latest,
       channel: prefix?.channel ?? 'registry',
+      ...prefix === undefined ? {} : { registry: prefix.registry ?? 'https://registry.npmjs.org' },
       installable: prefix !== undefined,
       updateAvailable: latest !== null && latest !== about.current,
     }
   } catch (error) {
-    return { ...empty, name, ...prefix === undefined ? {} : { channel: prefix.channel }, installable: prefix !== undefined, error: error instanceof Error ? error.message : 'update check failed' }
+    return {
+      ...empty,
+      name,
+      ...prefix === undefined ? {} : { channel: prefix.channel, registry: prefix.registry ?? 'https://registry.npmjs.org' },
+      installable: prefix !== undefined,
+      error: error instanceof Error ? error.message : 'update check failed',
+    }
   }
+}
+
+/**
+ * Where this install would update from. Reads the install prefix; asks no registry, so a
+ * panel can show the source while the network is slow or down.
+ * @param env - process environment; `MINI_APP_TARBALL_DIR` overrides the package folder
+ * @param cwd - directory the sidecar runs in
+ */
+export function readUpdateSource(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): UpdateSource {
+  const prefix = readPrefixUpdate(cwd, env)
+  if (prefix === undefined) return { channel: 'none' }
+  if (prefix.channel === 'tarball') return { channel: 'tarball', tarballDir: prefix.tarballDir ?? homePackagesDir(homedir()) }
+  return { channel: 'registry', registry: prefix.registry ?? 'https://registry.npmjs.org' }
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   type PanelUpdateAttempt,
   type PanelUpdateCheck,
   type PanelUpdateFailureCode,
+  type PanelUpdateSource,
   type McpCheckResult,
   type McpServerDraft,
   type PanelCredential,
@@ -437,10 +438,12 @@ function stringMap(value: unknown, field: 'env' | 'headers'): { env: Record<stri
 
 function panelAbout(value: Record<string, unknown>): PanelAbout {
   const authoring = record(value.authoring)
+  const source = updateSource(value.source)
   return {
     name: text(value.name),
     current: text(value.current),
     platform: text(value.platform),
+    ...source === undefined ? {} : { source },
     authoring: {
       url: text(authoring.url),
       token: text(authoring.token),
@@ -548,6 +551,8 @@ function authorMcpAgent(value: unknown): PanelAuthorMcpStatus['agents'] {
 
 function updateCheck(value: Record<string, unknown>): PanelUpdateCheck {
   const attempt = updateAttempt(value.lastAttempt)
+  const registry = updateText(value.registry)
+  const tarballDir = updateText(value.tarballDir)
   return {
     name: text(value.name),
     current: text(value.current),
@@ -555,6 +560,8 @@ function updateCheck(value: Record<string, unknown>): PanelUpdateCheck {
     updateAvailable: value.updateAvailable === true,
     ...value.channel === 'registry' || value.channel === 'tarball' ? { channel: value.channel } : {},
     ...value.installable === true ? { installable: true } : {},
+    ...registry === undefined ? {} : { registry },
+    ...tarballDir === undefined ? {} : { tarballDir },
     ...typeof value.error === 'string' ? { error: value.error } : {},
     ...attempt === undefined ? {} : { lastAttempt: attempt },
   }
@@ -588,6 +595,24 @@ function updateAttempt(value: unknown): PanelUpdateAttempt | undefined {
     ...typeof row.exitCode === 'number' && Number.isFinite(row.exitCode) ? { exitCode: row.exitCode } : {},
     ...typeof row.log === 'string' && row.log.length > 0 ? { log: row.log } : {},
   }
+}
+
+/** The source a record named, when it named a complete one. A channel with no detail reads as none. */
+function updateSource(value: unknown): PanelUpdateSource | undefined {
+  const row = record(value)
+  if (row.channel === 'registry') {
+    const registry = updateText(row.registry)
+    return registry === undefined ? undefined : { channel: 'registry', registry }
+  }
+  if (row.channel === 'tarball') {
+    const tarballDir = updateText(row.tarballDir)
+    return tarballDir === undefined ? undefined : { channel: 'tarball', tarballDir }
+  }
+  return row.channel === 'none' ? { channel: 'none' } : undefined
+}
+
+function updateText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
 function updateVersion(value: unknown): string | undefined {

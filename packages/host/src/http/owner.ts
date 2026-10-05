@@ -36,9 +36,10 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     if (denied !== undefined) return denied
     return writeConfig(c, ports)
   })
-  app.get(httpLayout.about, c => c.json({
+  app.get(httpLayout.about, async c => c.json({
     ok: true,
     ...aboutInfo(),
+    source: await ports.updateSource(),
     authoring: {
       url: `http://127.0.0.1:${ports.readPolicy().hostPort}${httpLayout.mcp}`,
       token: ports.authoringToken,

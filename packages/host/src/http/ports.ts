@@ -11,7 +11,7 @@ import type { CredentialListing } from '../credentials/provider.ts'
 import type { McpCheck, McpEditorServer } from '../host/mcp-editor.ts'
 import type { McpLoadFailure } from '../host/mcp.ts'
 import type { AppPin } from '../theme/pin.ts'
-import type { UpdateCheck } from './updates.ts'
+import type { UpdateCheck, UpdateSource } from './updates.ts'
 
 const require = createRequire(import.meta.url)
 
@@ -67,6 +67,8 @@ export interface LoopbackPorts {
   subscribeFrames(listener: (event: unknown) => void): () => void
   subscribeApp(appId: string, since: number, listener: (event: unknown) => void): () => void
   checkUpdate(): Promise<UpdateCheck>
+  /** Where an update would come from. Reads the prefix; no network. */
+  updateSource(): Promise<UpdateSource>
   installUpdate?(version: string): Promise<void>
   /** The panel showed the launcher's last attempt. The record is dropped, not shown twice. */
   ackUpdate?(at: number): Promise<void>

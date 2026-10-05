@@ -15,7 +15,7 @@ import { readVendorFile } from './ports.ts'
 import type { LoopbackPorts } from './ports.ts'
 import { authoringTokenMatches } from './guard.ts'
 import { probeBrain, type HostPolicy } from '../host/config.ts'
-import { checkPackageUpdate, discardUpdateResult, readUpdateResult, stagePackageUpdate } from './updates.ts'
+import { checkPackageUpdate, discardUpdateResult, readUpdateResult, readUpdateSource, stagePackageUpdate } from './updates.ts'
 import { McpError } from '@mohou/mcp-client'
 
 import { admitMcpText } from '../host/mcp-import.ts'
@@ -147,6 +147,7 @@ export function bindLoopback(input: {
     subscribeHost: listener => input.author.hostEvents.subscribe(listener),
     subscribeFrames: listener => forwardFrames(input.author.appEvents, listener),
     subscribeApp: (appId, since, listener) => input.author.appEvents.subscribe(appId, since, listener),
+    updateSource: () => Promise.resolve(readUpdateSource()),
     checkUpdate: async () => {
       const attempt = readUpdateResult(input.runtimeRoot)
       return {

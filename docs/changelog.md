@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.21
+
+The about block says where an update would come from. A chip carries the registry host, or the local package folder with the home directory collapsed to `~`; a source tree with no install prefix says that instead. The fact is read from the install prefix, so it is on screen when a registry is slow or unreachable, and the offer card shows the same chip before an install starts. A check that cannot reach its registry still names it.
+
 ## 1.0.20
 
 A tool in the MCP server dialog is a reference now instead of one paragraph. The panel shows the schemas the server declared: every top-level input field with its type, whether it is required, and its description, the schema itself as JSON, and an output section when the server sends one. The input schema was already answered to the agent by `mini_app_mcp_tools`; the panel's check was the copy that dropped it.

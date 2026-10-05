@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.25
+
+The first Windows launch to reach the new log named its own cause: the prefix was canonicalized, Windows returns a verbatim path for that, and the entry the launcher handed Node read `\\?\C:\...`. Node's module loader splits that, calls `lstat("C:")`, and dies before the sidecar's first line — the window opened, and then it was gone. The prefix is still canonical, which is what makes a symlinked install one prefix, but the verbatim form now stops at the process boundary: the entry, the panel directory, the runtime root, and the working directory are plain.
+
 ## 1.0.24
 
 A Windows launch that could not start said nothing at all, and this release is mostly about that. The launcher's only user-facing channel was a macOS dialog, its messages went to stderr, and a packaged app has no console — so a window that opened white and vanished left no trace anywhere. Every launch now writes `launcher.log` in the runtime root: the platform, the runtime root, the resolved Node, the entry, the PATH, everything the sidecar prints on stdout and stderr, and each message shown. A fatal launch shows that message natively on both macOS and Windows and names the log, and a sidecar that stops before it prints an origin names its exit code and its last lines.

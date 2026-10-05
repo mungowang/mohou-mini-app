@@ -38,6 +38,24 @@ pub fn shell_entry(prefix: &Path) -> PathBuf {
     prefix.join("node_modules/@mohou/shell/src/dev.ts")
 }
 
+/// Node's module loader cannot resolve a verbatim path. `\\?\C:\dir\dev.ts` reaches it as
+/// `lstat("C:")`, which is a directory, and the sidecar dies before it starts. Canonicalizing
+/// resolves `..` and symlinks, so the prefix stays canonical; only the Windows form it takes
+/// is a problem, and only Node cares.
+pub fn plain_path(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        let text = path.as_os_str().to_string_lossy();
+        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{rest}"));
+        }
+        if let Some(rest) = text.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+    }
+    path.to_path_buf()
+}
+
 /// `Contents/MacOS/<exe>` uses `Contents/Resources/prefix`. A sibling `prefix/` is the local layout.
 pub fn prefix_from_exe(exe: &Path) -> Option<PathBuf> {
     let dir = exe.parent()?;
@@ -47,7 +65,7 @@ pub fn prefix_from_exe(exe: &Path) -> Option<PathBuf> {
         dir.join("prefix"),
     ] {
         if shell_entry(&candidate).is_file() {
-            return Some(fs::canonicalize(&candidate).unwrap_or(candidate));
+            return Some(plain_path(&fs::canonicalize(&candidate).unwrap_or(candidate)));
         }
     }
     None
@@ -1241,11 +1259,25 @@ pub fn supervise(
 
 #[cfg(test)]
 mod tests {
-    use super::{child_stop, find_node, harden_install_args, installed_version, is_app_bundle, npm_bin, path_from_shell_env, prefix_from_exe, prepend_path, read_shell_cache, reads_login_shell, restore_update_snapshot, runtime_dir, save_update_snapshot, shell_entry, sidecar_failure, splash_label, tail_push, tail_text, update_result_body, update_snapshot_dir, with_log, write_shell_cache, write_update_result, ChildStop, Reporter, Splash, Tail, UpdateOutcome, RESTART_EXIT, TAIL_LINES};
+    use super::{child_stop, find_node, harden_install_args, installed_version, is_app_bundle, npm_bin, path_from_shell_env, plain_path, prefix_from_exe, prepend_path, read_shell_cache, reads_login_shell, restore_update_snapshot, runtime_dir, save_update_snapshot, shell_entry, sidecar_failure, splash_label, tail_push, tail_text, update_result_body, update_snapshot_dir, with_log, write_shell_cache, write_update_result, ChildStop, Reporter, Splash, Tail, UpdateOutcome, RESTART_EXIT, TAIL_LINES};
     use std::collections::VecDeque;
     use std::fs;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn a_verbatim_windows_path_loses_its_prefix() {
+        // Windows only: elsewhere the path is what it was.
+        let verbatim = Path::new(r"\\?\C:\dir\dev.ts");
+        let unc = Path::new(r"\\?\UNC\server\share\dev.ts");
+        if cfg!(windows) {
+            assert_eq!(plain_path(verbatim), PathBuf::from(r"C:\dir\dev.ts"));
+            assert_eq!(plain_path(unc), PathBuf::from(r"\\server\share\dev.ts"));
+        } else {
+            assert_eq!(plain_path(verbatim), verbatim);
+            assert_eq!(plain_path(unc), unc);
+        }
+    }
 
     #[test]
     fn a_login_shell_is_asked_on_macos_and_never_on_windows() {

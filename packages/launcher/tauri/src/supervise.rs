@@ -1,8 +1,9 @@
 //! The packaged app is this binary. It spawns the shell sidecar and owns the window.
 //! Exit code 75 starts the sidecar again. Any other exit stops the app.
 
+use std::collections::VecDeque;
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -50,6 +51,13 @@ pub fn prefix_from_exe(exe: &Path) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// True when a launch must ask a login shell for PATH. A Dock launch does not read `.zshrc`,
+/// so nvm, fnm, volta, and asdf only apply if we ask. Windows has no login shell to ask and
+/// already inherits the machine and user PATH, so asking is a macOS bundle concern.
+pub fn reads_login_shell(gui: bool, windows: bool) -> bool {
+    gui && !windows
 }
 
 pub fn is_app_bundle(prefix: &Path) -> bool {
@@ -209,7 +217,7 @@ fn launch_plan(prefix: &Path, app: &AppHandle, announce: bool) -> Result<(Launch
     // A Dock launch does not read .zshrc. Ask the login shell, the same way
     // shell-env and VS Code do, so nvm, fnm, volta, and asdf apply themselves.
     // A remembered PATH skips that wait. A background refresh updates the next open.
-    let (base_path, cached) = if gui {
+    let (base_path, cached) = if reads_login_shell(gui, cfg!(windows)) {
         if let Some(path) = read_shell_cache(&runtime) {
             if find_node(&path, &home).is_some() {
                 if announce {
@@ -427,10 +435,22 @@ fn login_path() -> Option<String> {
         .map(|line| line.to_string())
 }
 
-fn spawn_sidecar(prefix: &Path, app: &AppHandle) -> Result<(Child, bool, PathBuf), String> {
+fn spawn_sidecar(
+    prefix: &Path,
+    app: &AppHandle,
+    reporter: &Arc<Reporter>,
+    tail: &Tail,
+) -> Result<(Child, bool, PathBuf), String> {
     let (launch, cached) = launch_plan(prefix, app, true)?;
+    // The three facts that explain a launch that never reaches the panel.
+    reporter.note(&format!("node {}", launch.node.display()));
+    reporter.note(&format!("entry {}", launch.entry.display()));
+    reporter.note(&format!("PATH {}", launch.path));
     if launch.gui && !launch.node.is_file() {
-        return Err("Mohou needs Node.js 22+ . Install it from https://nodejs.org and open Mohou again.".to_string());
+        return Err(with_log(
+            "Mohou needs Node.js 22+ . Install it from https://nodejs.org and open Mohou again.",
+            reporter.path(),
+        ));
     }
     let mut cmd = Command::new(&launch.node);
     cmd.arg("--import")
@@ -449,15 +469,31 @@ fn spawn_sidecar(prefix: &Path, app: &AppHandle) -> Result<(Child, bool, PathBuf
         .env_remove("MINI_APP_WINDOW")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
+        .stderr(Stdio::piped());
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
     }
-    let child = cmd
+    let mut child = cmd
         .spawn()
-        .map_err(|error| format!("could not start Node: {error}"))?;
+        .map_err(|error| with_log(&format!("could not start Node: {error}"), reporter.path()))?;
+    // Node explains itself on stderr. A GUI launch has nowhere to show it, so it goes to the log.
+    if let Some(stderr) = child.stderr.take() {
+        let voice = Arc::clone(reporter);
+        let said = tail.clone();
+        thread::spawn(move || {
+            for line in BufReader::new(stderr).lines() {
+                let Ok(line) = line else { break };
+                let trimmed = line.trim_end();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                voice.note(&format!("sidecar error: {trimmed}"));
+                tail_push(&said, trimmed);
+            }
+        });
+    }
     // process_group(0) keeps grandchildren killable, but then a dead parent
     // does not take the sidecar with it. A watcher notices that and kills the group.
     spawn_parent_watch(child.id());
@@ -517,17 +553,29 @@ fn follow_origins(app: AppHandle, follow: mpsc::Receiver<Url>) {
     });
 }
 
-fn read_origin(stdout: impl std::io::Read + Send + 'static, child: &mut Child) -> OriginRead {
+fn read_origin(
+    stdout: impl std::io::Read + Send + 'static,
+    child: &mut Child,
+    reporter: Arc<Reporter>,
+    tail: Tail,
+) -> OriginRead {
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             let Ok(line) = line else { break };
             let trimmed = line.trim();
-            if let Ok(url) = admit_origin(trimmed) {
-                let _ = tx.send(url);
-            } else if !trimmed.is_empty() {
-                eprintln!("{trimmed}");
+            match admit_origin(trimmed) {
+                Ok(url) => {
+                    reporter.note(&format!("sidecar ready at {url}"));
+                    tail_push(&tail, trimmed);
+                    let _ = tx.send(url);
+                }
+                Err(_) if !trimmed.is_empty() => {
+                    reporter.note(&format!("sidecar: {trimmed}"));
+                    tail_push(&tail, trimmed);
+                }
+                Err(_) => {}
             }
         }
     });
@@ -744,7 +792,7 @@ fn stop_locked_install(prefix: &Path) {
 }
 
 /// A file left by a dead process must not install, and must not block open.
-fn park_leftover_update(prefix: &Path, runtime: &Path, gui: bool) {
+fn park_leftover_update(prefix: &Path, runtime: &Path, reporter: &Reporter) {
     stop_locked_install(prefix);
     restore_update_snapshot(prefix);
     if !update_request(prefix).is_file() {
@@ -758,10 +806,7 @@ fn park_leftover_update(prefix: &Path, runtime: &Path, gui: bool) {
         rolled_back: true,
         exit_code: None,
     });
-    tell_user_later(
-        "The previous update did not finish. Mohou opened the installed version.",
-        gui,
-    );
+    reporter.say("The previous update did not finish. Mohou opened the installed version.");
 }
 
 fn wait_budget(child: &mut Child, budget: Duration, closing: &AtomicBool) -> InstallWait {
@@ -780,7 +825,7 @@ fn wait_budget(child: &mut Child, budget: Duration, closing: &AtomicBool) -> Ins
 }
 
 /// Sidecar exit 75 in this process is the only install. Failure boots the prefix as it was.
-fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &AtomicBool, pid: &AtomicU32, app: &AppHandle) {
+fn apply_pending_update(prefix: &Path, runtime: &Path, reporter: &Reporter, closing: &AtomicBool, pid: &AtomicU32, app: &AppHandle) {
     let path = update_request(prefix);
     let Ok(text) = fs::read_to_string(&path) else {
         return;
@@ -816,7 +861,7 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &Atom
                 rolled_back: true,
                 exit_code: None,
             });
-            tell_user_later(&message, gui);
+            reporter.say(&message);
             return;
         }
     };
@@ -829,7 +874,7 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &Atom
             rolled_back: true,
             exit_code: None,
         });
-        tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
+        reporter.say("Mohou could not install the update. The installed version is still running.");
         return;
     }
     let args = harden_install_args(args);
@@ -845,7 +890,7 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &Atom
                 rolled_back: true,
                 exit_code: None,
             });
-            tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
+            reporter.say("Mohou could not install the update. The installed version is still running.");
             return;
         }
     };
@@ -861,7 +906,7 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &Atom
                 rolled_back: true,
                 exit_code: None,
             });
-            tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
+            reporter.say("Mohou could not install the update. The installed version is still running.");
             return;
         }
     };
@@ -889,7 +934,7 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &Atom
                 rolled_back: true,
                 exit_code: None,
             });
-            tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
+            reporter.say("Mohou could not install the update. The installed version is still running.");
             return;
         }
     };
@@ -934,36 +979,136 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, gui: bool, closing: &Atom
                 },
             });
             if !matches!(other, InstallWait::Closed) {
-                tell_user_later("Mohou could not install the update. The installed version is still running.", gui);
+                reporter.say("Mohou could not install the update. The installed version is still running.");
             }
         }
     }
 }
 
-fn tell_user(message: &str, gui: bool) {
-    eprintln!("{message}");
-    if !gui {
-        return;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let _ = dialog(message).status();
+/// The tail of what the sidecar said, for the message when it dies before it is ready.
+pub const TAIL_LINES: usize = 20;
+
+pub type Tail = Arc<Mutex<VecDeque<String>>>;
+
+pub fn tail_push(tail: &Tail, line: &str) {
+    if let Ok(mut lines) = tail.lock() {
+        if lines.len() == TAIL_LINES {
+            lines.pop_front();
+        }
+        lines.push_back(line.to_string());
     }
 }
 
-fn tell_user_later(message: &str, gui: bool) {
+pub fn tail_text(tail: &Tail) -> String {
+    tail.lock()
+        .map(|lines| lines.iter().cloned().collect::<Vec<_>>().join("\n"))
+        .unwrap_or_default()
+}
+
+/// What is worth saying when the sidecar stops before it prints an origin. Every word here is
+/// the difference between a silent window and a report someone can act on.
+pub fn sidecar_failure(when: &str, code: Option<i32>, tail: &str, log: &Path) -> String {
+    let status = code
+        .map(|code| format!("exit code {code}"))
+        .unwrap_or_else(|| "no exit code".to_string());
+    let said = if tail.trim().is_empty() {
+        "It printed nothing.".to_string()
+    } else {
+        format!("Its last lines:\n{tail}")
+    };
+    format!("Mohou's sidecar {when} ({status}).\n\n{said}\n\nThe launcher log is at {}", log.display())
+}
+
+/// The same message with the log path, which is the one thing a failed launch should always name.
+pub fn with_log(message: &str, log: &Path) -> String {
+    format!("{message}\n\nThe launcher log is at {}", log.display())
+}
+
+/// What the launcher says, in the places a user can see it: a log beside the runtime, stderr for
+/// a terminal launch, and a native message on a GUI launch. None of it is macOS-only.
+pub struct Reporter {
+    log: Option<Mutex<fs::File>>,
+    path: PathBuf,
+    gui: bool,
+}
+
+impl Reporter {
+    /// Open `<runtime>/launcher.log`, replacing the previous launch's file. A log that cannot be
+    /// opened costs the log, never the launch.
+    pub fn open(runtime: &Path, gui: bool) -> Reporter {
+        let path = runtime.join("launcher.log");
+        let _ = fs::create_dir_all(runtime);
+        let log = fs::File::create(&path).ok().map(Mutex::new);
+        let reporter = Reporter { log, path, gui };
+        reporter.note(&format!("Mohou launcher {} on {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS));
+        reporter.note(&format!("runtime {}", runtime.display()));
+        if reporter.log.is_none() {
+            reporter.note("the log file could not be opened");
+        }
+        reporter
+    }
+
+    /// Where the log is. Named in every fatal message, and kept even when the file is not there.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// One line to the log and to stderr. Nothing appears on screen.
+    pub fn note(&self, line: &str) {
+        eprintln!("{line}");
+        if let Some(log) = &self.log {
+            if let Ok(mut file) = log.lock() {
+                let _ = writeln!(file, "{line}");
+            }
+        }
+    }
+
+    /// A message for the user: logged, and shown when a GUI launch owns the screen.
+    pub fn say(&self, message: &str) {
+        self.note(message);
+        if self.gui {
+            message_box(message);
+        }
+    }
+}
+
+/// A native message. macOS asks `osascript`, Windows asks user32: one dialog is not worth a
+/// dependency, and a launch that failed must never be silent.
+#[cfg(target_os = "macos")]
+fn message_box(message: &str) {
+    let _ = dialog(message)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+}
+
+#[cfg(windows)]
+fn message_box(message: &str) {
+    use std::os::windows::ffi::OsStrExt;
+
+    const MB_OK: u32 = 0x0000_0000;
+    const MB_ICONERROR: u32 = 0x0000_0010;
+    const MB_SETFOREGROUND: u32 = 0x0001_0000;
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn MessageBoxW(window: *mut core::ffi::c_void, text: *const u16, title: *const u16, kind: u32) -> i32;
+    }
+
+    let wide = |text: &str| -> Vec<u16> {
+        std::ffi::OsStr::new(text).encode_wide().chain(std::iter::once(0)).collect()
+    };
+    let body = wide(message);
+    let title = wide("Mohou");
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), body.as_ptr(), title.as_ptr(), MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn message_box(message: &str) {
     eprintln!("{message}");
-    if !gui {
-        return;
-    }
-    #[cfg(target_os = "macos")]
-    {
-        let _ = dialog(message)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
-    }
 }
 
 #[cfg(target_os = "macos")]
@@ -985,27 +1130,29 @@ pub fn supervise(
     app: AppHandle,
 ) {
     let gui = is_app_bundle(&prefix);
+    let runtime = runtime_dir(&prefix, std::env::var("MINI_APP_RUNTIME").ok().as_deref(), &home_dir());
+    let reporter = Arc::new(Reporter::open(&runtime, gui));
     let mut install_after_restart = false;
     loop {
         if closing.load(Ordering::SeqCst) {
             app.exit(0);
             return;
         }
-        let runtime = runtime_dir(&prefix, std::env::var("MINI_APP_RUNTIME").ok().as_deref(), &home_dir());
         if install_after_restart {
             set_splash(&app, &runtime, Splash::Update);
-            apply_pending_update(&prefix, &runtime, gui, &closing, &pid, &app);
+            apply_pending_update(&prefix, &runtime, &reporter, &closing, &pid, &app);
         } else {
-            park_leftover_update(&prefix, &runtime, gui);
+            park_leftover_update(&prefix, &runtime, &reporter);
         }
         if closing.load(Ordering::SeqCst) {
             app.exit(0);
             return;
         }
-        let (mut child, cached, runtime) = match spawn_sidecar(&prefix, &app) {
+        let tail: Tail = Arc::new(Mutex::new(VecDeque::new()));
+        let (mut child, cached, runtime) = match spawn_sidecar(&prefix, &app, &reporter, &tail) {
             Ok(spawned) => spawned,
             Err(message) => {
-                tell_user(&message, gui);
+                reporter.say(&message);
                 app.exit(1);
                 return;
             }
@@ -1021,11 +1168,11 @@ pub fn supervise(
             return;
         }
         let Some(stdout) = child.stdout.take() else {
-            tell_user("could not read the sidecar", gui);
+            reporter.say(&with_log("could not read the sidecar", reporter.path()));
             app.exit(1);
             return;
         };
-        let url = match read_origin(stdout, &mut child) {
+        let url = match read_origin(stdout, &mut child, Arc::clone(&reporter), Arc::clone(&tail)) {
             OriginRead::Ready(url, follow) => {
                 follow_origins(app.clone(), follow);
                 url
@@ -1038,7 +1185,12 @@ pub fn supervise(
                         continue;
                     }
                     ChildStop::Exit(code) => {
-                        tell_user("Mohou's sidecar exited before it was ready.", gui);
+                        reporter.say(&sidecar_failure(
+                            "stopped before it was ready",
+                            Some(code),
+                            &tail_text(&tail),
+                            reporter.path(),
+                        ));
                         app.exit(code);
                         return;
                     }
@@ -1047,7 +1199,12 @@ pub fn supervise(
             OriginRead::TimedOut => {
                 stop_process(child.id());
                 let _ = child.wait();
-                tell_user("Mohou did not become ready.", gui);
+                reporter.say(&sidecar_failure(
+                    "did not become ready in time",
+                    None,
+                    &tail_text(&tail),
+                    reporter.path(),
+                ));
                 app.exit(1);
                 return;
             }
@@ -1084,9 +1241,58 @@ pub fn supervise(
 
 #[cfg(test)]
 mod tests {
-    use super::{child_stop, find_node, harden_install_args, installed_version, is_app_bundle, npm_bin, path_from_shell_env, prefix_from_exe, prepend_path, read_shell_cache, restore_update_snapshot, runtime_dir, save_update_snapshot, shell_entry, splash_label, update_result_body, update_snapshot_dir, write_shell_cache, write_update_result, ChildStop, Splash, UpdateOutcome, RESTART_EXIT};
+    use super::{child_stop, find_node, harden_install_args, installed_version, is_app_bundle, npm_bin, path_from_shell_env, prefix_from_exe, prepend_path, read_shell_cache, reads_login_shell, restore_update_snapshot, runtime_dir, save_update_snapshot, shell_entry, sidecar_failure, splash_label, tail_push, tail_text, update_result_body, update_snapshot_dir, with_log, write_shell_cache, write_update_result, ChildStop, Reporter, Splash, Tail, UpdateOutcome, RESTART_EXIT, TAIL_LINES};
+    use std::collections::VecDeque;
     use std::fs;
     use std::path::Path;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn a_login_shell_is_asked_on_macos_and_never_on_windows() {
+        assert!(reads_login_shell(true, false));
+        assert!(!reads_login_shell(true, true));
+        assert!(!reads_login_shell(false, false));
+        assert!(!reads_login_shell(false, true));
+    }
+
+    #[test]
+    fn the_tail_keeps_the_last_lines() {
+        let tail: Tail = Arc::new(Mutex::new(VecDeque::new()));
+        for index in 0..TAIL_LINES + 5 {
+            tail_push(&tail, &format!("line {index}"));
+        }
+        let text = tail_text(&tail);
+        let lines: Vec<&str> = text.lines().collect();
+        let last = format!("line {}", TAIL_LINES + 4);
+        assert_eq!(lines.len(), TAIL_LINES);
+        assert_eq!(lines.first().copied(), Some("line 5"));
+        assert_eq!(lines.last().copied(), Some(last.as_str()));
+    }
+
+    #[test]
+    fn a_sidecar_failure_names_the_code_the_tail_and_the_log() {
+        let log = Path::new("/tmp/launcher.log");
+        let silent = sidecar_failure("stopped before it was ready", None, "", log);
+        assert!(silent.contains("no exit code"));
+        assert!(silent.contains("It printed nothing."));
+        assert!(silent.contains("/tmp/launcher.log"));
+        let loud = sidecar_failure("did not become ready in time", Some(1), "sidecar error: boom", log);
+        assert!(loud.contains("exit code 1"));
+        assert!(loud.contains("sidecar error: boom"));
+        assert!(with_log("Mohou needs Node.js 22+", log).contains("/tmp/launcher.log"));
+    }
+
+    #[test]
+    fn the_reporter_writes_the_log_it_names() {
+        let root = std::env::temp_dir().join(format!("mma-launcher-log-{}", std::process::id()));
+        let reporter = Reporter::open(&root, false);
+        reporter.note("node C:\\Program Files\\nodejs\\node.exe");
+        reporter.say("Mohou's sidecar stopped before it was ready");
+        let text = fs::read_to_string(reporter.path()).expect("the log is there");
+        assert!(text.contains("Program Files"));
+        assert!(text.contains("stopped before it was ready"));
+        let _ = fs::remove_dir_all(root);
+    }
 
     #[test]
     fn a_result_record_carries_the_code_and_the_versions() {

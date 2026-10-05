@@ -7,6 +7,16 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.24
+
+A Windows launch that could not start said nothing at all, and this release is mostly about that. The launcher's only user-facing channel was a macOS dialog, its messages went to stderr, and a packaged app has no console — so a window that opened white and vanished left no trace anywhere. Every launch now writes `launcher.log` in the runtime root: the platform, the runtime root, the resolved Node, the entry, the PATH, everything the sidecar prints on stdout and stderr, and each message shown. A fatal launch shows that message natively on both macOS and Windows and names the log, and a sidecar that stops before it prints an origin names its exit code and its last lines.
+
+The bug behind the silence sat in the same place. A Windows launch asked the login shell for PATH — a macOS rule — and, finding no shell, replaced the inherited PATH with a unix one. Node was then looked for only under nvm-windows roots and `%ProgramFiles%\nodejs`, so an install anywhere else was invisible and the launch failed before it spawned anything. Windows now inherits the machine and user PATH, and the sidecar no longer starts with a PATH that hides every other tool on the machine.
+
+## 1.0.23
+
+A settings save was rejected whenever the update registry field was present, and because a save carries every editable field, that meant every save: theme, palette, port, language. The field was written through the config allowlist but never added to it, and the tests that covered the write used stubbed ports and a fake client, so none of them reached the check. It is an optional field now, a non-string is refused, an empty value clears it, and the allowlist and the HTTP path each have a test of their own.
+
 ## 1.0.22
 
 The update registry can be an owner's mirror now, because the public registry is slow in some networks. Settings → Network offers the packaged default, Alibaba npmmirror, and Tencent Cloud, with a custom url behind it; it must be https and carry no credentials, and a bad value never reaches the file. Only this product's own update check and install use it — one `--registry` argument on our own npm child — so the owner's `~/.npmrc` and an app's own dependency installs are untouched. The about chip names the registry in force, so a mirror is visible before an install starts.

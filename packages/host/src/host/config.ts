@@ -50,7 +50,7 @@ export interface PortBound {
 export const DEFAULT_PORT_BOUND: PortBound = { min: 1024, max: 65535 }
 
 const PUBLIC_KEYS = ['runtimeRoot', 'hostPort', 'theme', 'palette', 'locale', 'chatLanguage', 'llm', 'runtimeProvider'] as const
-const OPTIONAL_KEYS = ['defaultWorkbenchId'] as const
+const OPTIONAL_KEYS = ['defaultWorkbenchId', 'updateRegistry'] as const
 
 /**
  * Read `host.json`. A missing file writes a complete seed. A present bad file throws and is left as it was.
@@ -189,7 +189,16 @@ function admitPolicy(raw: unknown, runtimeRoot: string, ports: PortBound): HostP
     llm: admitLlm(raw.llm),
     runtimeProvider: admitProvider(raw.runtimeProvider),
     ...admitWorkbench(raw.defaultWorkbenchId),
+    ...admitUpdateRegistry(raw.updateRegistry),
   }
+}
+
+/** An empty value means the packaged default, so it is not written at all. */
+function admitUpdateRegistry(value: unknown): { updateRegistry: string } | Record<string, never> {
+  if (value === undefined) return {}
+  if (typeof value !== 'string') throw new ConfigError('config-invalid', 'host config updateRegistry is invalid')
+  const registry = value.trim()
+  return registry.length === 0 ? {} : { updateRegistry: registry }
 }
 
 function admitWorkbench(value: unknown): { defaultWorkbenchId: string } | Record<string, never> {

@@ -111,4 +111,24 @@ describe('host policy', () => {
     await writeFile(hostConfigPath(root), JSON.stringify({ ...created, runtimeProvider: { id: 'echo', config: { options: { a: 1 } } } }))
     await expect(resolveHostConfig(root, seed)).rejects.toMatchObject({ code: 'config-invalid' })
   })
+
+  it('keeps an update registry, and writes nothing for the packaged default', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-registry-'))
+    const created = await resolveHostConfig(root, seed)
+    expect(created.updateRegistry).toBeUndefined()
+    await writeFile(hostConfigPath(root), JSON.stringify({ ...created, updateRegistry: '  https://registry.npmmirror.com  ' }))
+    expect((await resolveHostConfig(root, seed)).updateRegistry).toBe('https://registry.npmmirror.com')
+
+    const written = await writeHostPolicy(root, { ...created }, { ...created, updateRegistry: 'https://mirrors.cloud.tencent.com/npm/' })
+    expect(written.policy.updateRegistry).toBe('https://mirrors.cloud.tencent.com/npm/')
+    expect(await readFile(hostConfigPath(root), 'utf8')).toContain('mirrors.cloud.tencent.com')
+
+    // The packaged default clears the field rather than storing an empty string.
+    const cleared = await writeHostPolicy(root, written.policy, { ...written.policy, updateRegistry: '' })
+    expect(cleared.policy.updateRegistry).toBeUndefined()
+    expect(await readFile(hostConfigPath(root), 'utf8')).not.toContain('updateRegistry')
+
+    await writeFile(hostConfigPath(root), JSON.stringify({ ...created, updateRegistry: 42 }))
+    await expect(resolveHostConfig(root, seed)).rejects.toMatchObject({ code: 'config-invalid' })
+  })
 })

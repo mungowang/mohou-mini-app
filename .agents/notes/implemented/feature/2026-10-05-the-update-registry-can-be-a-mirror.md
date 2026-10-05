@@ -35,6 +35,8 @@ Two fixes ride along, both from the same mirror scenario:
 
 An owner behind a slow registry picks a preset and the next check and install use it, with the chip confirming which host is in force. Nothing outside this product's own update path changes.
 
-`updateRegistry` lives in `host.json`, which is a policy file the panel writes with the authoring token. A mirror is therefore a trust decision the owner makes once, and the value is validated twice (form, host boundary) rather than once.
+`updateRegistry` lives in `host.json`, which is a policy file the panel writes with the authoring token. A mirror is therefore a trust decision the owner makes once. The form owns the https shape, because that is a usability rule; the host owns the field itself — a string when present, and an empty string clears it rather than storing one.
+
+The first release of this change was broken in a way worth naming. A panel save writes *every* editable field, so adding one to the form without adding it to the host's allowlist (`PUBLIC_KEYS` / `OPTIONAL_KEYS`) failed **every** settings save, not just the new field. The route test that covered the write used stubbed ports and so never reached the allowlist, and the panel tests used a fake client. The allowlist now has a test through the real `writeHostPolicy`, and the HTTP boundary has one that saves a registry and reads it back.
 
 The staged-publishing behaviour of npm's bypass-2FA tokens is unrelated to this and unimplemented here: a publish with such a token lands in staging and needs 2FA to approve. That is a publishing concern, not an update-source one.

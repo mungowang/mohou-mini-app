@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.34
+
+A stdio MCP server that closed before it answered reported `MCP error -32000: Connection closed`, and nothing else — the same message for a package npm could not fetch, a rejected token, and a crash at startup. The server's stderr was piped and never read. A failed start now carries its last words, capped and with secrets masked, into the message the check shows, so the next failure names its cause instead of its symptom.
+
 ## 1.0.33
 
 Quick add gained a third server: `@kud/mcp-jenkins` as **Jenkins**, with the URL, the user, and the API token as credential references — and the tools that change an instance (create, update, delete, rename, copy, replay, enable, disable, take a node offline, quiet down, restart) blocked in the preset. Asking whether a build is green should not hand over a controller. The preset test is table-driven now, so a row that forgets its credentials or its package fails the suite.

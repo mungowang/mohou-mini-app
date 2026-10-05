@@ -3,6 +3,18 @@ import { describe, expect, it } from 'vitest'
 import { McpClient, McpError, resolveMcpConfig, type McpServerSpec } from '../src/index.ts'
 
 describe('resolveMcpConfig', () => {
+  it('names what a server printed when it closes before it answers', async () => {
+    // A stdio server that dies reports "Connection closed" and nothing else; its stderr is the why.
+    const client = new McpClient({
+      broken: { command: process.execPath, args: ['-e', "console.error('boom: missing token'); process.exit(3)"] },
+    }, {}, 0)
+    const error = await client.listTools('broken').catch((thrown: unknown) => thrown)
+    expect(error).toMatchObject({ code: 'mcp-start-failed' })
+    const message = error instanceof Error ? error.message : String(error)
+    expect(message).toContain('boom: missing token')
+    await client.dispose()
+  })
+
   it('accepts a wrapper and skips settings', () => {
     const servers = resolveMcpConfig({
       mcpServers: {

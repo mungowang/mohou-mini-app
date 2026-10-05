@@ -218,12 +218,20 @@ export class McpClient {
       if (current?.generation === generation) this.sessions.delete(serverId)
       if (!this.recovering.has(serverId)) this.dropped.add(serverId)
     }
+    const transport = transportFor(spec, scrubEnv(this.parentEnv)) as Transport
+    const stderr = collectStderr(transport)
     try {
-      await client.connect(transportFor(spec, scrubEnv(this.parentEnv)) as Transport)
+      await client.connect(transport)
       return { client, generation }
     } catch (error) {
       await client.close().catch(() => undefined)
-      throw new McpError('mcp-start-failed', this.redact(error instanceof Error ? error.message : 'mcp server did not start', spec), { cause: error })
+      // A stdio server that exits reports nothing but "Connection closed", and its own last words
+      // are on stderr. Give the pipe a moment: they often land just after the socket closes.
+      await new Promise(resolve => setTimeout(resolve, STDERR_GRACE_MS))
+      const said = stderr.read()
+      const base = error instanceof Error ? error.message : 'mcp server did not start'
+      const message = said === undefined ? base : `${base} — ${said}`
+      throw new McpError('mcp-start-failed', this.redact(message, spec), { cause: error })
     }
   }
 
@@ -286,6 +294,25 @@ function transportFor(spec: McpServerSpec, parent: Record<string, string>) {
     env: { ...parent, ...spec.env },
     stderr: 'pipe',
   })
+}
+
+/** The child's own last words, capped: a server that dies says why on stderr, and nothing else does. */
+const STDERR_TAIL_CHARS = 600
+const STDERR_GRACE_MS = 100
+
+function collectStderr(transport: Transport): { read(): string | undefined } {
+  const stream = (transport as { stderr?: NodeJS.ReadableStream | null }).stderr
+  if (stream === null || stream === undefined) return { read: () => undefined }
+  let tail = ''
+  stream.on('data', (chunk: Buffer | string) => {
+    tail = `${tail}${chunk.toString()}`.slice(-STDERR_TAIL_CHARS)
+  })
+  return {
+    read() {
+      const text = tail.trim()
+      return text.length === 0 ? undefined : text
+    },
+  }
 }
 
 function scrubEnv(env: NodeJS.ProcessEnv): Record<string, string> {

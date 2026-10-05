@@ -171,8 +171,9 @@ function pruneShipModules(nodeModules) {
   return { files, dirs, mb: (bytes / (1024 * 1024)).toFixed(1) }
 }
 
+/** Block for a few seconds. Portable: no `sleep` binary is guaranteed. */
 function sleep(seconds) {
-  execFileSync('sleep', [String(seconds)])
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000)
 }
 
 function osascript(source) {
@@ -316,11 +317,29 @@ mkdirSync(prefix, { recursive: true })
 const engines = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).engines
 writeFileSync(join(prefix, 'package.json'), `${JSON.stringify(prefixPackage(channel, version, engines), null, 2)}\n`)
 
-// `--prefer-online` revalidates the packument: a version published minutes ago is otherwise
-// served from a five-minute cache and the install fails with a version that does exist.
+// `--prefer-online` revalidates the packument, and a release that follows a publish by a minute
+// can still meet a registry cache. Ask again rather than fail on a version that exists.
 const installArgs = ['install', '--no-fund', '--no-audit', '--prefer-online']
 if (channel === 'registry') installArgs.push('--registry', 'https://registry.npmjs.org')
-run('npm', installArgs, { cwd: prefix })
+installPrefix(installArgs)
+
+/**
+ * Install the prefix, retrying a registry that has not caught up yet.
+ * @param args - the `npm install` arguments
+ */
+function installPrefix(args) {
+  const attempts = 3
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      run('npm', args, { cwd: prefix })
+      return
+    } catch (error) {
+      if (attempt === attempts) throw error
+      console.log(`dist:app: npm install met a registry that does not have this version yet (attempt ${attempt} of ${attempts})`)
+      sleep(60)
+    }
+  }
+}
 
 const shellRoot = join(prefix, 'node_modules', '@mohou', 'shell')
 if (!existsSync(join(shellRoot, 'skill', 'mohou-mini-app', 'SKILL.md'))) {

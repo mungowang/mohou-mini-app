@@ -1,6 +1,6 @@
 {
   "name": "@mohou/runtime-provider",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "license": "MIT",
   "type": "module",
   "engines": {

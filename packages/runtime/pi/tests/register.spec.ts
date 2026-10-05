@@ -5,7 +5,7 @@ import path from 'node:path'
 import { createProviderRegistry } from '@mohou/runtime-provider'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createPiLoad, linkPiPeers, npmRootPlan, peerRoots, piPackage, registerPiRuntime } from '../src/register.ts'
+import { createPiLoad, installerPeerRoots, linkPiPeers, npmRootPlan, peerRoots, piAgentDir, piPackage, registerPiRuntime } from '../src/register.ts'
 
 const temps: string[] = []
 
@@ -111,6 +111,27 @@ describe('registerPiRuntime', () => {
     expect(provider.healthy()).toBe(false)
     // The probe shows this text, so it has to name the failure rather than the state.
     expect(provider.reason?.()).toContain('pi is not available')
+  })
+})
+
+describe('installerPeerRoots', () => {
+  it('finds the peers in the tree Pi\'s own installer writes, whatever shape it takes', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mma-pi-install-'))
+    temps.push(root)
+    const agent = path.join(root, 'agent')
+    // One layout: the packages directly under the agent directory.
+    mkdirSync(path.join(agent, 'node_modules', '@earendil-works', 'pi-coding-agent'), { recursive: true })
+    mkdirSync(path.join(agent, 'node_modules', '@earendil-works', 'pi-ai'), { recursive: true })
+    // Another: a versioned directory beside it, one level deeper.
+    mkdirSync(path.join(agent, 'versions', '1.0.3', 'lib', 'node_modules', '@earendil-works', 'pi-coding-agent'), { recursive: true })
+    mkdirSync(path.join(agent, 'bin'), { recursive: true })
+    const found = installerPeerRoots(agent)
+    expect(found).toContain(path.join(agent, 'node_modules'))
+    // A versioned install is a root too: the caller links whichever peers each root holds.
+    expect(found.some(dir => dir.includes('versions'))).toBe(true)
+    // Pi's own directory, and its override, are one decision.
+    expect(piAgentDir('/home/me', {})).toBe(path.join('/home/me', '.pi', 'agent'))
+    expect(piAgentDir('/home/me', { PI_CODING_AGENT_DIR: ' /tmp/pi-home ' })).toBe('/tmp/pi-home')
   })
 })
 

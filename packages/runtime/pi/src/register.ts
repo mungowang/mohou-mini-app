@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -76,7 +76,10 @@ export function createPiLoad(steps: PiLoadSteps): PiLoad {
 /** The real steps: the prefix's own `node_modules`, this machine's Pi installs, and the two imports. */
 function realSteps(): PiLoadSteps {
   const prefix = installRoot()
-  const roots = () => peerRoots(process.execPath, homedir(), process.env)
+  const roots = () => [
+    ...peerRoots(process.execPath, homedir(), process.env),
+    ...installerPeerRoots(piAgentDir(homedir(), process.env)),
+  ]
   return {
     present: () => peersPresent(prefix),
     async link() {
@@ -143,6 +146,46 @@ function peersPresent(prefix: string): boolean {
 /** Prefix that contains this package's `node_modules`. */
 export function installRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
+}
+
+/**
+ * Pi's own installer does not use npm's global directory: it writes a tree under the agent
+ * directory it also keeps sessions in. Walk that tree for a `node_modules` that holds the peers,
+ * rather than guessing the one layout an installer happens to use — and take the first match, so a
+ * versioned install works too.
+ * @param agentDir - Pi's agent directory
+ * @param maxDepth - directories to descend below the agent directory
+ */
+export function installerPeerRoots(agentDir: string, maxDepth = 4): string[] {
+  let level = [agentDir]
+  const found: string[] = []
+  for (let depth = 0; depth <= maxDepth && level.length > 0; depth += 1) {
+    const next: string[] = []
+    for (const dir of level) {
+      if (path.basename(dir) === 'node_modules') {
+        if (peers.some(peer => existsSync(path.join(dir, ...peer.split('/'))))) found.push(dir)
+        continue
+      }
+      let entries
+      try {
+        entries = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.isSymbolicLink()) continue
+        next.push(path.join(dir, entry.name))
+      }
+    }
+    level = next
+  }
+  return found
+}
+
+/** Pi's agent directory: `PI_CODING_AGENT_DIR`, else `~/.pi/agent`. Pi's own default. */
+export function piAgentDir(home: string, env: NodeJS.ProcessEnv): string {
+  const override = env.PI_CODING_AGENT_DIR?.trim()
+  return override !== undefined && override.length > 0 ? override : path.join(home, '.pi', 'agent')
 }
 
 export function peerRoots(node: string, home: string, env: NodeJS.ProcessEnv): string[] {

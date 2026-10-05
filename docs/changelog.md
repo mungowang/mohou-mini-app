@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.30
+
+Pi's own installer does not put its packages where npm's global directory is: it writes a tree under its agent directory, beside the shim it installs (`~/.pi/agent/bin/pi.ps1`). Mohou only looked in npm's locations, so a Pi installed the documented way was reported as a peer that cannot be found. The repair now walks Pi's agent directory — `PI_CODING_AGENT_DIR` when set, else `~/.pi/agent` — for a `node_modules` that holds the peers, at any of the shapes an installer may use, and it keeps npm's global directory as the fallback for a Pi installed that way. Both install styles work.
+
 ## 1.0.29
 
 Pi on Windows reported `pi is not available: spawn EINVAL`. That is Node's refusal to start a `.cmd` without a shell, and one repair step asks npm where its global packages are — as `npm.cmd`, which is the only npm Windows has. The step now asks the command interpreter there, and a failure to *ask npm* is no longer reported as the reason Pi is unavailable: the real reason, a peer package that is not where the repair looked, survives to the message. The probe added in 1.0.28 is what named this failure in the first place.

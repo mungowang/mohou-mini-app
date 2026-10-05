@@ -316,7 +316,9 @@ mkdirSync(prefix, { recursive: true })
 const engines = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).engines
 writeFileSync(join(prefix, 'package.json'), `${JSON.stringify(prefixPackage(channel, version, engines), null, 2)}\n`)
 
-const installArgs = ['install', '--no-fund', '--no-audit']
+// `--prefer-online` revalidates the packument: a version published minutes ago is otherwise
+// served from a five-minute cache and the install fails with a version that does exist.
+const installArgs = ['install', '--no-fund', '--no-audit', '--prefer-online']
 if (channel === 'registry') installArgs.push('--registry', 'https://registry.npmjs.org')
 run('npm', installArgs, { cwd: prefix })
 

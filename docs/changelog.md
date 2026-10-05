@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.26
+
+A Windows launch showed three console windows: two that flashed and one that stayed, titled with a Node path, empty, and fatal to close — closing it killed the sidecar and took the app with it. The launcher is a windows-subsystem binary, so Windows handed the console child it started a console of its own, window included. Every process it starts now asks for `CREATE_NO_WINDOW`: the sidecar, the update install, `taskkill`, and the watcher that notices the launcher's death. The processes Node itself starts inherit that hidden console rather than allocating their own, and the sidecar's output stays piped into `launcher.log`.
+
 ## 1.0.25
 
 The first Windows launch to reach the new log named its own cause: the prefix was canonicalized, Windows returns a verbatim path for that, and the entry the launcher handed Node read `\\?\C:\...`. Node's module loader splits that, calls `lstat("C:")`, and dies before the sidecar's first line — the window opened, and then it was gone. The prefix is still canonical, which is what makes a symlinked install one prefix, but the verbatim form now stops at the process boundary: the entry, the panel directory, the runtime root, and the working directory are plain.

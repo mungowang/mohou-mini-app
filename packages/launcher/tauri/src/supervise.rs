@@ -71,6 +71,19 @@ pub fn prefix_from_exe(exe: &Path) -> Option<PathBuf> {
     None
 }
 
+/// Keep Windows from giving a console child of this GUI process a console window. This binary
+/// is built for the windows subsystem, so the console `node.exe` would otherwise be handed is a
+/// new window — one that belongs to the sidecar, so closing it kills Host and the window with it.
+#[cfg(windows)]
+fn no_console(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn no_console(_cmd: &mut Command) {}
+
 /// True when a launch must ask a login shell for PATH. A Dock launch does not read `.zshrc`,
 /// so nvm, fnm, volta, and asdf only apply if we ask. Windows has no login shell to ask and
 /// already inherits the machine and user PATH, so asking is a macOS bundle concern.
@@ -488,6 +501,7 @@ fn spawn_sidecar(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    no_console(&mut cmd);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
@@ -543,12 +557,14 @@ fn spawn_parent_watch(child_pid: u32) {
         let script = format!(
             "while (Get-Process -Id {parent} -ErrorAction SilentlyContinue) {{ Start-Sleep -Milliseconds 200 }}; taskkill /PID {child_pid} /T /F | Out-Null"
         );
-        let _ = Command::new("powershell")
+        let mut watch = Command::new("powershell");
+        watch
             .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
+            .stderr(Stdio::null());
+        no_console(&mut watch);
+        let _ = watch.spawn();
     }
 }
 
@@ -646,9 +662,10 @@ pub fn stop_process(pid: u32) {
     }
     #[cfg(windows)]
     {
-        let _ = Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .status();
+        let mut kill = Command::new("taskkill");
+        kill.args(["/PID", &pid.to_string(), "/T", "/F"]);
+        no_console(&mut kill);
+        let _ = kill.status();
     }
     thread::spawn(move || {
         thread::sleep(Duration::from_secs(2));
@@ -935,6 +952,7 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, reporter: &Reporter, clos
         .stdin(Stdio::null())
         .stdout(Stdio::from(out))
         .stderr(Stdio::from(err));
+    no_console(&mut cmd);
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;

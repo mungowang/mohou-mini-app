@@ -19,6 +19,19 @@ describe('assistant dest tables', () => {
     })
     expect(builtinSkillAgents(home, { CLAUDE_CONFIG_DIR: '/tmp/claude-home' }).find(agent => agent.id === 'claude')?.skillsDir).toBe('/tmp/claude-home/skills')
   })
+  it('offers the DSH desktop profile when the Electron app has initialized it', () => {
+    const home = '/home/u'
+    const rows = builtinMcpAgents(home, {}, 'darwin')
+    const web = rows.find(agent => agent.id === 'dsh')
+    const desktop = rows.find(agent => agent.id === 'dsh-desktop')
+    expect(web?.file).toBe('/home/u/.dsh/profiles/web/cordis.patch.yml')
+    expect(desktop?.label).toBe('DSH · Desktop')
+    expect(desktop?.file).toBe('/home/u/.dsh/profiles/desktop/cordis.patch.yml')
+    // The harness may live somewhere other than `~/.dsh`; profiles follow it.
+    const moved = builtinMcpAgents(home, { DSH_HOME: '/opt/dsh' }, 'darwin').find(agent => agent.id === 'dsh-desktop')
+    expect(moved?.file).toBe('/opt/dsh/profiles/desktop/cordis.patch.yml')
+  })
+
 
   it('sends the skill to DSH under its own skills directory', () => {
     const home = homedir()

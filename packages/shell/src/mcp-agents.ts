@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 
 /** Built-in assistants that can receive the authoring MCP connection. */
-export const mcpAgentIds = ['claude', 'pi', 'pi-adapter', 'cursor', 'opencode', 'kiro', 'workbuddy', 'dsh'] as const
+export const mcpAgentIds = ['claude', 'pi', 'pi-adapter', 'cursor', 'opencode', 'kiro', 'workbuddy', 'dsh', 'dsh-desktop'] as const
 
 export type McpAgentId = (typeof mcpAgentIds)[number]
 
@@ -46,7 +46,16 @@ export function builtinMcpAgents(home = homedir(), env: NodeJS.ProcessEnv = proc
     { id: 'kiro', label: 'Kiro', file: path.join(home, '.kiro', 'settings', 'mcp.json'), detectDir: path.join(home, '.kiro'), format: 'mcpServers' },
     { id: 'workbuddy', label: 'WorkBuddy', file: path.join(home, '.codebuddy', 'mcp.json'), detectDir: path.join(home, '.codebuddy'), format: 'mcpServers' },
     { id: 'dsh', label: 'DSH', file: path.join(dshProfile, 'cordis.patch.yml'), detectDir: dshProfile, format: 'dsh' },
+    // The desktop profile is the Electron app's own; it exists only after that app has opened once,
+    // and DSH takes a lock on it, so the app has to be quit while this is written.
+    { id: 'dsh-desktop', label: 'DSH · Desktop', file: path.join(dshHome(home, env), 'profiles', 'desktop', 'cordis.patch.yml'), detectDir: path.join(dshHome(home, env), 'profiles', 'desktop'), format: 'dsh' },
   ]
+}
+
+/** `DSH_HOME` when the harness is configured away from `~/.dsh`, which is where profiles sit. */
+function dshHome(home: string, env: NodeJS.ProcessEnv): string {
+  const configured = env.DSH_HOME?.trim()
+  return configured !== undefined && configured.length > 0 ? configured : path.join(home, '.dsh')
 }
 
 /** `DSH_PROFILE_DIR` when this product itself runs under DSH; otherwise the profile name's default. */
@@ -54,5 +63,5 @@ function dshProfileDir(home: string, env: NodeJS.ProcessEnv): string {
   const dir = env.DSH_PROFILE_DIR?.trim()
   if (dir !== undefined && dir.length > 0) return dir
   const named = env.DSH_PROFILE?.trim()
-  return path.join(home, '.dsh', 'profiles', named !== undefined && named.length > 0 ? named : 'web')
+  return path.join(dshHome(home, env), 'profiles', named !== undefined && named.length > 0 ? named : 'web')
 }

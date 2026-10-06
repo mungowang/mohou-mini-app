@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.43
+
+DSH's desktop profile is an install target now. The harness keeps one profile per mode under `$DSH_HOME/profiles`, and this product only offered the CLI's `web` one: the table gained **DSH · Desktop**, writing the same patch block into `profiles/desktop`. That directory belongs to the Electron app — it appears the first time that app runs, DSH takes a lock on it, and the app has to be quit while the block is written — which is also why the row is offered only when the profile exists. `$DSH_HOME` is respected for both rows; the old code assumed `~/.dsh`.
+
 ## 1.0.42
 
 The trash glyph sat in the middle of the library header. That row spreads its children with `justify-between`, so a third child lands between the other two: the glyph and the search field are one group now, at the row's right edge.

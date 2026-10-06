@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.41
+
+The workbench template shows the trash. It is the template that demonstrates `ctx.workbench`, and it now demonstrates the two operations the panel's library uses for deleted apps: a block that appears only when the trash holds something, one restore per row, and the same name rule the panel applies — a homepage that draws its own cards decides that itself, because names are not identity to the host.
+
 ## 1.0.40
 
 A workbench app can now do what the panel's library does with deleted apps: `ctx.workbench.listTrash()` returns them in the same shape `listApps()` uses, and `restoreApp(id)` puts one back, rejecting an id that is live or no longer in the trash. Both are the operations the panel's own trash route calls, so the built-in library and an authored workbench share one path rather than one of them holding a power the other cannot reach.

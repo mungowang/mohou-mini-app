@@ -1,7 +1,7 @@
 ---
 name: mohou-mini-app
 description: Create or edit local mini-apps (ui.tsx + main.api.ts) that run in the mini-app panel. Confirm the core choices before mini_app_register when the ask is vague. Then write source with your file tools, compile with mini_app_reload, smoke-test with mini_app_call, and reveal with mini_app_open. Triggers include 做个小程序 / 小工具 / 面板 / 仪表盘 / dashboard / 看板 / 工作台 / mini-app. Not for editing Host, Panel, or Shell source.
-version: 1.0.36
+version: 1.0.37
 ---
 
 # Mini-app authoring

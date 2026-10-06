@@ -22,7 +22,7 @@ Layer: [App contract](README.md). Index: [features.md](../features.md).
 | `ctx.storage.query(sql, params?)` | one read statement | rows |
 | `ctx.storage.run(sql, params?)` | one `INSERT`, `UPDATE`, `DELETE`, or `REPLACE` | `{ changes, lastInsertRowid }` |
 | `ctx.storage.transaction(work)` | callback receives `tx` | the callback result |
-| `ctx.state` | — | in-memory object from `defineApp` |
+| `ctx.state` | — | a fresh `{}` per call: not shared between calls and not persisted. `defineApp.state` declares the type. Cross-call state is module scope; anything surviving a reload is `ctx.storage` |
 | `ctx.credentials.get(name)` | the owner's account name | that secret, or `undefined` when the name is absent |
 | `ctx.config` | — | `{ theme, palette, locale, chatLanguage, hostPort, llm }` |
 | `ctx.log(...args)` | any values | appended to that app's log file; returns nothing |

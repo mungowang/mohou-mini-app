@@ -18,6 +18,7 @@ import {
   useApp,
 } from '@mohou/ui'
 
+import type { RunRecall } from '../shared/events'
 import { GLASS, WELL, ms } from './glass'
 
 type Turn = { role: 'user' | 'assistant'; text: string; error?: string; at: number }
@@ -28,12 +29,18 @@ const EMPTY: Stats = { chars: 0, chunks: 0, firstTokenMs: null, durationMs: null
 export function LlmRegion({
   runtime,
   onRan,
+  recall,
 }: {
   runtime: { provider: string | null; model: string | null }
   onRan: () => void
+  recall?: RunRecall
 }) {
   const { streamCall, call } = useApp()
   const [prompt, setPrompt] = useState('')
+  // The rail's button hands a record back so the same prompt can be run again.
+  useEffect(() => {
+    if (recall !== undefined) setPrompt(recall.record.input)
+  }, [recall])
   const [system, setSystem] = useState('')
   const [systemOpen, setSystemOpen] = useState(false)
   const [provider, setProvider] = useState('')

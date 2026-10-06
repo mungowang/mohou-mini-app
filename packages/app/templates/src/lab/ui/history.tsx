@@ -194,12 +194,15 @@ export function HistoryRail({
   loading,
   onRefresh,
   onClear,
+  onRecall,
 }: {
   runs: RunRecord[]
   counts: Record<RunKind, number>
   loading: boolean
   onRefresh: (kind: Filter, search: string) => void
   onClear: () => void
+  /** Hand a record to its station so the form fills with what ran last time. */
+  onRecall: (record: RunRecord) => void
 }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
@@ -246,7 +249,7 @@ export function HistoryRail({
               {f.label}
               <span className="ml-1 font-mono opacity-60">
                 {f.key === 'all'
-                  ? counts.llm + counts.agent + counts.mcp
+                  ? KIND_ORDER.reduce((sum, kind) => sum + counts[kind], 0)
                   : counts[f.key]}
               </span>
             </button>
@@ -270,31 +273,42 @@ export function HistoryRail({
             <div className="flex flex-col gap-1 p-1.5">
               {runs.map((run, i) => (
                 <Reveal key={run.id} delay={Math.min(i, 12) * 30} distance={6}>
-                  <button
-                    type="button"
-                    onClick={() => { setSelected(run) }}
-                    className="hover:bg-muted/60 flex w-full flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className={cn('font-mono text-[10px] tracking-wide uppercase', TONE[run.kind])}>
-                        {run.kind}
+                  <div className="hover:bg-muted/60 flex items-center gap-1 rounded-lg pr-1.5 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => { setSelected(run) }}
+                      className="flex min-w-0 flex-1 flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className={cn('font-mono text-[10px] tracking-wide uppercase', TONE[run.kind])}>
+                          {run.kind}
+                        </span>
+                        {run.kind === 'mcp' ? (
+                          <span className="text-muted-foreground truncate font-mono text-[10px]">{run.source}</span>
+                        ) : (
+                          <span className="text-muted-foreground truncate font-mono text-[10px]">{run.model ?? '—'}</span>
+                        )}
+                        <span className="ml-auto shrink-0">
+                          <StatusBadge status={statusFor(run.status)} />
+                        </span>
                       </span>
-                      {run.kind === 'mcp' ? (
-                        <span className="text-muted-foreground truncate font-mono text-[10px]">{run.source}</span>
-                      ) : (
-                        <span className="text-muted-foreground truncate font-mono text-[10px]">{run.model ?? '—'}</span>
-                      )}
-                      <span className="ml-auto shrink-0">
-                        <StatusBadge status={statusFor(run.status)} />
+                      <span className="line-clamp-2 text-xs leading-snug">{clip(run.title, 90) || '（无标题）'}</span>
+                      <span className="text-muted-foreground/80 flex items-center gap-2 font-mono text-[10px]">
+                        <span>{stamp(run.startedAt)}</span>
+                        <span className="ml-auto">{ms(run.durationMs)}</span>
+                        {run.steps.length ? <span>{run.steps.length} 步</span> : null}
                       </span>
-                    </span>
-                    <span className="line-clamp-2 text-xs leading-snug">{clip(run.title, 90) || '（无标题）'}</span>
-                    <span className="text-muted-foreground/80 flex items-center gap-2 font-mono text-[10px]">
-                      <span>{stamp(run.startedAt)}</span>
-                      <span className="ml-auto">{ms(run.durationMs)}</span>
-                      {run.steps.length ? <span>{run.steps.length} 步</span> : null}
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="带入这次输入"
+                      title="带入这次输入，改完再触发"
+                      onClick={() => { onRecall(run) }}
+                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-lg p-1.5 transition-colors"
+                    >
+                      <Icon.Play className="size-3.5" />
+                    </button>
+                  </div>
                 </Reveal>
               ))}
             </div>

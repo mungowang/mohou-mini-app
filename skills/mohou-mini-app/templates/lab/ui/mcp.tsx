@@ -14,6 +14,7 @@ import {
 } from '@mohou/ui'
 
 import { MCP_PRESETS, MCP_SERVERS, findServer } from '../shared/mcp'
+import type { RunRecall } from '../shared/events'
 import { GLASS, WELL, asJson, ms } from './glass'
 
 type Outcome = { ok: boolean; text: string; durationMs: number; at: number }
@@ -26,7 +27,7 @@ const pretty = (value: unknown): string => {
   }
 }
 
-export function McpRegion({ onRan }: { onRan: () => void }) {
+export function McpRegion({ onRan, recall }: { onRan: () => void; recall?: RunRecall }) {
   const { call } = useApp()
   const first = MCP_SERVERS[0]
   const [serverId, setServerId] = useState(first?.id ?? '')
@@ -38,6 +39,19 @@ export function McpRegion({ onRan }: { onRan: () => void }) {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // The rail's button brings back the server, the tool, and the exact arguments that ran.
+  useEffect(() => {
+    if (recall === undefined) return
+    const record = recall.record
+    if (record.source !== null && findServer(record.source) !== undefined) setServerId(record.source)
+    const tool = record.meta.tool
+    if (typeof tool === 'string') setToolName(tool)
+    setArgsText(record.input)
+    setTouched(true)
+    setOutcome(null)
+    setError(null)
+  }, [recall])
 
   // Switching tool re-seeds the args box from that tool's own example, unless the user is editing.
   useEffect(() => {

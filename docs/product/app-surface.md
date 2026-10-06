@@ -18,10 +18,10 @@ There is no `ctx.tool` and no `listTools`. Timeouts, caps, and retry counts are 
 | --- | --- | --- |
 | `ctx.appId`, `ctx.appDir` | value | [identity](app-contract/identity.md) |
 | `ctx.storage` | `kv` `query` `run` `transaction` | [identity](app-contract/identity.md) |
-| `ctx.state` | value, same object as `defineApp` | [identity](app-contract/identity.md) |
+| `ctx.state` | a fresh `{}` per call; the declaration is a type | [identity](app-contract/identity.md) |
 | `ctx.credentials.get` | one secret by name, or `undefined` | [identity](app-contract/identity.md) |
 | `ctx.config` | public policy fields, no secrets | [identity](app-contract/identity.md) |
-| `ctx.log` | host log; returns nothing | [identity](app-contract/identity.md) |
+| `ctx.log` | app log; returns nothing | [ctx.log](app-contract/ctx-log.md) |
 | `ctx.signal` | `AbortSignal` for this call, or absent | [identity](app-contract/identity.md) |
 | `ctx.http` | `{ ok, status, headers, text, json }` | [ctx.http](app-contract/ctx-http.md) |
 | `ctx.bash` | `{ stdout, stderr, exitCode }` | [ctx.bash](app-contract/ctx-bash.md) |

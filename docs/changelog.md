@@ -7,6 +7,14 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.38
+
+The shipped templates that run a command choose by platform instead of by failure. `chores` carries one command per shell — `df -k /` beside `Get-PSDrive`, `ps -axo …` beside `Get-Process` — and reads `ctx.system.metrics().platform` once to pick the shell and the string together. A command written for the wrong shell fails in a way that reads like the app is broken, which is worse than not offering the button.
+
+The workbench gained a **Shell** station: choose `auto`, `bash`, or `pwsh`, run a command, and read stdout, stderr, and the exit code as separate facts. Every run is recorded like the others, and every record in the rail has a button that fills the station's form with what that run used — the prompt, the goal, the MCP server, tool and arguments, or the command — so a run can be repeated after an edit instead of retyped. The rail also reports a count per station instead of a hardcoded three.
+
+`ctx.log` has a page now: the file, the record shape, the segment and cap policy, and the fact that nothing reads it back for the app. The author guide says what `ctx.state` actually is — a fresh empty object per call — because the documented "in-memory object from `defineApp`" is not what the host passes.
+
 ## 1.0.37
 
 The two shipped templates that run a command on this machine — `chores` and `watch` — used `ctx.bash` alone, which answers `bash-unavailable` on a Windows machine without bash, and most Windows machines do not have it. Both try `ctx.bash` and fall back to `ctx.pwsh`, the shell this contract already documents for that platform, and they say in the code that the two are different shells rather than translations of each other. The message a missing shell raises names `ctx.pwsh` now, and the `ctx.bash` page points at it instead of stating the Windows requirement and stopping there.

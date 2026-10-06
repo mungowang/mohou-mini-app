@@ -17,7 +17,7 @@ import {
   type AgentEvent,
 } from '@mohou/ui'
 
-import { EV, step, type AgentStepEvent, type RunStep, type StepPhase } from '../shared/events'
+import { EV, step, type AgentStepEvent, type RunRecall, type RunStep, type StepPhase } from '../shared/events'
 import { GLASS, WELL, clock, ms } from './glass'
 
 type Stats = { turns: number; tools: number; chars: number; durationMs: number | null }
@@ -104,9 +104,17 @@ function StepList({ steps, running }: { steps: RunStep[]; running: boolean }) {
   )
 }
 
-export function AgentRegion({ runtime, onRan }: { runtime: { provider: string | null; model: string | null }; onRan: () => void }) {
+export function AgentRegion({ runtime, onRan, recall }: {
+  runtime: { provider: string | null; model: string | null }
+  onRan: () => void
+  recall?: RunRecall
+}) {
   const { streamCall, call, on } = useApp()
   const [goal, setGoal] = useState('')
+  // The rail's button hands a record back so the same goal can be run again.
+  useEffect(() => {
+    if (recall !== undefined) setGoal(recall.record.input)
+  }, [recall])
   const [system, setSystem] = useState('')
   const [systemOpen, setSystemOpen] = useState(false)
   const [provider, setProvider] = useState('')

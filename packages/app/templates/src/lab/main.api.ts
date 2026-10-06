@@ -594,6 +594,53 @@ export default defineApp({
       }
     },
 
+    /**
+     * Run one command through `ctx.bash` or `ctx.pwsh`, and keep the record. `auto` reads the
+     * platform: a Windows machine has pwsh, and most of them do not have bash.
+     * The exit code is a field, not a status — a non-zero exit is still a finished run.
+     */
+    async shell(ctx, args?: { command?: string; shell?: string }) {
+      const command = str(args?.command).trim()
+      if (command.length === 0) throw new Error('命令为空')
+      const asked = str(args?.shell)
+      const { platform } = await ctx.system.metrics()
+      const auto = platform === 'win32' ? 'pwsh' : 'bash'
+      const chosen = asked === 'bash' || asked === 'pwsh' ? asked : auto
+      const startedAt = Date.now()
+      const id = await insert(ctx, {
+        kind: 'shell',
+        title: `${chosen} · ${command.slice(0, 60)}`,
+        input: command,
+        source: chosen,
+        meta: { shell: chosen, platform },
+      })
+      // A shell command takes no abort signal, so Cancel marks the run and leaves the child to
+      // finish under the host's own timeout. Say so rather than implying a kill.
+      begin('shell', new AbortController(), id)
+      try {
+        const result = chosen === 'pwsh' ? await ctx.pwsh(command) : await ctx.bash(command)
+        await finish(ctx, id, {
+          status: 'done',
+          output: result.stdout,
+          meta: { shell: chosen, platform, exitCode: result.exitCode, stderr: result.stderr },
+        })
+        endRun(id)
+        return {
+          id,
+          shell: chosen,
+          stdout: result.stdout,
+          stderr: result.stderr,
+          exitCode: result.exitCode,
+          durationMs: Date.now() - startedAt,
+        }
+      } catch (cause) {
+        const message = fail(cause)
+        await finish(ctx, id, { status: 'error', error: message, meta: { shell: chosen, platform } })
+        endRun(id)
+        throw cause
+      }
+    },
+
     /** Stop reaches whichever stream is live: llm, agent, or a pending tool call. */
     async cancel(ctx) {
       const running = active

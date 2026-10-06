@@ -194,7 +194,7 @@ export function findServer(id: string): McpServer | undefined {
   return MCP_SERVERS.find(s => s.id === id)
 }
 
-export const KIND_ORDER: RunKind[] = ['llm', 'agent', 'mcp']
+export const KIND_ORDER: RunKind[] = ['llm', 'agent', 'mcp', 'shell']
 
 /** A preset's args are the tool's own object, so the shape stays open. */
 export type McpPreset = {

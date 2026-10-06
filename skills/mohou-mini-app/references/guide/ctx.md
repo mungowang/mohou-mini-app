@@ -12,10 +12,10 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.storage.query(sql, params?)` | rows | One read. Cannot name `kv` |
 | `ctx.storage.run(sql, params?)` | `{ changes, lastInsertRowid }` | One `INSERT`/`UPDATE`/`DELETE`/`REPLACE` |
 | `ctx.storage.transaction(work)` | callback result | Use `tx`, not the outer `ctx.storage` |
-| `ctx.state` | object | Same reference as `defineApp.state` |
+| `ctx.state` | object | A fresh `{}` on every call: not shared, not persisted. Cross-call state goes in module scope (the app module loads once); anything that must outlive a reload goes in `ctx.storage`. |
 | `ctx.credentials.get(name)` | string or `undefined` | Owner-stored secret. Do not invent a second name |
 | `ctx.config` | `{ theme, palette, locale, chatLanguage, hostPort, llm }` | `theme` is `light` \| `dark` \| `system`. `llm` is `{ provider, model }` or `null` |
-| `ctx.log(...args)` | void | Host log |
+| `ctx.log(...args)` | void | App log: JSONL at `apps/<appId>/logs/app.log`, 1 MiB segments, 5 MiB per app, oldest sealed segment dropped. Never log credentials. Nothing reads it back for the app. |
 | `ctx.signal` | `AbortSignal` or absent | Aborts when this call settles, and when the user stops. Long jobs must check it |
 | `ctx.push(name, params)` | void | Fire-and-forget to this app's views. JSON-serialisable |
 | `ctx.http(url, opts?)` | `{ ok, status, headers, text, json }` | 4xx/5xx do not throw. `json` is set only when the content type contains json and parsing succeeds |

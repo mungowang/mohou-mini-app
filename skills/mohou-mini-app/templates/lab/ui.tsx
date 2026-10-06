@@ -13,12 +13,14 @@ import {
   useApp,
 } from '@mohou/ui'
 
-import { EMPTY_COUNTS, EV, type LabSnapshot, type RunKind, type RunRecord } from './shared/events'
+import { EMPTY_COUNTS, EV, type LabSnapshot, type RunKind, type RunRecall, type RunRecord } from './shared/events'
 import { AgentRegion } from './ui/agent'
 import { GLASS, LiquidFilter, Sky, WELL, clock, ms } from './ui/glass'
 import { HistoryRail } from './ui/history'
+import { KIND_ORDER } from './shared/mcp'
 import { LlmRegion } from './ui/llm'
 import { McpRegion } from './ui/mcp'
+import { ShellRegion } from './ui/shell'
 
 const EMPTY_SNAPSHOT: LabSnapshot = {
   runs: [],
@@ -42,6 +44,7 @@ const STATIONS: Station[] = [
   { value: 'llm', label: 'LLM 补全', hint: '一次一个 prompt，逐字流式' },
   { value: 'agent', label: 'Agent 执行', hint: '多步自主执行 + 步骤跟踪' },
   { value: 'mcp', label: 'MCP 调用', hint: '挑 server 和 tool，发一次真调用' },
+  { value: 'shell', label: 'Shell 执行', hint: 'ctx.bash / ctx.pwsh，按平台选 shell' },
 ]
 
 export default function Ui() {
@@ -50,6 +53,8 @@ export default function Ui() {
   const [station, setStation] = useState<RunKind>('llm')
   const [loading, setLoading] = useState(true)
   const [railLoading, setRailLoading] = useState(false)
+  // The rail's button hands a record back; the station it belongs to fills its own form from it.
+  const [recall, setRecall] = useState<RunRecall | null>(null)
   const filter = useRef<{ kind: string; search: string }>({ kind: 'all', search: '' })
 
   const loadSnapshot = useCallback(async () => {
@@ -111,7 +116,7 @@ export default function Ui() {
   }, [loadSnapshot, reloadRail])
 
   const total = useMemo(
-    () => snapshot.counts.llm + snapshot.counts.agent + snapshot.counts.mcp,
+    () => KIND_ORDER.reduce((sum, kind) => sum + snapshot.counts[kind], 0),
     [snapshot.counts],
   )
 
@@ -190,13 +195,16 @@ export default function Ui() {
               </TabsList>
 
               <TabsContent value="llm" className="flex min-h-0 flex-1 flex-col">
-                <LlmRegion runtime={snapshot.runtime} onRan={onRan} />
+                <LlmRegion runtime={snapshot.runtime} onRan={onRan} {...recall?.record.kind === 'llm' ? { recall } : {}} />
               </TabsContent>
               <TabsContent value="agent" className="flex min-h-0 flex-1 flex-col">
-                <AgentRegion runtime={snapshot.runtime} onRan={onRan} />
+                <AgentRegion runtime={snapshot.runtime} onRan={onRan} {...recall?.record.kind === 'agent' ? { recall } : {}} />
               </TabsContent>
               <TabsContent value="mcp" className="flex min-h-0 flex-1 flex-col">
-                <McpRegion onRan={onRan} />
+                <McpRegion onRan={onRan} {...recall?.record.kind === 'mcp' ? { recall } : {}} />
+              </TabsContent>
+              <TabsContent value="shell" className="flex min-h-0 flex-1 flex-col">
+                <ShellRegion onRan={onRan} {...recall?.record.kind === 'shell' ? { recall } : {}} />
               </TabsContent>
             </Tabs>
 
@@ -205,6 +213,7 @@ export default function Ui() {
               <span>LLM {snapshot.counts.llm}</span>
               <span>Agent {snapshot.counts.agent}</span>
               <span>MCP {snapshot.counts.mcp}</span>
+              <span>Shell {snapshot.counts.shell}</span>
               {snapshot.runs[0] ? (
                 <span className="ml-auto">最近一次 {ms(snapshot.runs[0].durationMs)}</span>
               ) : null}
@@ -217,6 +226,10 @@ export default function Ui() {
             loading={railLoading}
             onRefresh={(kind, search) => void reloadRail(kind, search)}
             onClear={() => void clearHistory()}
+            onRecall={(record) => {
+              setRecall({ record, at: Date.now() })
+              setStation(record.kind)
+            }}
           />
         </div>
       </div>

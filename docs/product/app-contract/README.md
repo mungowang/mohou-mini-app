@@ -17,6 +17,7 @@ The app contract is what an author writes and what a running mini-app may call. 
 - [ctx.http](ctx-http.md)
 - [ctx.bash](ctx-bash.md)
 - [ctx.pwsh](ctx-pwsh.md)
+- [ctx.log](ctx-log.md)
 - [ctx.system.metrics](ctx-metrics.md)
 - [ctx.push and useApp events](ctx-push.md)
 - [UI kit](ui-kit.md)

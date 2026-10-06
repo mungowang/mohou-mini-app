@@ -16,9 +16,19 @@ function fmtBytes(n: number): string {
   return n.toFixed(i ? 1 : 0) + unit
 }
 
+/** `ctx.bash` is POSIX; a Windows machine without bash runs the same line through `ctx.pwsh`. */
+async function shell(ctx, cmd: string) {
+  try {
+    return await ctx.bash(cmd)
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'bash-unavailable') throw error
+    return ctx.pwsh(cmd)
+  }
+}
+
 async function sh(ctx, cmd: string): Promise<string> {
   try {
-    const r = await ctx.bash(cmd)
+    const r = await shell(ctx, cmd)
     if (r.exitCode !== 0) return ''
     return r.stdout.trim()
   } catch {

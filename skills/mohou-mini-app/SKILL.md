@@ -113,7 +113,7 @@ The kit is a shortcut for SaaS-shaped screens: lists, settings, boards, dashboar
 
 Names, parts, and props: [references/catalog.md](references/catalog.md), then one file under [references/contracts/](references/contracts/). Icons: [references/guide/icons.md](references/guide/icons.md). Colour: [references/theme.md](references/theme.md). Toast is `toast.add`, not a function call: [references/contracts/toast.md](references/contracts/toast.md). `CodeEditor`, `CodeBlock`, and `DiffViewer` load an engine on demand and degrade if that fetch fails. Do not import the engine.
 
-Reach an external system only after the confirm in [references/guide/choices.md](references/guide/choices.md). Lead with a connected MCP server when `mini_app_mcp_list` has one. Otherwise `ctx.http`, a logged-in CLI (`ctx.bash` / `ctx.pwsh`), or `mini_app_install`. Do not install `react`, `lodash`, `motion`, or a UI library. Secrets use `ctx.credentials.get`.
+Reach an external system only after the confirm in [references/guide/choices.md](references/guide/choices.md). Lead with a connected MCP server when `mini_app_mcp_list` has one. Otherwise `ctx.http`, a logged-in CLI (`ctx.bash` on POSIX, `ctx.pwsh` on Windows; a command written for one is not the other, and `bash-unavailable` says which one this machine has), or `mini_app_install`. Do not install `react`, `lodash`, `motion`, or a UI library. Secrets use `ctx.credentials.get`.
 
 ## Read on demand
 

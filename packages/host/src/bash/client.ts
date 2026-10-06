@@ -17,5 +17,5 @@ export function scrubBashEnv(env: NodeJS.ProcessEnv = process.env): Record<strin
  * @param shell - executable name; tests inject a missing one
  */
 export function createBash(policy: CommandPolicy, callSignal?: AbortSignal, shell = 'bash'): CommandHandle {
-  return createCommand(policy, callSignal, command => [shell, '-c', command], () => new BashError('bash-unavailable', 'bash is not available'))
+  return createCommand(policy, callSignal, command => [shell, '-c', command], () => new BashError('bash-unavailable', 'bash is not available; ctx.pwsh is the shell on a Windows machine without it'))
 }

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-09-23
+updated: 2026-10-05
 ---
 
 # ctx.pwsh

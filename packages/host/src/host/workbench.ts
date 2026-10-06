@@ -9,11 +9,15 @@ export function createAppWorkbench(ports: {
   openApp(appId: string, title?: string): Promise<void>
   readDefault(): string | undefined
   writeDefault(id: string | undefined): Promise<void>
+  listTrash(): Promise<readonly AppListItem[]>
+  restoreApp(appId: string): Promise<void>
   locale(): string
 }): AppWorkbench {
   return {
     listApps: () => ports.listApps(),
     openApp: (appId, title) => title === undefined ? ports.openApp(appId) : ports.openApp(appId, title),
+    listTrash: () => ports.listTrash(),
+    restoreApp: appId => ports.restoreApp(appId),
     async listWorkbenches() {
       const apps = await ports.listApps()
       return workbenchEntries(apps, ports.readDefault(), builtinName(ports.locale()))

@@ -9,6 +9,8 @@ This page owns released version notes. The product version is the `version` fiel
 
 ## 1.0.40
 
+A workbench app can now do what the panel's library does with deleted apps: `ctx.workbench.listTrash()` returns them in the same shape `listApps()` uses, and `restoreApp(id)` puts one back, rejecting an id that is live or no longer in the trash. Both are the operations the panel's own trash route calls, so the built-in library and an authored workbench share one path rather than one of them holding a power the other cannot reach.
+
 The library's first screen is apps again. The trash had been a row of deleted apps under the grid — leftovers competing with the thing the page is for, and a name that restored on a press nobody could read as an action. It is a bare glyph beside the search field now (muted until the pointer is on it, no count on the icon), and it opens a panel listing what was deleted with one restore action per row. A refused restore stays on that row: the host refuses an id that is live (`app-duplicate`), and the panel refuses a name that is taken, naming the app that holds it. `restoreApp` returns that message instead of reporting a failed restore as a failed deletion, which is what it used to do.
 
 ## 1.0.39

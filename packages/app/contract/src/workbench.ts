@@ -32,6 +32,10 @@ export interface AppWorkbench {
   openApp(appId: string, title?: string): Promise<void>
   listWorkbenches(): Promise<readonly WorkbenchEntry[]>
   setDefaultWorkbench(id: string): Promise<void>
+  /** Apps the owner deleted, in the same shape `listApps` returns. */
+  listTrash(): Promise<readonly AppListItem[]>
+  /** Put one back. An id that is live, or not in the trash, rejects. */
+  restoreApp(appId: string): Promise<void>
 }
 
 /** One list for the builtin library and for `ctx.workbench.listWorkbenches`. */

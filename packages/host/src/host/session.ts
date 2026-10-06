@@ -126,6 +126,11 @@ export async function createHost(options: {
     const activity = readActivity(registry.runtimeRoot)
     return Promise.all(listed.apps.map(async app => listedApp(app, await historyBounds(app.directory), activity.apps[app.id])))
   }
+  const listTrashApps = async () => {
+    const listed = await registry.listTrash()
+    const activity = readActivity(registry.runtimeRoot)
+    return Promise.all(listed.map(async app => listedApp(app, await historyBounds(app.directory), activity.apps[app.id])))
+  }
   const author = createAuthorTools({
     registry,
     mcp,
@@ -162,6 +167,9 @@ export async function createHost(options: {
           appId,
           ...title === undefined ? {} : { title },
         }).then(() => undefined),
+        listTrash: () => listTrashApps(),
+        // The same call the panel's restore route makes, so both paths publish and refresh alike.
+        restoreApp: appId => author.undeleteApp(appId).then(() => undefined),
         readDefault: () => policy.defaultWorkbenchId,
         writeDefault: async (id) => {
           const { defaultWorkbenchId: _gone, ...rest } = policy

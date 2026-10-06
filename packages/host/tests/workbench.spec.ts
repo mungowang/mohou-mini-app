@@ -28,6 +28,8 @@ describe('createAppWorkbench', () => {
         stored = id
         return Promise.resolve()
       },
+      listTrash: () => Promise.resolve([{ ...todo, name: 'Todo (old)' }]),
+      restoreApp: appId => appId === todo.id ? Promise.resolve() : Promise.reject(new Error('app not trashed')),
       locale: () => 'en',
     })
     expect(await workbench.listWorkbenches()).toEqual([
@@ -43,5 +45,20 @@ describe('createAppWorkbench', () => {
     expect(stored).toBeUndefined()
     await workbench.openApp(todo.id, 'Todo')
     expect(opened).toEqual([todo.id])
+  })
+
+  it('shows the trash and restores from it, refusing an id that is not there', async () => {
+    const workbench = createAppWorkbench({
+      listApps: () => Promise.resolve([todo]),
+      openApp: () => Promise.resolve(),
+      readDefault: () => undefined,
+      writeDefault: () => Promise.resolve(),
+      listTrash: () => Promise.resolve([{ ...todo, name: 'Todo (old)' }]),
+      restoreApp: appId => appId === todo.id ? Promise.resolve() : Promise.reject(new Error('app not trashed')),
+      locale: () => 'en',
+    })
+    expect((await workbench.listTrash()).map(app => app.name)).toEqual(['Todo (old)'])
+    await workbench.restoreApp(todo.id)
+    await expect(workbench.restoreApp('com.example.other')).rejects.toThrow(/not trashed/)
   })
 })

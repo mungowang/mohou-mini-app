@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.42
+
+The trash glyph sat in the middle of the library header. That row spreads its children with `justify-between`, so a third child lands between the other two: the glyph and the search field are one group now, at the row's right edge.
+
 ## 1.0.41
 
 The workbench template shows the trash. It is the template that demonstrates `ctx.workbench`, and it now demonstrates the two operations the panel's library uses for deleted apps: a block that appears only when the trash holds something, one restore per row, and the same name rule the panel applies — a homepage that draws its own cards decides that itself, because names are not identity to the host.

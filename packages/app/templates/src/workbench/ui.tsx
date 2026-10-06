@@ -4,6 +4,7 @@ import { AppCard, DashboardShell, LiveRefresh, PageHeader, useApp } from '@mohou
 
 type FocusItem = { id: string; title: string; detail: string }
 type AppItem = { id: string; name: string; description: string; version: string; acronym: string }
+type TrashItem = { id: string; name: string }
 type Home = { focus: FocusItem[]; apps: AppItem[] }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,11 +21,26 @@ export default function Ui() {
   //          The aside is one sketch. A grid, tiles, or no kit is the same kind.
   const { call } = useApp()
   const [home, setHome] = useState<Home | null>(null)
+  const [trash, setTrash] = useState<TrashItem[]>([])
+  const [refusal, setRefusal] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = async () => {
     const data = await call('home', {})
     if (isHome(data)) setHome(data)
+    const deleted = await call('trash', {})
+    const items = isRecord(deleted) && Array.isArray(deleted.items) ? deleted.items as TrashItem[] : []
+    setTrash(items)
+  }
+
+  const restore = async (appId: string) => {
+    try {
+      await call('restore', { appId })
+      setRefusal(null)
+      await load()
+    } catch (caught) {
+      setRefusal(caught instanceof Error ? caught.message : String(caught))
+    }
   }
 
   useEffect(() => {
@@ -70,6 +86,18 @@ export default function Ui() {
       aside={
         <div className="flex flex-col gap-3 p-3">
           <h2 className="m-0 text-xs font-semibold tracking-wide text-muted-foreground">应用</h2>
+          {trash.length === 0 ? null : (
+            <div className="flex flex-col gap-2 rounded-xl border border-dashed px-3 py-2">
+              <h2 className="m-0 text-xs font-semibold tracking-wide text-muted-foreground">回收站 · {trash.length}</h2>
+              {refusal === null ? null : <p className="m-0 text-xs text-destructive">{refusal}</p>}
+              {trash.map(item => (
+                <div key={item.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{item.name}</span>
+                  <button type="button" className="rounded-md px-2 py-1 text-xs hover:bg-muted" onClick={() => { void restore(item.id) }}>恢复</button>
+                </div>
+              ))}
+            </div>
+          )}
           {(home?.apps ?? []).map(app => (
             <AppCard
               key={app.id}

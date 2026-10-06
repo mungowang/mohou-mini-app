@@ -19,7 +19,7 @@ import {
 } from '@mohou/ui'
 
 import type { RunRecall } from '../shared/events'
-import { GLASS, WELL, ms } from './glass'
+import { CHIP, GLASS, WELL, ms } from './glass'
 
 type Turn = { role: 'user' | 'assistant'; text: string; error?: string; at: number }
 type Stats = { chars: number; chunks: number; firstTokenMs: number | null; durationMs: number | null }
@@ -140,7 +140,7 @@ export function LlmRegion({
           <button
             type="button"
             onClick={() => { setSystemOpen(v => !v) }}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 text-[11px] transition-colors"
+            className={cn(CHIP, 'text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 text-[11px] transition-colors')}
             style={WELL}
           >
             <Icon.ChevronRight className={cn('size-3 transition-transform', systemOpen && 'rotate-90')} />

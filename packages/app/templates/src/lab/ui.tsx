@@ -182,7 +182,20 @@ export default function Ui() {
             >
               <TabsList className="h-auto w-fit gap-1 p-1.5" variant="default" style={GLASS}>
                 {STATIONS.map(s => (
-                  <TabsTrigger key={s.value} value={s.value} className="gap-1.5 rounded-full px-3 py-1.5 text-xs">
+                  <TabsTrigger
+                    key={s.value}
+                    value={s.value}
+                    className="gap-1.5 rounded-full px-3 py-1.5 text-xs"
+                    // The kit paints the active tab `bg-background` — a white pill on this glass
+                    // list. An inline style wins over that utility, which is the only reliable
+                    // override: two `data-active:bg-*` classes are decided by stylesheet order.
+                    style={s.value === station
+                      ? {
+                        background: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+                        boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--primary) 30%, transparent)',
+                      }
+                      : undefined}
+                  >
                     <span className="flex flex-col items-start gap-0.5">
                       <span className="font-medium whitespace-nowrap">{s.label}</span>
                       <span className="text-muted-foreground hidden text-[10px] whitespace-nowrap sm:inline">

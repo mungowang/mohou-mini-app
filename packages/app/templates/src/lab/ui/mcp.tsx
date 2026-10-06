@@ -15,7 +15,7 @@ import {
 
 import { MCP_PRESETS, MCP_SERVERS, findServer } from '../shared/mcp'
 import type { RunRecall } from '../shared/events'
-import { GLASS, WELL, asJson, ms } from './glass'
+import { CHIP, GLASS, WELL, asJson, ms } from './glass'
 
 type Outcome = { ok: boolean; text: string; durationMs: number; at: number }
 
@@ -121,10 +121,11 @@ export function McpRegion({ onRan, recall }: { onRan: () => void; recall?: RunRe
                 type="button"
                 onClick={() => { pickServer(s.id) }}
                 className={cn(
+                  CHIP,
                   'flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors',
                   s.id === serverId
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                    : 'bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                 )}
                 style={s.id === serverId ? undefined : WELL}
               >
@@ -145,10 +146,11 @@ export function McpRegion({ onRan, recall }: { onRan: () => void; recall?: RunRe
               type="button"
               onClick={() => { pickTool(t.name) }}
               className={cn(
+                CHIP,
                 'rounded-lg px-2 py-1 font-mono text-[11px] transition-colors',
                 t.name === toolName
                   ? 'bg-foreground text-background'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                  : 'bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground',
               )}
             >
               {t.name}
@@ -182,7 +184,7 @@ export function McpRegion({ onRan, recall }: { onRan: () => void; recall?: RunRe
                 setArgsText(pretty(preset.args))
                 setTouched(true)
               }}
-              className="text-muted-foreground hover:text-foreground rounded-full px-2.5 py-1 text-[11px] transition-colors"
+              className={cn(CHIP, 'bg-transparent text-muted-foreground hover:text-foreground rounded-full px-2.5 py-1 text-[11px] transition-colors')}
               style={WELL}
             >
               {preset.label}

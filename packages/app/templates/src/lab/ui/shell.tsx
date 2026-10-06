@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Button, Icon, ScrollArea, StatusBadge, cn, useApp } from '@mohou/ui'
 
 import type { RunRecall } from '../shared/events'
-import { GLASS, WELL, ms } from './glass'
+import { CHIP, GLASS, WORK, ms } from './glass'
 
 type ShellChoice = 'auto' | 'bash' | 'pwsh'
 
@@ -59,7 +59,7 @@ export function ShellRegion({ onRan, recall }: { onRan: () => void; recall?: Run
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5">
-      <div className="flex flex-col gap-2 p-3" style={WELL}>
+      <div className="flex flex-col gap-2 p-3" style={WORK}>
         <div className="flex flex-wrap items-center gap-1.5">
           <Icon.Terminal className="text-muted-foreground size-4" />
           {SHELLS.map(item => (
@@ -69,10 +69,11 @@ export function ShellRegion({ onRan, recall }: { onRan: () => void; recall?: Run
               title={item.hint}
               onClick={() => { setChoice(item.value) }}
               className={cn(
+                CHIP,
                 'rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors',
                 item.value === choice
                   ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                  : 'bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground',
               )}
             >
               {item.label}
@@ -111,7 +112,7 @@ export function ShellRegion({ onRan, recall }: { onRan: () => void; recall?: Run
       ) : null}
 
       {outcome !== null ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-2 p-3" style={WELL}>
+        <div className="flex min-h-0 flex-1 flex-col gap-2 p-3" style={WORK}>
           <div className="flex items-center gap-2">
             <StatusBadge status={outcome.exitCode === 0 ? 'done' : 'error'} />
             <span className="text-muted-foreground font-mono text-[10px]">

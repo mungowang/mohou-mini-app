@@ -18,7 +18,7 @@ import {
 } from '@mohou/ui'
 
 import { EV, step, type AgentStepEvent, type RunRecall, type RunStep, type StepPhase } from '../shared/events'
-import { GLASS, WELL, clock, ms } from './glass'
+import { CHIP, GLASS, WELL, clock, ms } from './glass'
 
 type Stats = { turns: number; tools: number; chars: number; durationMs: number | null }
 
@@ -66,14 +66,15 @@ function StepList({ steps, running }: { steps: RunStep[]; running: boolean }) {
               type="button"
               onClick={() => { setOpen(expanded ? null : i) }}
               className={cn(
-                'hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors',
+                CHIP,
+                'hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg bg-transparent px-2 py-1.5 text-left transition-colors',
                 !step.detail && 'cursor-default',
               )}
             >
               <span
                 className={cn(
                   'font-mono text-[10px] tracking-wide uppercase',
-                  phase === 'tool' ? 'text-primary' : 'text-muted-foreground',
+                  phase === 'tool' ? 'text-primary' : 'bg-transparent text-muted-foreground',
                 )}
               >
                 {phase}
@@ -286,7 +287,7 @@ export function AgentRegion({ runtime, onRan, recall }: {
           <button
             type="button"
             onClick={() => { setSystemOpen(v => !v) }}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 text-[11px] transition-colors"
+            className={cn(CHIP, 'bg-transparent text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 text-[11px] transition-colors')}
             style={WELL}
           >
             <Icon.ChevronRight className={cn('size-3 transition-transform', systemOpen && 'rotate-90')} />

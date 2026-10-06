@@ -5,6 +5,19 @@ import type { CSSProperties } from 'react'
  * identity is the stack of them. Values are tokens only — a hex here would break the host
  * palette and both modes.
  */
+/**
+ * A chip in this app is a raw `<button>`, not the kit's `Button`. Preflight leaves buttons with
+ * `appearance: button`, so the system draws a button face on interaction that no background-color
+ * removes; the reset is here. With no background of its own the browser paints its default face
+ * too — invisible on a white card, a white band on the translucent wells this app uses.
+ *
+ * Each chip states its background in every branch (`bg-primary` when selected, `bg-transparent`
+ * when not) which also keeps the two from competing: the order of classes in the attribute does
+ * not decide which wins, the order in the stylesheet does.
+ */
+export const CHIP =
+  'appearance-none border-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50'
+
 export const GLASS: CSSProperties = {
   borderRadius: 'var(--radius)',
   backgroundColor: 'color-mix(in oklch, var(--card) 34%, transparent)',

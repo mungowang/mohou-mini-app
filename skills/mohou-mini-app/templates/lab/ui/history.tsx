@@ -25,7 +25,7 @@ import {
 
 import { KIND_LABEL, type RunKind, type RunRecord, type RunStep } from '../shared/events'
 import { KIND_ORDER, MCP_SERVERS } from '../shared/mcp'
-import { WELL, asJson, clip, clock, ms, stamp } from './glass'
+import { CHIP, WELL, asJson, clip, clock, ms, stamp } from './glass'
 
 /** Grouped into one filter row: "all" plus the three kinds, with live counts. */
 type Filter = 'all' | RunKind
@@ -38,7 +38,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 const TONE: Record<string, string> = {
   llm: 'text-primary',
   agent: 'text-foreground',
-  mcp: 'text-muted-foreground',
+  mcp: 'bg-transparent text-muted-foreground',
 }
 
 function statusFor(status: RunRecord['status']): string {
@@ -78,6 +78,7 @@ function StepRow({ step, index }: { step: RunStep; index: number }) {
           if (step.detail) setOpen(v => !v)
         }}
         className={cn(
+          CHIP,
           'w-full rounded-lg px-2 py-1.5 text-left transition-colors',
           step.detail ? 'hover:bg-muted/50 cursor-pointer' : 'cursor-default',
         )}
@@ -240,10 +241,11 @@ export function HistoryRail({
               type="button"
               onClick={() => { apply(f.key, search) }}
               className={cn(
+                CHIP,
                 'rounded-full px-2.5 py-1 text-[11px] transition-colors',
                 filter === f.key
                   ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                  : 'bg-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground',
               )}
             >
               {f.label}
@@ -277,7 +279,7 @@ export function HistoryRail({
                     <button
                       type="button"
                       onClick={() => { setSelected(run) }}
-                      className="flex min-w-0 flex-1 flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors"
+                      className={cn(CHIP, 'bg-transparent flex min-w-0 flex-1 flex-col gap-1 rounded-lg px-2.5 py-2 text-left transition-colors')}
                     >
                       <span className="flex items-center gap-1.5">
                         <span className={cn('font-mono text-[10px] tracking-wide uppercase', TONE[run.kind])}>
@@ -304,7 +306,7 @@ export function HistoryRail({
                       aria-label="带入这次输入"
                       title="带入这次输入，改完再触发"
                       onClick={() => { onRecall(run) }}
-                      className="text-muted-foreground hover:text-foreground shrink-0 rounded-lg p-1.5 transition-colors"
+                      className={cn(CHIP, 'bg-transparent text-muted-foreground hover:text-foreground shrink-0 rounded-lg p-1.5 transition-colors')}
                     >
                       <Icon.Play className="size-3.5" />
                     </button>

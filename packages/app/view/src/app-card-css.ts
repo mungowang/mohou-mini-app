@@ -13,7 +13,10 @@ export const appCardCss = [
   '.mma-glass-copy{margin:6px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;font-weight:400;line-height:1.45;color:var(--muted-foreground);}',
   '.mma-feature .mma-glass-copy{margin-top:8px;font-size:14px;line-height:1.625;}',
   'button[data-card="stamp"] .mma-copy,button[data-card="etch"] .mma-copy,button[data-card="pulse"] .mma-copy,button[data-card="hero"] .mma-copy{min-height:2.75em;}',
-  '.mma-glass:hover{transform:translateY(-4px);background:color-mix(in oklch,var(--card) 88%,transparent);box-shadow:0 20px 40px -16px color-mix(in oklch,var(--foreground) 16%,transparent);}',
+  // No background on hover. A card that hosts something — a running app in a workbench slot, chips
+  // inside a preview — is hovered whenever its content is, and swapping the card's background
+  // paints a white one behind content that was designed against the card's own tint.
+  '.mma-glass:hover{transform:translateY(-4px);box-shadow:0 20px 40px -16px color-mix(in oklch,var(--foreground) 16%,transparent);}',
   '.mma-feature{grid-column:span 2;}',
   '@container (max-width:680px){.mma-feature{grid-column:span 1;}}',
   '.mma-mark{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;background:linear-gradient(to bottom right,hsl(var(--h) 48% 46%),hsl(var(--h) 40% 38% / .35));-webkit-background-clip:text;background-clip:text;color:transparent;}',

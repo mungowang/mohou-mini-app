@@ -7,7 +7,19 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.39
+
+The workbench's chips — the shell choice, the MCP server, tool, and preset rows, the rail's filters and its recall button — painted the browser's default button face. On a white card that is invisible; on the translucent wells this app uses it showed as a white band behind the row, which the new shell chips made obvious. A raw `<button>` has no background unless it states one, so every chip states it in each branch: `bg-primary` when selected, `bg-transparent` when not. The branches are mutually exclusive on purpose — the order of classes in the attribute does not decide which wins, the order in the stylesheet does.
+
+The tab that is **clicked** turned white for the same family of reasons: the kit paints the active tab `bg-background`, which is a white pill on the workbench's glass tab list. The active tab states its own look as an inline style, because an inline style beats the utility and two `data-active:bg-*` classes would be decided by stylesheet order again.
+
 ## 1.0.38
+
+Chips and cards no longer turn white under the pointer. The workbench's chips are raw buttons, so the browser painted its default face behind them — and preflight's `appearance: button` lets the system draw a face on interaction that no `background-color` removes. Each chip states its background in every branch and resets the native appearance; the active tab states its own look inline, because the kit paints the active tab `bg-background` and two `data-active:bg-*` classes are decided by stylesheet order.
+
+The library card was the deeper case. `:hover` reaches an ancestor whenever anything *inside* it is hovered, so a card that swapped its background for `--card` on hover painted a white surface behind a running app in a workbench slot and behind any content inside a preview. The card lifts and takes a shadow on hover now, and leaves its background alone.
+
+## 1.0.37
 
 The shipped templates that run a command choose by platform instead of by failure. `chores` carries one command per shell — `df -k /` beside `Get-PSDrive`, `ps -axo …` beside `Get-Process` — and reads `ctx.system.metrics().platform` once to pick the shell and the string together. A command written for the wrong shell fails in a way that reads like the app is broken, which is worse than not offering the button.
 

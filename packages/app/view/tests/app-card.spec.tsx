@@ -44,6 +44,15 @@ describe('AppCard', () => {
     expect(regular).toContain('mma-glass-copy')
   })
 
+  it('lifts a glass card on hover without changing what is behind it', () => {
+    const from = appCardCss.indexOf('.mma-glass:hover')
+    const hover = appCardCss.slice(from, appCardCss.indexOf('}', from) + 1)
+    expect(hover).toContain('translateY(-4px)')
+    expect(hover).toContain('box-shadow')
+    // A background here would sit behind whatever the card holds, since :hover reaches ancestors.
+    expect(hover).not.toContain('background:')
+  })
+
   it('paints glass marks with the app hue and a geometric system stack', () => {
     expect(appCardCss).toContain('Avenir Next')
     expect(appCardCss).toContain('Bahnschrift')

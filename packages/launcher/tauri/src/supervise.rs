@@ -75,14 +75,14 @@ pub fn prefix_from_exe(exe: &Path) -> Option<PathBuf> {
 /// is built for the windows subsystem, so the console `node.exe` would otherwise be handed is a
 /// new window — one that belongs to the sidecar, so closing it kills Host and the window with it.
 #[cfg(windows)]
-fn no_console(cmd: &mut Command) {
+pub fn no_console(cmd: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
 #[cfg(not(windows))]
-fn no_console(_cmd: &mut Command) {}
+pub fn no_console(_cmd: &mut Command) {}
 
 /// True when a launch must ask a login shell for PATH. A Dock launch does not read `.zshrc`,
 /// so nvm, fnm, volta, and asdf only apply if we ask. Windows has no login shell to ask and

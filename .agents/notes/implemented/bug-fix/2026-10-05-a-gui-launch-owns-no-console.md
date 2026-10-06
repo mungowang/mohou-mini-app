@@ -14,6 +14,8 @@ The same mechanism hid a second problem. Without a window of its own, that conso
 
 `no_console(cmd)` sets `CREATE_NO_WINDOW` on Windows, and does nothing elsewhere. It is applied to every process this launcher starts that is a console program: the sidecar, the update install, `taskkill`, and the `powershell` watcher.
 
+A fifth path was worse than missing the flag. Opening a link outside the panel ran `cmd /C start <url>`, which flashed a console *and* read the URL as command-line text: `start` splits on `&` and expands `%`, so a Jira query URL arrived mangled as well. That path is `ShellExecuteW` now — the API for handing a URL to the system — which is not a console program at all, and the launcher shares `no_console` with the rest.
+
 Nothing else is needed for the descendants. `CREATE_NO_WINDOW` still gives the child a console — it just never shows one — so the processes Node starts inherit that console rather than allocating their own.
 
 The sidecar's stdout and stderr stay piped, so the change costs no diagnostics: `launcher.log` records the same lines, and the failure dialog still quotes them.
@@ -27,6 +29,6 @@ The sidecar's stdout and stderr stay piped, so the change costs no diagnostics: 
 
 ## Consequences
 
-A Windows launch shows one window: the app. Its lifetime is owned by that window, as it is on macOS.
+A Windows launch shows one window: the app, and opening a link shows none. Its lifetime is owned by that window, as it is on macOS.
 
 `no_console` is a no-op off Windows, so this is a Windows-only mechanism and cannot be exercised by the test suite on the machines that build the product. The one check that covers it is a launch on Windows, which is where this was found.

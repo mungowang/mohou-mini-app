@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.36
+
+Opening a link into the browser flashed a black window on Windows. The launcher handed the URL to `cmd /C start`, and a GUI process spawning a console child makes that console appear: the same mechanism as the last launch's windows, in a place that change did not cover. It calls `ShellExecuteW` now, which is the API for handing a URL to the system, is not a console program, and does not read the URL as command-line text — `start` mangles a link containing `&` or `%`, so a Jira query URL arrived broken as well as noisy.
+
 ## 1.0.35
 
 The workbench's MCP tab names the three servers the MCP section presets — `jira` (`@mohou/jira-mcp`), `gitlab`, and `jenkins` (`@kud/mcp-jenkins`) — with the read-only tools worth starting from: job and build status, recent builds, console output, pipeline stages, project and merge-request reads. The catalog it shipped with named a filesystem server rooted at one machine's directory and a checkout-specific Jira entry, which was machine-specific and, in a template that ships to everyone, more than it should have said. Settings → Agent → Install samples installs the corrected app into a library that does not have it.

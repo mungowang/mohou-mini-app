@@ -192,6 +192,12 @@ fn same_origin(origin: &Url, url: &Url) -> bool {
         && url.port_or_known_default() == origin.port_or_known_default()
 }
 
+/// Hand a URL to the system's own handler.
+///
+/// Windows used to run `cmd /C start`, which had two problems: a GUI process spawning a console
+/// child makes that console flash on screen, and `start` reads the URL as command-line text, so a
+/// link with `&` or `%` in it arrives mangled. `ShellExecuteW` is the API for this, and it is not
+/// a console program.
 fn open_outside(url: &Url) {
     let text = url.as_str();
     #[cfg(target_os = "macos")]
@@ -200,10 +206,33 @@ fn open_outside(url: &Url) {
     }
     #[cfg(target_os = "windows")]
     {
-        let _ = std::process::Command::new("cmd")
-            .args(["/C", "start", "", text])
-            .spawn();
+        use std::os::windows::ffi::OsStrExt;
+
+        const SW_SHOWNORMAL: i32 = 1;
+
+        #[link(name = "shell32")]
+        extern "system" {
+            fn ShellExecuteW(
+                window: *mut core::ffi::c_void,
+                operation: *const u16,
+                file: *const u16,
+                parameters: *const u16,
+                directory: *const u16,
+                show: i32,
+            ) -> *mut core::ffi::c_void;
+        }
+
+        let wide = |value: &str| -> Vec<u16> {
+            std::ffi::OsStr::new(value).encode_wide().chain(std::iter::once(0)).collect()
+        };
+        let operation = wide("open");
+        let file = wide(text);
+        unsafe {
+            ShellExecuteW(std::ptr::null_mut(), operation.as_ptr(), file.as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL);
+        }
     }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let _ = text;
 }
 
 #[cfg(test)]

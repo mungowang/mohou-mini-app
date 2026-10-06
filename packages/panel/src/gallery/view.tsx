@@ -305,31 +305,33 @@ export function GalleryBody(props: {
                           />
                         </div>
                       </div>
-                      <TrashButton
-                        apps={state.trash}
-                        failed={state.trashFailed}
-                        live={state.apps}
-                        label={label}
-                        onRestore={async (app) => {
+                      <div className="flex items-center gap-2">
+                        <TrashButton
+                          apps={state.trash}
+                          failed={state.trashFailed}
+                          live={state.apps}
+                          label={label}
+                          onRestore={async (app) => {
                           // Names are not identity to the host, but two cards with one name is what a
                           // person would call a failed restore. The id conflict is the host's own.
-                          if (state.apps.some(other => other.name === app.name)) {
-                            return `${label('restore-name-conflict')}「${app.name}」· ${label('restore-name-conflict-help')}`
-                          }
-                          const failure = await restoreApp(props.client, app.id, dispatch)
-                          return failure === undefined ? undefined : label('restore-id-conflict')
-                        }}
-                      />
-                      <div className="mma-search relative w-full max-w-xs">
-                        <Search size={18} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                          className="h-11 w-full rounded-[14px] border border-foreground/10 bg-card/60 pr-4 pl-10 text-sm text-foreground outline-none backdrop-blur-md placeholder:text-muted-foreground focus:border-primary focus:bg-card"
-                          type="search"
-                          aria-label={label('search')}
-                          placeholder={label('search-placeholder')}
-                          value={state.query}
-                          onChange={event => dispatch({ type: 'search', query: event.target.value })}
+                            if (state.apps.some(other => other.name === app.name)) {
+                              return `${label('restore-name-conflict')}「${app.name}」· ${label('restore-name-conflict-help')}`
+                            }
+                            const failure = await restoreApp(props.client, app.id, dispatch)
+                            return failure === undefined ? undefined : label('restore-id-conflict')
+                          }}
                         />
+                        <div className="mma-search relative w-full max-w-xs">
+                          <Search size={18} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            className="h-11 w-full rounded-[14px] border border-foreground/10 bg-card/60 pr-4 pl-10 text-sm text-foreground outline-none backdrop-blur-md placeholder:text-muted-foreground focus:border-primary focus:bg-card"
+                            type="search"
+                            aria-label={label('search')}
+                            placeholder={label('search-placeholder')}
+                            value={state.query}
+                            onChange={event => dispatch({ type: 'search', query: event.target.value })}
+                          />
+                        </div>
                       </div>
                     </div>
                     {state.openError !== undefined ? <p className="px-6 py-2 text-sm text-destructive">{state.openError.length > 0 ? state.openError : label('open-failed')}</p> : null}

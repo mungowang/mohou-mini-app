@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { cachedUiBundle, purgeAutogen, readAutogen } from '../src/compile/autogen.ts'
+import { cachedUiBundle, purgeAutogen, readAutogen, sourceStamp, writeAutogen } from '../src/compile/autogen.ts'
 
 describe('autogen', () => {
   it('rewrites the bundle when a source is newer and drops both files together', async () => {
@@ -23,5 +23,18 @@ describe('autogen', () => {
     expect(second).not.toBe(first)
     await purgeAutogen(dir)
     await expect(readFile(file, 'utf8')).rejects.toThrow()
+  })
+
+  it('treats extra stamp material as part of the key', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'mma-autogen-extra-'))
+    await writeFile(join(dir, 'ui.tsx'), 'export default 1')
+    const first = await sourceStamp(dir, 'kit-a')
+    expect(first).not.toBe(await sourceStamp(dir, 'kit-b'))
+    expect(first).toBe(await sourceStamp(dir, 'kit-a'))
+    // Written under one revision, invisible under another: the sheet cache follows the kit.
+    await writeAutogen(dir, 'ui.css', 'body{}', 'kit-a')
+    expect(await readAutogen(dir, 'ui.css', 'kit-a')).toBe('body{}')
+    expect(await readAutogen(dir, 'ui.css', 'kit-b')).toBeUndefined()
+    await rm(dir, { recursive: true, force: true })
   })
 })

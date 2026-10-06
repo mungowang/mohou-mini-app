@@ -8,7 +8,7 @@ import { Scanner } from '@tailwindcss/oxide'
 import { appEntries } from '@mohou/contract'
 import { appCardCss } from '@mohou/app-view/css'
 
-import { readAutogen, sheetFile, writeAutogen } from './autogen.ts'
+import { readAutogen, sheetFile, sourceStamp, writeAutogen } from './autogen.ts'
 import { CompileError } from './codes.ts'
 import { themeTokens } from '../theme/tokens.ts'
 
@@ -21,13 +21,17 @@ const require = createRequire(import.meta.url)
  * @param appDir - absolute app directory
  */
 export async function compileAppStylesheet(appDir: string): Promise<string> {
-  const hit = await readAutogen(appDir, sheetFile)
+  // Tailwind scans the kit and the view as sources, so their files are inputs of this sheet too.
+  // A stamp over the app alone would keep an app on a sheet built from an older kit — which is
+  // how a card rule fixed in the product never reached an app that had already compiled once.
+  const hostStamp = `${await sourceStamp(kitSourceDir())}|${await sourceStamp(viewSourceDir())}`
+  const hit = await readAutogen(appDir, sheetFile, hostStamp)
   if (hit !== undefined) return hit
   await newest(appDir)
   const built = await compileSources([appDir])
   const author = await readFile(path.join(appDir, appEntries.stylesheet), 'utf8').catch(() => '')
   const css = author.length === 0 ? `${built}\n${appCardCss}` : `${built}\n${appCardCss}\n${author}`
-  await writeAutogen(appDir, sheetFile, css).catch(() => undefined)
+  await writeAutogen(appDir, sheetFile, css, hostStamp).catch(() => undefined)
   return css
 }
 

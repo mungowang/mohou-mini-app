@@ -15,7 +15,16 @@ const sheetFile = 'ui.css'
  * The same stamp invalidates the bundle and the stylesheet.
  * @param appDir - absolute app directory
  */
-export async function sourceStamp(appDir: string): Promise<string> {
+/**
+ * A stamp over one directory's files: how many, and the newest mtime.
+ *
+ * `extra` is for the inputs that are not in the directory — an app's stylesheet is compiled from
+ * the app *and* from the kit and view sources the compiler scans, so a stamp over the app alone
+ * would keep serving a sheet built from an older kit.
+ * @param appDir - directory to walk
+ * @param extra - further stamp material, concatenated
+ */
+export async function sourceStamp(appDir: string, extra = ''): Promise<string> {
   let max = 0
   let count = 0
   const walk = async (dir: string): Promise<void> => {
@@ -34,22 +43,22 @@ export async function sourceStamp(appDir: string): Promise<string> {
     }
   }
   await walk(appDir)
-  return `${max}-${count}`
+  return extra.length === 0 ? `${max}-${count}` : `${max}-${count}-${extra}`
 }
 
 /** Read one generated file when its stamp still matches the sources. */
-export async function readAutogen(appDir: string, file: string): Promise<string | undefined> {
+export async function readAutogen(appDir: string, file: string, extra = ''): Promise<string | undefined> {
   const dir = path.join(appDir, autogenDirName)
   const saved = await readFile(path.join(dir, `${file}.stamp`), 'utf8').catch(() => '')
-  if (saved !== await sourceStamp(appDir)) return undefined
+  if (saved !== await sourceStamp(appDir, extra)) return undefined
   return readFile(path.join(dir, file), 'utf8').catch(() => undefined)
 }
 
 /** Write one generated file and its stamp. A write failure does not change the returned body. */
-export async function writeAutogen(appDir: string, file: string, body: string): Promise<void> {
+export async function writeAutogen(appDir: string, file: string, body: string, extra = ''): Promise<void> {
   const dir = path.join(appDir, autogenDirName)
   await mkdir(dir, { recursive: true })
-  const stamp = await sourceStamp(appDir)
+  const stamp = await sourceStamp(appDir, extra)
   await writeFile(path.join(dir, file), body)
   await writeFile(path.join(dir, `${file}.stamp`), stamp)
 }

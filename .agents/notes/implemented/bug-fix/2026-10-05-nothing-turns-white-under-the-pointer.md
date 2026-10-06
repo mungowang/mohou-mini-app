@@ -29,6 +29,19 @@ Reading the compiled sheet the app actually gets (275 KB) found no rule that pai
 - **Keep the hover background and make it hue-preserving.** Better than white, and it still puts a different surface behind content that was designed against the card's own tint.
 - **Scope the card hover to preview cards only.** CSS cannot tell a card being hovered from a card containing the hovered element, which is the whole mechanism.
 
+## The fix would not have reached anyone
+
+The card rule lives in the host's sheet, and an app's compiled sheet is cached under a stamp taken
+over the app's own files. Tailwind scans the kit and the view sources as well, so a sheet built
+before this change stayed valid forever: the stamp could not see that the kit had changed. Deleting
+the app's `.autogen` directory proved it — the same request then returned the fixed rule — and it
+means a styling fix shipped in the product never reached an app that had already compiled once.
+
+The stamp now covers the directories the compiler actually scans, so a kit or view change retires
+every app's sheet once. `sourceStamp` takes that material as a parameter, and a test pins the two
+halves: a different revision is a different key, and a file written under one is invisible under the
+other.
+
 ## Consequences
 
 Hovering anything in the workbench changes nothing behind it. A card still lifts, a chip still takes its selected colour, and a tab still marks itself active.

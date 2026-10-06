@@ -9,9 +9,8 @@ import { Tooltip } from '../ui/tooltip.tsx'
 import { readCardStyle, writeCardStyle } from './card-style.ts'
 import { DeskBar } from './desk.tsx'
 import type { PanelClient } from './client.ts'
-import { galleryCardStyles, isGalleryCardStyle, type GalleryCardStyle, type GalleryKind } from './list.ts'
-import {
-  loadGallery,
+import { type GalleryApp, galleryCardStyles, isGalleryCardStyle, type GalleryCardStyle, type GalleryKind } from './list.ts'
+import { loadGallery,
   loadTrash,
   galleryState,
   reduceGallery,
@@ -19,8 +18,7 @@ import {
   visibleApps,
   type GalleryAction,
   type PanelShell,
-  type GalleryState,
-} from './state.ts'
+  type GalleryState } from './state.ts'
 
 /** What settings needs from the gallery. Card style is panel-local. */
 export interface GalleryChrome {
@@ -307,6 +305,21 @@ export function GalleryBody(props: {
                           />
                         </div>
                       </div>
+                      <TrashButton
+                        apps={state.trash}
+                        failed={state.trashFailed}
+                        live={state.apps}
+                        label={label}
+                        onRestore={async (app) => {
+                          // Names are not identity to the host, but two cards with one name is what a
+                          // person would call a failed restore. The id conflict is the host's own.
+                          if (state.apps.some(other => other.name === app.name)) {
+                            return `${label('restore-name-conflict')}「${app.name}」· ${label('restore-name-conflict-help')}`
+                          }
+                          const failure = await restoreApp(props.client, app.id, dispatch)
+                          return failure === undefined ? undefined : label('restore-id-conflict')
+                        }}
+                      />
                       <div className="mma-search relative w-full max-w-xs">
                         <Search size={18} strokeWidth={2} className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-muted-foreground" />
                         <input
@@ -336,15 +349,7 @@ export function GalleryBody(props: {
                         }}
                       />
                     ) : null}
-                    {state.trashFailed ? <p className="px-6 py-2 text-sm text-destructive">{label('trash-failed')}</p> : null}
-                    {state.trash.length === 0 ? null : (
-                      <div className="px-6 py-4 text-sm text-muted-foreground">
-                        <p>{label('trash')}</p>
-                        {state.trash.map(app => (
-                          <button key={app.id} type="button" className="h-8 rounded-md px-2 text-sm hover:bg-muted" data-trash={app.id} onClick={() => { void restoreApp(props.client, app.id, dispatch) }}>{app.name}</button>
-                        ))}
-                      </div>
-                    )}
+
                   </div>
                 </div>
               )}
@@ -429,15 +434,16 @@ async function reloadApp(client: PanelClient, appId: string, dispatch: (action: 
   }
 }
 
-async function restoreApp(client: PanelClient, appId: string, dispatch: (action: GalleryAction) => void): Promise<void> {
-  if (client.undeleteApp === undefined) return
+/** Restore one trashed app. A refusal comes back as a message: it is about this row, not the view. */
+async function restoreApp(client: PanelClient, appId: string, dispatch: (action: GalleryAction) => void): Promise<string | undefined> {
+  if (client.undeleteApp === undefined) return undefined
   try {
     await client.undeleteApp(appId)
   } catch (error) {
-    dispatch({ type: 'delete-failed', ...thrown(error) })
-    return
+    return error instanceof Error ? error.message : String(error)
   }
   dispatch({ type: 'undeleted', appId })
+  return undefined
 }
 
 async function removeApp(client: PanelClient, appId: string | undefined, dispatch: (action: GalleryAction) => void): Promise<void> {
@@ -498,4 +504,84 @@ function cardLabel(style: GalleryCardStyle): 'card-hero' | 'card-stamp' | 'card-
 function thrown(error: unknown): { message: string } | Record<string, never> {
   const message = error instanceof Error ? error.message : ''
   return message.length > 0 ? { message } : {}
+}
+
+/**
+ * The trash, behind a glyph that only shows itself on hover. Deleted apps are a side errand, so the
+ * library's first screen is apps only: this opens a small panel rather than replacing the grid.
+ * A refused restore stays on its own row, because it is about that row and not about the view.
+ */
+function TrashButton({ apps, failed, label, onRestore }: {
+  apps: readonly GalleryApp[]
+  failed: boolean
+  live: readonly GalleryApp[]
+  label: (key: string) => string
+  onRestore: (app: GalleryApp) => Promise<string | undefined>
+}): ReactNode {
+  const [open, setOpen] = useState(false)
+  const [refusal, setRefusal] = useState<{ id: string; message: string } | undefined>(undefined)
+  const box = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const away = (event: MouseEvent) => {
+      if (box.current !== null && !box.current.contains(event.target as Node)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+
+  return (
+    <div className="relative" ref={box}>
+      <button
+        type="button"
+        data-trash-open=""
+        aria-label={label('trash-open')}
+        aria-expanded={open}
+        onClick={() => { setOpen(!open) }}
+        className="text-muted-foreground/60 hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-muted/60"
+      >
+        <Trash2 size={16} strokeWidth={2} />
+      </button>
+      {!open ? null : (
+        <div
+          data-trash-panel=""
+          className="absolute top-10 right-0 z-30 max-h-[70vh] w-80 origin-top-right overflow-auto rounded-xl border bg-card p-3 shadow-lg"
+        >
+          <p className="text-muted-foreground m-0 mb-2 px-1 text-xs">
+            {label('trash-open')}{apps.length === 0 ? '' : ` · ${apps.length}`}
+          </p>
+          {failed ? <p className="text-destructive m-0 px-1 py-2 text-xs">{label('trash-failed')}</p> : null}
+          {!failed && apps.length === 0 ? (
+            <p className="text-muted-foreground m-0 px-1 py-2 text-xs">{label('trash-empty')}</p>
+          ) : null}
+          {apps.map(app => (
+            <div key={app.id} className="flex flex-col gap-1 rounded-lg px-1 py-1.5" data-trash={app.id}>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm">{app.name}</span>
+                <button
+                  type="button"
+                  data-restore={app.id}
+                  className="hover:bg-muted shrink-0 rounded-md px-2 py-1 text-xs"
+                  onClick={() => {
+                    void onRestore(app).then((message) => { setRefusal(message === undefined ? undefined : { id: app.id, message }) })
+                  }}
+                >
+                  {label('trash-restore')}
+                </button>
+              </div>
+              {refusal !== undefined && refusal.id === app.id ? <p className="text-destructive m-0 text-[11px] leading-snug">{refusal.message}</p> : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

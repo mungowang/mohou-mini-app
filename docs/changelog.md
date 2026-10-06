@@ -7,6 +7,10 @@ updated: 2026-10-05
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.40
+
+The library's first screen is apps again. The trash had been a row of deleted apps under the grid — leftovers competing with the thing the page is for, and a name that restored on a press nobody could read as an action. It is a bare glyph beside the search field now (muted until the pointer is on it, no count on the icon), and it opens a panel listing what was deleted with one restore action per row. A refused restore stays on that row: the host refuses an id that is live (`app-duplicate`), and the panel refuses a name that is taken, naming the app that holds it. `restoreApp` returns that message instead of reporting a failed restore as a failed deletion, which is what it used to do.
+
 ## 1.0.39
 
 The workbench's chips — the shell choice, the MCP server, tool, and preset rows, the rail's filters and its recall button — painted the browser's default button face. On a white card that is invisible; on the translucent wells this app uses it showed as a white band behind the row, which the new shell chips made obvious. A raw `<button>` has no background unless it states one, so every chip states it in each branch: `bg-primary` when selected, `bg-transparent` when not. The branches are mutually exclusive on purpose — the order of classes in the attribute does not decide which wins, the order in the stylesheet does.

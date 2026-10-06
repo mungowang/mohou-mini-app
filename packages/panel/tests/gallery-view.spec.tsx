@@ -50,7 +50,8 @@ describe('GalleryBody', () => {
     expect(markup(reduceGallery(galleryState('standalone'), { type: 'list-failed', message: '500' }))).toContain('500')
     expect(markup(reduceGallery(galleryState('standalone'), { type: 'list-failed', message: '' }))).toContain('The app list failed')
     expect(markup(reduceGallery(open, { type: 'frame-error', message: '' }))).toContain('Reload failed')
-    expect(markup(reduceGallery(galleryState('standalone'), { type: 'trash-failed' }))).toContain('Trash failed to load')
+    // The trash is a glyph until it is opened: deleted apps are not part of the first screen.
+    expect(markup(reduceGallery(galleryState('standalone'), { type: 'trash-failed' }))).toContain('data-trash-open')
     expect(markup(reduceGallery(open, { type: 'frame-error', message: 'missing' }))).toContain('missing')
     expect(markup(open)).not.toContain('/api/')
     expect(markup(open)).not.toContain('src=')

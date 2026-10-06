@@ -1,6 +1,6 @@
 # Agent Note: The trash behind a quiet icon
 
-Status: proposed
+Status: implemented
 
 ## Problem
 
@@ -16,13 +16,17 @@ exposes `undeleteApp`, and the gallery state already carries `trash`, `trash-fai
 
 ## Decision
 
-**A quiet icon in the chrome, not a row under the grid.** The library's first screen shows apps. A
-trash glyph sits with the toolbar's other quiet controls, carrying a count when there is something
-in it, and opens a trash view — the same gallery shell, listing what was deleted rather than what is
-live. A person who never deletes anything never sees it.
+**A quiet glyph in the chrome, and a panel rather than a view.** The library's first screen shows
+apps. The trash is a bare glyph beside the search field — no border, no background, muted until the
+pointer is on it — and it opens a small panel listing what was deleted. Three shapes were drawn as
+clickable prototypes first (a view, this panel, and a peer tab beside the library); the panel was
+chosen because the errand is short and a view is more machinery than it earns. A person who never
+deletes anything sees one grey glyph, and the count lives in the panel's own header, not on the
+icon.
 
-**Restore is a button on a row, and the row says what it is.** Each trashed app shows its name, when
-it was deleted, and one restore action. Pressing a name restores it only if the row says so.
+**Restore is a button on a row, and the row says what it is.** Each trashed app is a row with its
+name and one restore action. Pressing a name no longer restores it, which was the old behaviour and
+read as nothing in particular.
 
 **A conflict is named, not swallowed.** The host refuses a live id with `app-duplicate`; the view
 shows that as "an app with this id is back" rather than a failed request. A *name* that is already
@@ -35,8 +39,10 @@ other app is renamed.
 
 - **Leave it under the grid and style it better.** The complaint is placement, not styling: the
   first screen is for the library.
-- **A dialog instead of a view.** A dialog over the grid still puts the trash on the first screen,
-  and a list of deleted apps wants the room a view has.
+- **A dialog instead of a panel.** A modal over the grid wants a scrim, a focus trap, and a decision
+  about dismissal; the panel is anchored, light, and closes on an outside press.
+- **A view instead of a panel.** More room, and more machinery: navigation, a back affordance, and a
+  first screen that no longer shows the library. Worth it when the trash grows actions of its own.
 - **Restore on a name press, as now.** It hides the action behind a label that does not read as one.
 - **Let a name collide and restore anyway.** The host allows it; the library then shows two cards
   with one name and no way to tell which is which.
@@ -50,4 +56,10 @@ says whether there is anything to look at.
 
 The restore path gains a name check that the host does not have, which lives in the view and not in
 `undeleteApp`: the host's rule stays about identity, and the view's rule stays about the person
-reading the cards.
+reading the cards. A refusal stays on its own row, and `restoreApp` returns the message instead of
+dispatching a delete failure, which is what it used to do — a restore that failed was reported as a
+deletion that failed.
+
+The trash is still panel-only: `ctx.workbench` has `apps`, `openApp`, and `setDefault`, so an
+authored workbench cannot list or restore a deleted app. That is the next change, and it is the
+same capability the panel's route already calls.

@@ -57,12 +57,19 @@ describe('gallery card styles and toolbar', () => {
       expect(host.querySelector(`[data-card="${style}"]`)).toBeTruthy()
     }
     state = reduceGallery(state, { type: 'open', appId: todo.id, title: 'Todo' })
-    state = reduceGallery(state, { type: 'trash', apps: [todo] })
+    state = reduceGallery(state, { type: 'trash', apps: [{ ...todo, name: 'Todo (old)' }] })
     state = reduceGallery(state, { type: 'ask-delete', appId: todo.id })
     await paint()
     await act(async () => {
+      host.querySelector('button[data-trash-open]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    await act(async () => {
+      host.querySelector('button[data-restore="com.example.todo"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    await act(async () => {
       host.querySelector('[aria-label="Close"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      host.querySelector('button[data-trash="com.example.todo"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       ;[...host.querySelectorAll('button')].find(button => button.textContent === 'Cancel')?.click()
       host.querySelector('button.go')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       host.querySelector('button[aria-label="Reload"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))

@@ -102,7 +102,11 @@ describe('gallery clicks', () => {
     await act(async () => {
       root.render(<GalleryBody state={gallery} dispatch={() => undefined} client={client} locale="en" mode="production" />)
     })
-    const restore = host.querySelector('button[data-trash="com.example.todo"]')
+    await act(async () => {
+      host.querySelector('button[data-trash-open]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const restore = host.querySelector('button[data-restore="com.example.todo"]')
     await act(async () => {
       if (restore instanceof HTMLButtonElement) restore.click()
       await Promise.resolve()
@@ -124,7 +128,11 @@ describe('gallery clicks', () => {
     await act(async () => {
       root.render(<GalleryBody state={gallery} dispatch={() => undefined} client={failing} locale="en" mode="production" />)
     })
-    const restoreAgain = host.querySelector('button[data-trash="com.example.todo"]')
+    await act(async () => {
+      host.querySelector('button[data-trash-open]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const restoreAgain = host.querySelector('button[data-restore="com.example.todo"]')
     await act(async () => {
       if (restoreAgain instanceof HTMLButtonElement) restoreAgain.click()
       await Promise.resolve()

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-01
+updated: 2026-10-08
 ---
 
 # UI kit
@@ -34,7 +34,7 @@ Kit capabilities an author can call:
 - Icons: `import { Icon } from` the UI kit, then `<Icon.HelpCircle />`. Any name in the icon set works. The skill publishes a curated subset.
 - Illustrations: `IlluEmpty`, `IlluNoData`, `IlluSearch`, `IlluLoading`, `IlluServerStatus`, `IlluAccessDenied`, `IlluPageNotFound`, `IlluDataProcessing`, `IlluBugFixing`, `IlluCodeReview`. Accent follows `--primary-svg-color`. Assets contain no hex.
 
-`CodeEditor` loads its editor engine on demand. Find uses Mod-f / Ctrl-f when that engine loads (next, previous, match case, regexp). `CodeBlock` and `DiffViewer` load their highlighter on demand. `RichTextEditor` is local content-editable and loads nothing. When the on-demand fetch fails, `CodeEditor` becomes a text area and the highlighter renders plain text. The view does not crash. Authors do not import those engines and do not add them as app dependencies.
+`CodeEditor` loads its editor engine on demand. Find uses Mod-f / Ctrl-f when that engine loads (next, previous, match case, regexp). `CodeBlock` and `DiffViewer` load their highlighter on demand. `DiffViewer` keeps a ruler on the right. Each mark is one run of changed lines. The header names how many runs there are. Up and down step to the previous and next run. A click on the ruler scrolls that run into view. `RichTextEditor` is local content-editable and loads nothing. When the on-demand fetch fails, `CodeEditor` becomes a text area and the highlighter renders plain text. The view does not crash. Authors do not import those engines and do not add them as app dependencies.
 
 Kit chrome strings (toolbar labels, empty states, aria labels, relative time) go through the kit label function. Keys exist in `en` and `zh`. A new string lands in both. Technical tokens (log abbreviations, environment keys, commit hashes) stay English. The host runner wraps `UiProvider` from host `locale` (`zh-CN` → `zh`, otherwise `en`). Authors do not wrap a second provider for the default kit language.
 

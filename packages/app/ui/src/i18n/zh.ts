@@ -287,4 +287,10 @@ export const zh: UiMessages = {
     everySeconds: (n: number) => `每 ${n} 秒`,
     everyMinutes: (n: number) => `每 ${n} 分钟`,
   },
+  diffViewer: {
+    overview: (n: number) => `改动预览，${n} 处`,
+    sites: (n: number) => `${n} 处`,
+    previous: '上一处',
+    next: '下一处',
+  },
 }

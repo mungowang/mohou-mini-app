@@ -303,6 +303,12 @@ export const en = {
     everySeconds: (n: number) => `Every ${n}s`,
     everyMinutes: (n: number) => `Every ${n} min`,
   },
+  diffViewer: {
+    overview: (n: number) => `Change overview, ${n} sites`,
+    sites: (n: number) => `${n} changes`,
+    previous: 'Previous change',
+    next: 'Next change',
+  },
 }
 
 export type UiMessages = typeof en

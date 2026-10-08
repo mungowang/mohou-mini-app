@@ -1,11 +1,19 @@
 ---
 status: locked
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.45
+
+`DiffViewer` names how many change sites there are. Up and down step to the previous and next site.
+
+## 1.0.44
+
+`DiffViewer` keeps a ruler on the right. Each mark is one run of changed lines. A click scrolls that run into view. `ctx.http` adds `application/json` only when the caller did not already set `content-type`, in any letter case. A local tarball install does not revalidate the registry.
 
 ## 1.0.43
 

@@ -4,9 +4,12 @@
  *
  * Inputs: workspace package.json files under packages/
  * Writes: artifacts/npm/*.tgz on check; the configured registry on publish
- * Side effects: publish uploads only when MINI_APP_PUBLISH=1
+ * Side effects: publish uploads only when MINI_APP_PUBLISH=1.
+ *   After the upload, each package is queued on npmmirror unless
+ *   --no-mirror-sync is set or MINI_APP_MIRROR_SYNC is 0 or false.
  * Run as: pnpm publish:check
  *         MINI_APP_PUBLISH=1 pnpm publish:packages
+ *         MINI_APP_MIRROR_SYNC=0 pnpm publish:packages
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
@@ -130,7 +133,46 @@ function packAll(rootDir) {
   for (const name of names) console.log(join(dest, name))
 }
 
-function publishAll(rootDir) {
+/** npmmirror is the Settings mirror that accepts a sync. Tencent's mirror has no such route. */
+export const npmmirrorSyncRegistry = 'https://registry.npmmirror.com'
+
+/** On unless `--no-mirror-sync` is present or `MINI_APP_MIRROR_SYNC` is `0` or `false`. The flag wins. */
+export function mirrorSyncEnabled(argv, env) {
+  if (argv.includes('--no-mirror-sync')) return false
+  const raw = env.MINI_APP_MIRROR_SYNC?.trim() ?? ''
+  return raw !== '0' && raw !== 'false'
+}
+
+export function mirrorSyncUrl(name, registry = npmmirrorSyncRegistry) {
+  return `${registry}/-/package/${encodeURIComponent(name)}/syncs`
+}
+
+/**
+ * Queue one sync per package. A 2xx body is the mirror's log line.
+ * A transport error or a non-2xx response is one failure string. The caller decides the exit.
+ */
+export async function syncMirrors(names, fetchImpl = globalThis.fetch) {
+  const failures = []
+  for (const name of names) {
+    const url = mirrorSyncUrl(name)
+    let response
+    try {
+      response = await fetchImpl(url, { method: 'PUT' })
+    } catch (error) {
+      failures.push(`${name} ${error instanceof Error ? error.message : String(error)}`)
+      continue
+    }
+    const body = await response.text()
+    if (!response.ok) {
+      failures.push(`${name} ${response.status} ${body}`)
+      continue
+    }
+    console.log(`mirror sync ${name} ${body}`)
+  }
+  return failures
+}
+
+async function publishAll(rootDir) {
   if (process.env.MINI_APP_PUBLISH !== '1') {
     console.error('Refusing to upload. Set MINI_APP_PUBLISH=1 when you mean to publish.')
     process.exit(1)
@@ -147,6 +189,13 @@ function publishAll(rootDir) {
     cwd: rootDir,
     stdio: 'inherit',
   })
+  if (!mirrorSyncEnabled(process.argv, process.env)) return
+  const names = workspacePackages(rootDir).map(item => item.pkg.name)
+  const failures = await syncMirrors(names)
+  if (failures.length > 0) {
+    console.error(`npm upload finished. npmmirror sync failed:\n${failures.join('\n')}`)
+    process.exit(1)
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -155,6 +204,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error(failures.join('\n'))
     process.exit(1)
   }
-  if (process.argv.includes('--publish')) publishAll(root)
+  if (process.argv.includes('--publish')) await publishAll(root)
   else packAll(root)
 }

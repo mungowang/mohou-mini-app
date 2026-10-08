@@ -24,6 +24,7 @@
     "gen:skill": "node scripts/gen/skill/index.mjs",
     "sync:skill": "node scripts/sync/skill-into-shell.mjs",
     "check:skill": "node scripts/check/skill.mjs",
+    "bump:product": "node scripts/bump/product.mjs",
     "dist:local": "node scripts/local-app/index.mjs",
     "dist:app:local": "node scripts/build/app.mjs --channel=tarball",
     "dist:app:release": "node scripts/build/app.mjs --channel=registry",

@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-02
+updated: 2026-10-08
 ---
 
 # Development
@@ -23,11 +23,12 @@ pnpm build:panel      # write packages/shell/dist/panel.html and panel.js
 pnpm build:window     # build packages/launcher/tauri → mini-app-window
 pnpm build:artifact   # release window named Mohou, panel bundle, and artifacts/Mohou-<version>-<platform>/
 pnpm publish:check    # pack the workspace packages locally; it does not upload
-pnpm publish:packages # upload. Requires MINI_APP_PUBLISH=1 and a clean tree. Runs check first
+pnpm publish:packages # upload. Requires MINI_APP_PUBLISH=1 and a clean tree. Runs check first. Then queues each package on npmmirror. MINI_APP_MIRROR_SYNC=0, MINI_APP_MIRROR_SYNC=false, or --no-mirror-sync skips that queue. The flag wins over the variable.
 pnpm dev:host         # serve the built panel and open the window. It does not compile the panel. The process exits when the window closes
 pnpm gen:skill         # regenerate the catalog, copy templates, sync skill into shell (K≡S)
 pnpm sync:skill       # set skill version from shell; copy skills/ → packages/shell/skill/
 pnpm check:skill      # MCP tools, ctx members, generated contracts, skill version === shell
+pnpm bump:product 1.0.47 # the product version in every carrier; the changelog section must exist first
 pnpm dist:local       # pack tarballs + install artifacts/local-app from file: tarballs; write run
 pnpm dist:app:local   # unsigned bundle under artifacts/app/. Prefix from artifacts/npm tarballs. Copies them to ~/.mini-app/packages and stamps that directory as the tarball channel
 pnpm dist:app:release # same bundle shape. Prefix from the npm registry. Channel registry. That shell version must already be published

@@ -33,6 +33,27 @@ async function withServer(handler: (body: string) => { status: number; type: str
   }
 }
 
+async function withHeaderServer(run: (url: string, seen: () => string | undefined) => Promise<void>): Promise<void> {
+  let type: string | undefined
+  const server = createServer((req, res) => {
+    type = req.headers['content-type']
+    res.writeHead(204)
+    res.end()
+    req.resume()
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address() as AddressInfo
+  try {
+    await run(`http://127.0.0.1:${address.port}/item`, () => type)
+  } finally {
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve()
+      })
+    })
+  }
+}
+
 describe('createHttp', () => {
   it('returns a json body and keeps an error status', async () => {
     const http = createHttp(policy)
@@ -51,6 +72,12 @@ describe('createHttp', () => {
       const result = await http(url, { method: 'POST', body: 'plain', headers: { 'content-type': 'text/plain' } })
       expect(result.json).toBeNull()
       expect(result.text).toBe('{')
+    })
+    await withHeaderServer(async (url, seen) => {
+      await http(url, { method: 'POST', body: { n: 1 }, headers: { 'Content-Type': 'application/merge-patch+json' } })
+      expect(seen()).toBe('application/merge-patch+json')
+      await http(url, { method: 'POST', body: { n: 1 } })
+      expect(seen()).toBe('application/json')
     })
   })
 

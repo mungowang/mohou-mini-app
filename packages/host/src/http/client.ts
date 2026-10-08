@@ -113,10 +113,12 @@ function encodeBody(
     throw new HttpError('http-too-large', 'request body exceeds the host cap')
   }
   if (typeof body === 'string') return headers === undefined ? { payload } : { payload, headers }
-  return {
-    payload,
-    headers: { ...headers, 'content-type': headers?.['content-type'] ?? 'application/json' },
-  }
+  if (headers !== undefined && hasContentType(headers)) return { payload, headers }
+  return { payload, headers: { ...headers, 'content-type': 'application/json' } }
+}
+
+function hasContentType(headers: Record<string, string>): boolean {
+  return Object.keys(headers).some(key => key.toLowerCase() === 'content-type')
 }
 
 async function readResponse(response: Response, maxBodyBytes: number, signal: AbortSignal): Promise<AppHttpResponse> {

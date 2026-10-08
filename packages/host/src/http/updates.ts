@@ -200,7 +200,7 @@ function tarballInstallArgs(prefix: PrefixUpdate, version: string): string[] {
     const file = path.join(dir, packedName(name, version))
     return `file:${file.replaceAll('\\', '/')}`
   })
-  return ['install', ...specs, ...installFlags()]
+  return ['install', ...specs, ...installFlags(), '--prefer-offline']
 }
 
 function packedName(packageName: string, version: string): string {

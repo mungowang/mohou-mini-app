@@ -774,6 +774,10 @@ pub fn harden_install_args(mut args: Vec<String>) -> Vec<String> {
             args.push(flag.to_string());
         }
     }
+    // A file: install already has the tarballs. Revalidating the registry is what burns the budget.
+    if args.iter().any(|arg| arg.starts_with("file:")) && !args.iter().any(|arg| arg == "--prefer-offline") {
+        args.push("--prefer-offline".to_string());
+    }
     args
 }
 
@@ -1432,8 +1436,12 @@ mod tests {
         assert!(args.contains(&"--omit=peer".to_string()));
         assert!(args.contains(&"--fetch-retries=1".to_string()));
         assert!(args.contains(&"--fetch-timeout=20000".to_string()));
+        assert!(args.contains(&"--prefer-offline".to_string()));
         let again = harden_install_args(args.clone());
         assert_eq!(again.iter().filter(|arg| *arg == "--omit=peer").count(), 1);
+        assert_eq!(again.iter().filter(|arg| *arg == "--prefer-offline").count(), 1);
+        let registry = harden_install_args(vec!["install".into(), "@mohou/shell@1.0.0".into()]);
+        assert!(!registry.iter().any(|arg| arg == "--prefer-offline"));
         assert_eq!(harden_install_args(vec!["run".into()]), vec!["run".to_string()]);
     }
 

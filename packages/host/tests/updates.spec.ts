@@ -74,6 +74,7 @@ describe('checkPackageUpdate', () => {
     expect(staged.args[0]).toBe('install')
     expect(staged.args.some(arg => arg.includes('mohou-shell-1.2.0.tgz'))).toBe(true)
     expect(staged.args).toContain('--omit=peer')
+    expect(staged.args).toContain('--prefer-offline')
     expect(staged.args).toContain('--fetch-retries=1')
     expect(newestTarball(join(root, 'missing'), 'shell')).toBeNull()
     expect(() => { stagePackageUpdate('1.0.0', {}, join(tmpdir(), 'mma-no-prefix')) }).toThrow(/app prefix/)
@@ -86,6 +87,7 @@ describe('checkPackageUpdate', () => {
     const registry = JSON.parse(await readFile(join(root, 'update.json'), 'utf8')) as { args: string[] }
     expect(registry.args).toContain('@mohou/shell@2.0.0')
     expect(registry.args).toContain('--omit=peer')
+    expect(registry.args).not.toContain('--prefer-offline')
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })))
     const same = await checkPackageUpdate(
       { name: '@mohou/shell', current: '9.0.0', platform: 'darwin', private: false },

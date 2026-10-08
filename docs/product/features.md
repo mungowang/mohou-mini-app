@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # Product features
@@ -49,6 +49,7 @@ Adapters that embed this platform in another agent product are out of scope.
 | Runtime | [Kiro](runtime/kiro.md) |
 | MCP client | [ctx.mcp](mcp-client/ctx-mcp.md) |
 | MCP client | [Server config](mcp-client/server-config.md) |
+| MCP client | [Supported agents](mcp-client/supported-agents.md) |
 | MCP server | [Authoring projection](mcp-server/projection.md) |
 | MCP server | [Author surface](author-surface.md) |
 | MCP server | [Authoring tools](mcp-server/tools.md) |

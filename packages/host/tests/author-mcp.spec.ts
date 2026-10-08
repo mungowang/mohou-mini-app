@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -120,5 +120,109 @@ describe('author mcp install', () => {
     expect(saved).not.toContain('Authorization: "Bearer older"')
     expect(saved.match(/id: mcp-mini-app/g)).toHaveLength(1)
     expect((await readAuthorMcp(layout, { ...live, token: 'newest' })).agents[0]).toMatchObject({ installed: true, updateAvailable: false })
+  })
+
+  it('appends the Grok block and leaves every other line, including a native mini-app table', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-grok-'))
+    const file = join(root, 'config.toml')
+    const head = '# keep me\n[cli]\ntheme = "dark"\n\n[mcp_servers.other]\ncommand = "npx"\n\n'
+    const native = '[mcp_servers.mini-app]\nurl = "http://old"\nenabled = false\n\n[mcp_servers.mini-app.headers]\nAuthorization = "Bearer old"\n\n'
+    const tail = '[models]\ndefault = "grok"\n'
+    await writeFile(file, `${head}${native}${tail}`, 'utf8')
+    const layout = {
+      agents: [{ id: 'grok', label: 'Grok', file, detectDir: root, format: 'grok' as const }],
+    }
+    expect((await readAuthorMcp(layout, live)).agents[0]).toMatchObject({ installed: false, updateAvailable: false, homePresent: true })
+
+    const wrote = await writeAuthorMcp(layout, ['grok'], live)
+    expect(wrote.agents[0]).toMatchObject({ installed: true, updateAvailable: false })
+    const saved = await readFile(file, 'utf8')
+    expect(saved.startsWith(`${head}${native}${tail.trimEnd()}`)).toBe(true)
+    expect(saved).toContain(`url = "${live.url}"`)
+    expect(saved).toContain('enabled = true')
+    expect(saved).toContain(`Authorization = "Bearer ${live.token}"`)
+    expect(saved.match(/\[mcp_servers\.mini-app\]/g)).toHaveLength(2)
+    expect(saved.match(/# >>> mohou:mini-app/g)).toHaveLength(1)
+
+    await writeAuthorMcp(layout, ['grok'], { ...live, token: 'newest' })
+    const again = await readFile(file, 'utf8')
+    expect(again.startsWith(`${head}${native}${tail.trimEnd()}`)).toBe(true)
+    expect(again).toContain('Authorization = "Bearer newest"')
+    expect(again).not.toContain(live.token)
+    expect(again.match(/\[mcp_servers\.mini-app\]/g)).toHaveLength(2)
+    expect(again.match(/# >>> mohou:mini-app/g)).toHaveLength(1)
+  })
+
+  it('leaves an inline mini-app key and appends the marked block', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-grok-inline-'))
+    const file = join(root, 'config.toml')
+    const head = '[mcp_servers]\nother = { command = "npx" }\n'
+    const inline = 'mini-app = {\n  url = "http://old",\n  headers = { Authorization = "Bearer old" }\n}\n'
+    const tail = '[ui]\ntheme = "dark"\n'
+    await writeFile(file, `${head}${inline}${tail}`, 'utf8')
+    const layout = {
+      agents: [{ id: 'grok', label: 'Grok', file, detectDir: root, format: 'grok' as const }],
+    }
+    expect((await readAuthorMcp(layout, live)).agents[0]).toMatchObject({ installed: false, updateAvailable: false })
+    await writeAuthorMcp(layout, ['grok'], live)
+    const saved = await readFile(file, 'utf8')
+    expect(saved.startsWith(`${head}${inline}${tail.trimEnd()}`)).toBe(true)
+    expect(saved).toContain('http://old')
+    expect(saved.match(/\[mcp_servers\.mini-app\]/g)).toHaveLength(1)
+    expect(saved.match(/# >>> mohou:mini-app/g)).toHaveLength(1)
+  })
+
+  it('leaves a Grok server line that sits inside a multiline string', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-grok-string-'))
+    const file = join(root, 'config.toml')
+    const decoy = '[notes]\nbio = """\n[mcp_servers.mini-app]\nurl = "nope"\n"""\n\n[cli]\nkeep = true\n'
+    await writeFile(file, decoy, 'utf8')
+    const layout = {
+      agents: [{ id: 'grok', label: 'Grok', file, detectDir: join(root, 'missing'), format: 'grok' as const }],
+    }
+    expect((await readAuthorMcp(layout, live)).agents[0]).toMatchObject({ installed: false, homePresent: false })
+    await writeAuthorMcp(layout, ['grok'], live)
+    const saved = await readFile(file, 'utf8')
+    expect(saved.startsWith(decoy.trimEnd())).toBe(true)
+    expect(saved).toContain('url = "nope"')
+    expect(saved).toContain(`url = "${live.url}"`)
+    expect((await readAuthorMcp(layout, live)).agents[0]).toMatchObject({ installed: true, updateAvailable: false })
+  })
+
+  it('writes a Grok token that needs TOML escapes and treats that block as current', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-grok-escape-'))
+    const file = join(root, 'config.toml')
+    const layout = {
+      agents: [{ id: 'grok', label: 'Grok', file, detectDir: root, format: 'grok' as const }],
+    }
+    const token = 'a"b\\c\u0001'
+    await writeAuthorMcp(layout, ['grok'], { ...live, token })
+    const saved = await readFile(file, 'utf8')
+    expect(saved).toContain('Authorization = "Bearer a\\"b\\\\c\\u0001"')
+    expect((await readAuthorMcp(layout, { ...live, token })).agents[0]).toMatchObject({ installed: true, updateAvailable: false })
+  })
+
+  it('creates a missing Grok config and refuses to replace an unreadable one', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-mcp-grok-create-'))
+    const file = join(root, 'nested', 'config.toml')
+    const layout = {
+      agents: [{ id: 'grok', label: 'Grok', file, detectDir: root, format: 'grok' as const }],
+    }
+    await writeAuthorMcp(layout, ['grok'], live)
+    expect(await readFile(file, 'utf8')).toContain(`url = "${live.url}"`)
+
+    const locked = join(root, 'locked.toml')
+    const original = 'keep = true\n'
+    await writeFile(locked, original, 'utf8')
+    const lockedLayout = {
+      agents: [{ id: 'grok', label: 'Grok', file: locked, detectDir: root, format: 'grok' as const }],
+    }
+    await chmod(locked, 0)
+    try {
+      await expect(writeAuthorMcp(lockedLayout, ['grok'], live)).rejects.toThrow()
+    } finally {
+      await chmod(locked, 0o644)
+    }
+    expect(await readFile(locked, 'utf8')).toBe(original)
   })
 })

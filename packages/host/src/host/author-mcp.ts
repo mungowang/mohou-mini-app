@@ -7,10 +7,10 @@ import { ConfigError } from './codes.ts'
 export const authorMcpServerId = 'mini-app'
 
 /**
- * `dsh` is not a JSON file: DSH reads MCP servers from the YAML plugin list in the profile's
- * `cordis.patch.yml`, so that format is merged as text (see `writeDshPatch`).
+ * `dsh` and `grok` are not JSON files. DSH reads YAML plugin entries. Grok reads TOML tables in
+ * `config.toml`. Both are merged as text so the rest of the file stays byte for byte.
  */
-export type AuthorMcpFormat = 'mcpServers' | 'claude' | 'opencode' | 'dsh'
+export type AuthorMcpFormat = 'mcpServers' | 'claude' | 'opencode' | 'dsh' | 'grok'
 
 /** One assistant file Shell named. */
 export interface AuthorMcpAgent {
@@ -88,7 +88,11 @@ export async function revealAuthorMcp(
 
 async function writeAgent(agent: AuthorMcpAgent, live: AuthorMcpLive): Promise<void> {
   if (agent.format === 'dsh') {
-    await writeDshPatch(agent.file, live)
+    await writeMarkedBlock(agent.file, dshBlock(live))
+    return
+  }
+  if (agent.format === 'grok') {
+    await writeMarkedBlock(agent.file, grokBlock(live))
     return
   }
   const root = await readRoot(agent.file)
@@ -100,7 +104,7 @@ async function writeAgent(agent: AuthorMcpAgent, live: AuthorMcpLive): Promise<v
   await writeFile(agent.file, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
 }
 
-/** First and last line of the block this product owns inside a DSH patch file. */
+/** First and last line of the block this product owns in a DSH patch and in Grok's `config.toml`. */
 const dshMarkStart = `# >>> mohou:${authorMcpServerId}`
 const dshMarkEnd = `# <<< mohou:${authorMcpServerId}`
 
@@ -126,20 +130,6 @@ function dshBlock(live: AuthorMcpLive): string {
   ].join('\n')
 }
 
-/**
- * Merge the entry into the profile's patch layer as text. The file may hold hand-written YAML
- * (`!!js` tags included), so it is never re-serialised: everything outside our two markers is
- * copied through byte for byte.
- */
-async function writeDshPatch(file: string, live: AuthorMcpLive): Promise<void> {
-  const text = await readText(file)
-  const stripped = dropDshBlock(text)
-  const head = stripped.trimEnd()
-  const next = head.length === 0 ? dshBlock(live) : `${head}\n\n${dshBlock(live)}`
-  await mkdir(path.dirname(file), { recursive: true })
-  await writeFile(file, next, 'utf8')
-}
-
 function dropDshBlock(text: string): string {
   const start = text.indexOf(dshMarkStart)
   if (start < 0) return text
@@ -147,6 +137,29 @@ function dropDshBlock(text: string): string {
   if (end < 0) return text.slice(0, start)
   const after = text.indexOf('\n', end)
   return `${text.slice(0, start)}${after < 0 ? '' : text.slice(after + 1)}`
+}
+
+/**
+ * Replace the marked block and copy every other byte through. The file is the user's
+ * (DSH YAML, Grok TOML), so it is never re-serialised.
+ */
+async function writeMarkedBlock(file: string, block: string): Promise<void> {
+  const head = dropDshBlock(await readText(file)).trimEnd()
+  const next = head.length === 0 ? block : `${head}\n\n${block}`
+  await mkdir(path.dirname(file), { recursive: true })
+  await writeFile(file, next, 'utf8')
+}
+
+/** Installed when the start marker is present. Current when the block equals `block`. */
+async function hasMarkedBlock(file: string, block: string): Promise<{ ok: boolean; current: boolean }> {
+  const text = await readText(file)
+  const start = text.indexOf(dshMarkStart)
+  if (start < 0) return { ok: false, current: false }
+  const end = text.indexOf(dshMarkEnd, start)
+  if (end < 0) return { ok: true, current: false }
+  const lineEnd = text.indexOf('\n', end)
+  const found = lineEnd < 0 ? text.slice(start) : text.slice(start, lineEnd)
+  return { ok: true, current: found === block.trimEnd() }
 }
 
 async function readText(file: string): Promise<string> {
@@ -157,7 +170,8 @@ async function readText(file: string): Promise<string> {
 }
 
 async function hasServer(agent: AuthorMcpAgent, live: AuthorMcpLive): Promise<{ ok: boolean; current: boolean }> {
-  if (agent.format === 'dsh') return hasDshBlock(agent.file, live)
+  if (agent.format === 'dsh') return hasMarkedBlock(agent.file, dshBlock(live))
+  if (agent.format === 'grok') return hasMarkedBlock(agent.file, grokBlock(live))
   const root = await readRoot(agent.file).catch(() => undefined)
   if (root === undefined) return { ok: false, current: false }
   const nest = root[nestKey(agent.format)]
@@ -167,18 +181,6 @@ async function hasServer(agent: AuthorMcpAgent, live: AuthorMcpLive): Promise<{ 
   const headers = isRecord(row.headers) ? row.headers : {}
   const current = row.url === live.url && headers.Authorization === `Bearer ${live.token}`
   return { ok: true, current }
-}
-
-/** Installed when our markers are there; current only when the block matches the live server. */
-async function hasDshBlock(file: string, live: AuthorMcpLive): Promise<{ ok: boolean; current: boolean }> {
-  const text = await readText(file)
-  const start = text.indexOf(dshMarkStart)
-  if (start < 0) return { ok: false, current: false }
-  const end = text.indexOf(dshMarkEnd, start)
-  if (end < 0) return { ok: true, current: false }
-  const lineEnd = text.indexOf('\n', end)
-  const block = lineEnd < 0 ? text.slice(start) : text.slice(start, lineEnd)
-  return { ok: true, current: block === dshBlock(live).trimEnd() }
 }
 
 async function readRoot(file: string): Promise<Record<string, unknown>> {
@@ -197,7 +199,7 @@ async function readRoot(file: string): Promise<Record<string, unknown>> {
   return parsed
 }
 
-function entryOf(format: AuthorMcpFormat, live: AuthorMcpLive, entry: 'url' | 'extended' = 'extended'): Record<string, unknown> {
+function entryOf(format: Exclude<AuthorMcpFormat, 'dsh' | 'grok'>, live: AuthorMcpLive, entry: 'url' | 'extended' = 'extended'): Record<string, unknown> {
   const headers = { Authorization: `Bearer ${live.token}` }
   if (format === 'opencode') return { type: 'remote', url: live.url, enabled: true, headers }
   if (format === 'claude') return { type: 'http', url: live.url, headers }
@@ -211,7 +213,7 @@ function entryOf(format: AuthorMcpFormat, live: AuthorMcpLive, entry: 'url' | 'e
   }
 }
 
-function nestKey(format: AuthorMcpFormat): 'mcpServers' | 'mcp' {
+function nestKey(format: Exclude<AuthorMcpFormat, 'dsh' | 'grok'>): 'mcpServers' | 'mcp' {
   return format === 'opencode' ? 'mcp' : 'mcpServers'
 }
 
@@ -248,4 +250,42 @@ function openPath(target: string, platform: string): Promise<void> {
     child.unref()
     resolve()
   })
+}
+
+function grokBlock(live: AuthorMcpLive): string {
+  return [
+    `${dshMarkStart} — written by Mohou Settings → Agent. Delete this whole block to uninstall.`,
+    `[mcp_servers.${authorMcpServerId}]`,
+    `url = ${tomlBasic(live.url)}`,
+    'enabled = true',
+    '',
+    `[mcp_servers.${authorMcpServerId}.headers]`,
+    `Authorization = ${tomlBasic(`Bearer ${live.token}`)}`,
+    dshMarkEnd,
+    '',
+  ].join('\n')
+}
+
+const tomlEscapes: Readonly<Record<string, string>> = {
+  '\\': '\\\\',
+  '"': '\\"',
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+}
+
+function tomlBasic(value: string): string {
+  let out = '"'
+  for (const ch of value) {
+    const mapped = tomlEscapes[ch]
+    if (mapped !== undefined) {
+      out += mapped
+      continue
+    }
+    const code = ch.codePointAt(0) ?? 0
+    out += code < 0x20 || code === 0x7f ? `\\u${code.toString(16).padStart(4, '0')}` : ch
+  }
+  return `${out}"`
 }

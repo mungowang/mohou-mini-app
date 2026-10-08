@@ -82,4 +82,23 @@ describe('assistant dest tables', () => {
       file: path.join(home, '.dsh', 'profiles', 'work', 'cordis.patch.yml'),
     })
   })
+
+  it('points Grok at $GROK_HOME for the skill and for config.toml', () => {
+    const home = '/home/u'
+    expect(builtinSkillAgents(home, {}).find(agent => agent.id === 'grok')).toEqual({
+      id: 'grok',
+      label: 'Grok',
+      skillsDir: path.join(home, '.grok', 'skills'),
+      detectDir: path.join(home, '.grok'),
+    })
+    expect(builtinMcpAgents(home, {}).find(agent => agent.id === 'grok')).toMatchObject({
+      label: 'Grok',
+      file: path.join(home, '.grok', 'config.toml'),
+      detectDir: path.join(home, '.grok'),
+      format: 'grok',
+    })
+    expect(builtinMcpAgents(home, { GROK_HOME: '/opt/grok' }).find(agent => agent.id === 'grok')?.file).toBe(path.join('/opt/grok', 'config.toml'))
+    expect(builtinSkillAgents(home, { GROK_HOME: '/opt/grok' }).find(agent => agent.id === 'grok')?.skillsDir).toBe(path.join('/opt/grok', 'skills'))
+    expect(builtinMcpAgents(home, { GROK_HOME: '   ' }).find(agent => agent.id === 'grok')?.file).toBe(path.join(home, '.grok', 'config.toml'))
+  })
 })

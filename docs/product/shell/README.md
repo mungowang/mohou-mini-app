@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-09-16
+updated: 2026-10-08
 ---
 
 # Shell

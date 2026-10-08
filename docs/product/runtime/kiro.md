@@ -1,7 +1,7 @@
 ---
 status: draft
 progress: open
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 
 # Kiro
@@ -10,7 +10,7 @@ Layer: [Runtime](README.md). Index: [features.md](../features.md).
 
 This brain is the same shape as Pi. `ctx.llm` is one completion in this process. `ctx.agent` is one in-memory session. Neither call writes a Kiro session record, and neither call changes the user's Kiro permissions. The package is not created while Kiro has no such API.
 
-Installing the writing skill or the authoring MCP server into Kiro is [Settings](../panel/settings.md). That install is a different feature.
+Installing the writing skill or the authoring MCP server into Kiro is [Supported agents](../mcp-client/supported-agents.md). The form is [Settings](../panel/settings.md).
 
 - Owner: Runtime, constructed by Shell and injected into Host. The package would be `@mohou/runtime-kiro`. Host does not import it.
 - Input: `runtimeProvider.id` of `kiro`, plus optional `{ provider, model, options }` from config. Login stays where Kiro already stores it: the `kiro-cli login` session (Builder ID, IAM Identity Center, GitHub, or Google), or a `KIRO_API_KEY` already in the environment.

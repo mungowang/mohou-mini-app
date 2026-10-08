@@ -2,11 +2,11 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 
 /** Built-in assistants that can receive the authoring MCP connection. */
-export const mcpAgentIds = ['claude', 'pi', 'pi-adapter', 'cursor', 'opencode', 'kiro', 'workbuddy', 'dsh', 'dsh-desktop'] as const
+export const mcpAgentIds = ['claude', 'pi', 'pi-adapter', 'cursor', 'opencode', 'kiro', 'workbuddy', 'dsh', 'dsh-desktop', 'grok'] as const
 
 export type McpAgentId = (typeof mcpAgentIds)[number]
 
-export type McpAgentFormat = 'mcpServers' | 'claude' | 'opencode' | 'dsh'
+export type McpAgentFormat = 'mcpServers' | 'claude' | 'opencode' | 'dsh' | 'grok'
 
 export interface McpAgentTarget {
   readonly id: McpAgentId
@@ -29,6 +29,7 @@ export interface McpAgentTarget {
  * WorkBuddy uses CodeBuddy's home. Cursor is here because it speaks MCP; it is not a skill dest.
  * DSH is the exception: its servers are YAML plugin entries in the active profile's patch layer,
  * which is reapplied after every profile rebuild.
+ * Grok reads `[mcp_servers.*]` tables in `config.toml`. That file is merged as text.
  */
 export function builtinMcpAgents(home = homedir(), env: NodeJS.ProcessEnv = process.env): readonly McpAgentTarget[] {
   const configHome = env.XDG_CONFIG_HOME?.trim() || path.join(home, '.config')
@@ -49,7 +50,14 @@ export function builtinMcpAgents(home = homedir(), env: NodeJS.ProcessEnv = proc
     // The desktop profile is the Electron app's own; it exists only after that app has opened once,
     // and DSH takes a lock on it, so the app has to be quit while this is written.
     { id: 'dsh-desktop', label: 'DSH · Desktop', file: path.join(dshHome(home, env), 'profiles', 'desktop', 'cordis.patch.yml'), detectDir: path.join(dshHome(home, env), 'profiles', 'desktop'), format: 'dsh' },
+    { id: 'grok', label: 'Grok', file: path.join(grokHome(home, env), 'config.toml'), detectDir: grokHome(home, env), format: 'grok' },
   ]
+}
+
+/** `GROK_HOME` when Grok's directory is not `~/.grok`. The skill row uses the same directory. */
+function grokHome(home: string, env: NodeJS.ProcessEnv): string {
+  const configured = env.GROK_HOME?.trim()
+  return configured !== undefined && configured.length > 0 ? configured : path.join(home, '.grok')
 }
 
 /** `DSH_HOME` when the harness is configured away from `~/.dsh`, which is where profiles sit. */

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-09-29
+updated: 2026-10-08
 ---
 
 # Owner surface
@@ -133,6 +133,7 @@ Owner `restoreStorage` closes the live storage handle, then calls `restoreStorag
 - Input: selected assistant ids and custom `.../skills` dirs.
 - Output: dests, source `version`, per-copy `version` and `updateAvailable`.
 - `writeAuthorSkill` copies this repo's writing skill into those dests.
+- The built-in assistants for this call and for [readAuthorMcp](#readauthormcp--writeauthormcp--revealauthormcp) are [Supported agents](mcp-client/supported-agents.md).
 - `revealAuthorSkill` opens one dest this layout already owns.
 - Failure: `config-invalid` when the dest is not in the list or the last folder is not `skills`.
 

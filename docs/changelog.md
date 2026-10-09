@@ -7,6 +7,10 @@ updated: 2026-10-08
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.47
+
+`ctx.llm` and `ctx.agent` take images. Each image is inline base64 or a file path the host reads. A web URL is not a path. The lab has a 图片识别 station for both.
+
 ## 1.0.46
 
 Settings → Agent installs into Grok. The writing skill goes to `$GROK_HOME/skills` (`~/.grok/skills` when that variable is unset), and the authoring MCP server is a marked block in `$GROK_HOME/config.toml`: `[mcp_servers.mini-app]` with the live url, `enabled = true`, and the bearer. A later install replaces that block. A `[mcp_servers.mini-app]` table already in the file, outside the markers, stays; two tables of that name make the file invalid TOML.

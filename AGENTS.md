@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-01
+updated: 2026-10-09
 ---
 
 # AGENTS.md
@@ -48,6 +48,15 @@ pnpm run check
 ```
 
 [docs/development.md](docs/development.md) states what each command checks. [.agents/skills/pre-push-checks/SKILL.md](.agents/skills/pre-push-checks/SKILL.md) selects the checks that cover an outgoing change.
+
+## Release
+
+Do not hand-edit version fields. [docs/development.md](docs/development.md) owns the commands. Do not bump, publish, or tag unless asked.
+
+- Bump: write `## x.y.z` in `docs/changelog.md` first, then `pnpm bump:product x.y.z`. That script writes every carrier.
+- Local packs: `pnpm publish:check`. It does not upload.
+- npm: `MINI_APP_PUBLISH=1 pnpm publish:packages`. A dirty tree is refused. The shell version must be on the registry before a release tag.
+- GitHub Release: push tag `vX.Y.Z`, matching `@mohou/shell` with no `v`. `workflow_dispatch` builds the bundles and does not publish the Release.
 
 ## Conventions
 

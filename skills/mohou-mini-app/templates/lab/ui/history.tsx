@@ -39,6 +39,7 @@ const TONE: Record<string, string> = {
   llm: 'text-primary',
   agent: 'text-foreground',
   mcp: 'bg-transparent text-muted-foreground',
+  vision: 'text-primary',
 }
 
 function statusFor(status: RunRecord['status']): string {

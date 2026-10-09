@@ -25,7 +25,7 @@ export type RunRecord = {
   durationMs: number | null
 }
 
-export type RunKind = 'llm' | 'agent' | 'mcp' | 'shell'
+export type RunKind = 'llm' | 'agent' | 'mcp' | 'shell' | 'vision'
 /**
  * A record the rail hands back to a station. The form fills from it, and `at` makes each hand-off
  * a new object, so filling twice from one record still lands.
@@ -99,11 +99,12 @@ export type LabSnapshot = {
   activeRunId: number | null
 }
 
-export const EMPTY_COUNTS: Record<RunKind, number> = { llm: 0, agent: 0, mcp: 0, shell: 0 }
+export const EMPTY_COUNTS: Record<RunKind, number> = { llm: 0, agent: 0, mcp: 0, shell: 0, vision: 0 }
 
 export const KIND_LABEL: Record<RunKind, string> = {
   llm: 'LLM 补全',
   agent: 'Agent 执行',
   mcp: 'MCP 调用',
   shell: 'Shell 执行',
+  vision: '图片识别',
 }

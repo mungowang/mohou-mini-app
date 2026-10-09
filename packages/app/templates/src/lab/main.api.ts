@@ -353,6 +353,83 @@ export default defineApp({
     },
 
     /**
+     * Image probe. Paste sends bytes. A path is read by the host, not by this view.
+     */
+    async *recognize(
+      ctx,
+      args?: {
+        prompt?: string
+        mode?: string
+        mimeType?: string
+        data?: string
+        path?: string
+        provider?: string
+        model?: string
+      },
+    ) {
+      const mode = args?.mode === 'path' ? 'path' : 'data'
+      const prompt = (args?.prompt ?? '').trim() || 'You are an OCR engine. Keep layout structure as close as possible with monospace-style spacing. Do not add explanation.'
+      const path = (args?.path ?? '').trim()
+      const data = (args?.data ?? '').trim()
+      const mimeType = (args?.mimeType ?? '').trim()
+      if (mode === 'path' && !path) throw new Error('请填写文件路径')
+      if (mode === 'data' && (!data || !mimeType)) throw new Error('请粘贴或选择一张图片')
+      const ac = new AbortController()
+      link(ctx, ac)
+      const startedAt = Date.now()
+      const runtime = runtimeOf(ctx)
+      const provider = args?.provider?.trim() || runtime.provider || undefined
+      const model = args?.model?.trim() || runtime.model || undefined
+      const images = mode === 'path'
+        ? [{ path, ...(mimeType ? { mimeType } : {}) }]
+        : [{ mimeType, data }]
+      const label = mode === 'path' ? path : `粘贴 ${mimeType}`
+
+      const id = await insert(ctx, {
+        kind: 'vision',
+        title: prompt.slice(0, 80),
+        input: label,
+        source: provider ?? null,
+        provider: provider ?? null,
+        model: model ?? null,
+        meta: { mode, mimeType: mimeType || null },
+      })
+      begin('vision', ac, id)
+
+      const opts = {
+        signal: ac.signal,
+        images,
+        ...(provider ? { provider } : {}),
+        ...(model ? { model } : {}),
+      } as AppLlmOptions
+
+      let body = ''
+      try {
+        for await (const event of ctx.llm(prompt, { ...opts, stream: true })) {
+          if (str(field(event, 'type')) !== eventType.textDelta) continue
+          const text = str(field(event, 'text'))
+          if (!text) continue
+          body += text
+          yield text
+        }
+      } catch (cause) {
+        const message = fail(cause)
+        const status = codeOf(cause) === 'cancelled' ? 'cancelled' : 'error'
+        await finish(ctx, id, { status, output: body, error: status === 'error' ? message : null })
+        endRun(id)
+        throw cause
+      }
+      const endedAt = Date.now()
+      await finish(ctx, id, {
+        status: 'done',
+        output: body,
+        meta: { mode, mimeType: mimeType || null },
+      })
+      endRun(id)
+      return { id, chars: body.length, durationMs: endedAt - startedAt }
+    },
+
+    /**
      * ⭐ key: the agent is isolated — do not rebuild it from a loop of ctx.llm. It emits `turn` and
      * `tool` events; those ARE the execution steps. Step detail is captured as they arrive and
      * persisted at the end, so a finished run is fully inspectable.

@@ -21,6 +21,7 @@ import { KIND_ORDER } from './shared/mcp'
 import { LlmRegion } from './ui/llm'
 import { McpRegion } from './ui/mcp'
 import { ShellRegion } from './ui/shell'
+import { VisionRegion } from './ui/vision'
 
 const EMPTY_SNAPSHOT: LabSnapshot = {
   runs: [],
@@ -45,6 +46,7 @@ const STATIONS: Station[] = [
   { value: 'agent', label: 'Agent 执行', hint: '多步自主执行 + 步骤跟踪' },
   { value: 'mcp', label: 'MCP 调用', hint: '挑 server 和 tool，发一次真调用' },
   { value: 'shell', label: 'Shell 执行', hint: 'ctx.bash / ctx.pwsh，按平台选 shell' },
+  { value: 'vision', label: '图片识别', hint: '粘贴数据，或给文件路径' },
 ]
 
 export default function Ui() {
@@ -219,6 +221,9 @@ export default function Ui() {
               <TabsContent value="shell" className="flex min-h-0 flex-1 flex-col">
                 <ShellRegion onRan={onRan} {...recall?.record.kind === 'shell' ? { recall } : {}} />
               </TabsContent>
+              <TabsContent value="vision" className="flex min-h-0 flex-1 flex-col">
+                <VisionRegion runtime={snapshot.runtime} onRan={onRan} {...recall?.record.kind === 'vision' ? { recall } : {}} />
+              </TabsContent>
             </Tabs>
 
             <footer className="text-muted-foreground/80 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 font-mono text-[10px]">
@@ -227,6 +232,7 @@ export default function Ui() {
               <span>Agent {snapshot.counts.agent}</span>
               <span>MCP {snapshot.counts.mcp}</span>
               <span>Shell {snapshot.counts.shell}</span>
+              <span>图片 {snapshot.counts.vision}</span>
               {snapshot.runs[0] ? (
                 <span className="ml-auto">最近一次 {ms(snapshot.runs[0].durationMs)}</span>
               ) : null}

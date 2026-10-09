@@ -126,6 +126,8 @@ function PaletteRow(props: {
   readonly onPick: () => void
   readonly onPoint: () => void
 }): ReactNode {
+  // muted-foreground and a foreground wash assume the card. A light accent hides both.
+  const quiet = props.on ? 'text-accent-foreground/80' : 'text-muted-foreground'
   return (
     <button
       type="button"
@@ -137,13 +139,15 @@ function PaletteRow(props: {
       onMouseDown={(event) => { event.preventDefault(); props.onPick() }}
       onMouseMove={props.onPoint}
     >
-      <span className="grid size-7 place-items-center rounded-md bg-foreground/8 text-[11px] font-semibold">{props.mark}</span>
+      <span className={props.on
+        ? 'grid size-7 place-items-center rounded-md bg-accent-foreground text-[11px] font-semibold text-accent'
+        : 'grid size-7 place-items-center rounded-md bg-foreground/8 text-[11px] font-semibold'}>{props.mark}</span>
       <span className="min-w-0">
         <span className="block font-semibold">{props.name}</span>
-        <span className="block truncate text-xs text-muted-foreground">{props.detail}</span>
-        {props.why === undefined ? null : <span className="block text-[11px] text-muted-foreground">{props.why}</span>}
+        <span className={`block truncate text-xs ${quiet}`}>{props.detail}</span>
+        {props.why === undefined ? null : <span className={`block text-[11px] ${quiet}`}>{props.why}</span>}
       </span>
-      <span className="text-[11px] text-muted-foreground">{props.meta}</span>
+      <span className={`text-[11px] ${quiet}`}>{props.meta}</span>
     </button>
   )
 }

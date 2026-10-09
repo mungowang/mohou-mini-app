@@ -46,6 +46,7 @@ export function PanelGallery(props: {
   readonly shell: PanelShell
   readonly frame?: (appId: string) => ReactNode
   readonly focus?: { readonly appId: string; readonly title?: string }
+  readonly renamed?: { readonly from: string; readonly to: string }
   readonly onClosePanel?: () => void
   readonly tools?: ReactNode
   readonly themeOpen?: boolean
@@ -68,6 +69,10 @@ export function PanelGallery(props: {
     if (props.focus === undefined) return
     dispatch({ type: 'open', appId: props.focus.appId, ...props.focus.title === undefined ? {} : { title: props.focus.title } })
   }, [props.focus])
+  useEffect(() => {
+    if (props.renamed === undefined) return
+    dispatch({ type: 'rename-app', from: props.renamed.from, to: props.renamed.to })
+  }, [props.renamed])
   return (
     <GalleryBody
       state={state}

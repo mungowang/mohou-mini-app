@@ -132,6 +132,9 @@ export async function createHost(options: {
     return Promise.all(listed.map(async app => listedApp(app, await historyBounds(app.directory), activity.apps[app.id])))
   }
   const author = createAuthorTools({
+    onWorkbenchRenamed: (from, to) => {
+      if (policy.defaultWorkbenchId === from) policy = { ...policy, defaultWorkbenchId: to }
+    },
     registry,
     mcp,
     readMcpFailures,

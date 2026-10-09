@@ -2,6 +2,7 @@
 
 export type HostEvent =
   | { type: 'app:open'; appId: string; title?: string }
+  | { type: 'app:rename'; from: string; to: string }
   | { type: 'workbench:default'; appId: string }
   | { type: 'app:reload'; appId: string }
   | { type: 'storage-size'; appId: string; table: string; keys: string[] }

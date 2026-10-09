@@ -54,6 +54,18 @@ export function switchTab(state: PanelTabs, index: number): TabChange {
   return { tabs: { tabs: state.tabs, active: index }, reload: false }
 }
 
+/** Point an open tab at a renamed app. The document is not reloaded here. */
+export function renameAppTab(state: PanelTabs, from: string, to: string): PanelTabs {
+  return {
+    ...state,
+    tabs: state.tabs.map((tab) => {
+      if (tab.kind !== 'app' || tab.appId !== from) return tab
+      if (tab.title === undefined || tab.title === from) return { kind: 'app', appId: to }
+      return { kind: 'app', appId: to, title: tab.title }
+    }),
+  }
+}
+
 /** Remove one app tab after a failed open. The gallery tab stays. */
 export function dropAppTab(state: PanelTabs, appId: string): PanelTabs {
   const index = state.tabs.findIndex(tab => tab.kind === 'app' && tab.appId === appId)

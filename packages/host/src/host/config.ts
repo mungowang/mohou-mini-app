@@ -210,6 +210,29 @@ function admitUpdateRegistry(value: unknown): { updateRegistry: string } | Recor
   return registry.length === 0 ? {} : { updateRegistry: registry }
 }
 
+/**
+ * Point the stored homepage at a renamed workbench. Another id is left alone.
+ * A missing config file is not a homepage.
+ * @param runtimeRoot - directory that contains the file
+ * @param from - current id
+ * @param to - id to use
+ */
+export async function renameDefaultWorkbench(runtimeRoot: string, from: string, to: string): Promise<boolean> {
+  const file = hostConfigPath(runtimeRoot)
+  let text: string
+  try {
+    text = await readFile(file, 'utf8')
+  } catch {
+    return false
+  }
+  const parsed: unknown = JSON.parse(text)
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false
+  if (!('defaultWorkbenchId' in parsed) || parsed.defaultWorkbenchId !== from) return false
+  await writeFile(file, `${JSON.stringify({ ...parsed, defaultWorkbenchId: to }, null, 2)}
+`)
+  return true
+}
+
 function admitWorkbench(value: unknown): { defaultWorkbenchId: string } | Record<string, never> {
   if (value === undefined || value === 'default') return {}
   if (typeof value !== 'string' || value.length === 0) {

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-03
+updated: 2026-10-09
 ---
 
 # Author surface
@@ -28,6 +28,7 @@ Codes are in [implementation.md](implementation.md).
 | `mini_app_write` | `appId`, `path`, `content`, optional `commit` | created or replaced file | `path-escape`, `path-is-directory` |
 | `mini_app_delete` | `appId`, `path`, optional `commit` | file removed | `manifest-protected`, `file-missing`. Required entries cannot be deleted. Another owner may mark more paths protected. |
 | `mini_app_register` | `appId`, `name`, `description`, `version`, optional `acronym`, `tags`, `kind` | `{ directory, needed }` plus the list summary. `needed` is the absolute paths of `ui.tsx` and `main.api.ts`. A `files` field is rejected. | `app-id-invalid`, `manifest-invalid`, `app-duplicate` |
+| `mini_app_rename` | `appId`, `newAppId` | the list summary for the new id, including `directory` | `app-id-invalid`, `app-not-registered`, `app-duplicate`. An unchanged id is `app-id-invalid`. |
 | `mini_app_reload` | `appId`, optional `cleanCaches` | compile result | codes on [compile.md](host/compile.md) |
 | `mini_app_install` | `appId`, optional packages to add or remove, optional `commit` | `{ ok, packages, lockfile }` or `{ ok: false, code }` | `install-denied`, `install-failed` |
 | `mini_app_call` | `appId` plus one `method`/`args`, or `calls` | one result, or one result per entry | `unknown-method`; one entry's failure does not drop the others |
@@ -52,6 +53,8 @@ Both MCP write tools mask the values that a name segment or a value shape identi
 Mounted: `createAuthorTools` is the one implementation. `GET /api/tools`, `POST /api/tools/invoke`, and `POST /mcp` (`initialize`, `tools/list`, `tools/call`) project it. A missing or wrong token is `authoring-token`. A non-loopback caller is `authoring-loopback`. An unknown name is `unknown-tool` and names the catalog that projection mounts. History commit, list, and reset are mounted. A tree change calls `onTreeChanged` and publishes `app:reload`. `mini_app_open` publishes `app:open` and returns `notified` only when a host-stream subscriber is attached. `mini_app_errors` reads the error ring. `mini_app_install` is mounted. It is the only writer of `package.json` and `package-lock.json`. `mini_app_view_eval` is mounted. No subscriber returns `not-open` immediately. A subscriber that reports no frame also returns `not-open` immediately. A second call while that app's view is still answering returns `pending`. A timeout returns `runner-not-booted` or `stuck` and does not hang. The iframe runs the code; Host only routes `app:eval`. Delete is not an authoring tool. `mini_app_mcp_add` and `mini_app_mcp_remove` are the only writers of the MCP server file, and a write hands the live client the specs it just wrote, so `ctx.mcp` and the authoring tools see the change without a restart. `mini_app_mcp_list`, `mini_app_mcp_tools`, `mini_app_mcp_add`, `mini_app_mcp_remove`, and `mini_app_credential_list` are not on `ctx`.
 
 There is no migration tool. The agent writes `schema/NNN_name.sql`. One file is one transaction: create or alter app tables, seed rows, or rewrite existing rows. Do not ship a one-shot TypeScript loop of `ctx.storage.run` for that work. A file that has not been applied can be edited or deleted. A file that has been applied is changed by adding the next number, not by deleting it. Deleting an applied file fails the next open with `storage-migration`. Opening storage, including reload and the next call, applies pending files.
+
+`mini_app_rename` moves the app directory, writes the new id into `manifest.json`, moves that id's key in `activity.json`, and points `host.json` `defaultWorkbenchId` at the new id when it was the old one. Trash copies of the old id follow. Logs, storage, theme pin, and git history sit in the directory and move with it. `.autogen` is dropped so the next open compiles the new id. The same history commit used by reload then records the tree, message `Rename <old> to <new>`. A trash copy that changed gets that commit in its own repo. Source text is not rewritten. An open panel tab follows the new id.
 
 `mini_app_open` returning `no-panel-connected` means the app is fine and no panel is attached.
 

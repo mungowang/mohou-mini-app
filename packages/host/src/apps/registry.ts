@@ -5,6 +5,9 @@ import path from 'node:path'
 import { ContractError, appEntries, parseAppId, resolveManifest, type AppId, type AppListItem } from '@mohou/contract'
 
 import { resolveAppPath } from '../files/tools.ts'
+import { commitApp } from '../history/store.ts'
+import { renameActivityApp } from '../host/activity.ts'
+import { renameDefaultWorkbench } from '../host/config.ts'
 import { hostAppsDir, hostLayout, hostTrashDir } from '../host/layout.ts'
 import { monogram } from './monogram.ts'
 
@@ -73,6 +76,7 @@ export function createAppRegistry(runtimeRoot: string) {
     trash: (appId: string) => trashApp(appsDir, runtimeRoot, appId),
     restoreTrashed: (appId: string) => restoreTrashed(appsDir, runtimeRoot, appId),
     listTrash: () => listTrash(runtimeRoot),
+    rename: (appId: string, newAppId: string) => renameApp(appsDir, runtimeRoot, appId, newAppId),
   }
 }
 
@@ -117,6 +121,72 @@ async function registerApp(appsDir: string, appId: string, files: Record<string,
   } catch (error) {
     await rm(staging, { recursive: true, force: true })
     throw error
+  }
+}
+
+/**
+ * Move one live app to a new id. The directory name and `manifest.json` stay the same id.
+ * Trash copies of the old id follow, so a later restore does not recreate the old id.
+ * @param appsDir - live apps directory
+ * @param runtimeRoot - host runtime root
+ * @param appId - current id
+ * @param newAppId - id to use
+ */
+async function renameApp(appsDir: string, runtimeRoot: string, appId: string, newAppId: string): Promise<AppSummary> {
+  const from = admitId(appId)
+  const to = admitId(newAppId)
+  if (from === to) throw new ContractError('app-id-invalid', `app id is unchanged: ${from}`)
+  const source = path.join(appsDir, from)
+  if (!(await exists(source))) throw new RegistryError('app-not-registered', `app is not registered: ${from}`)
+  const target = path.join(appsDir, to)
+  if (await exists(target)) throw new RegistryError('app-duplicate', `app already exists: ${to}`)
+  const manifestPath = path.join(source, appEntries.manifest)
+  const original = await readFile(manifestPath, 'utf8')
+  await rename(source, target)
+  try {
+    await writeManifestId(path.join(target, appEntries.manifest), original, to)
+    renameActivityApp(runtimeRoot, from, to)
+    await renameDefaultWorkbench(runtimeRoot, from, to)
+    await renameTrashCopies(runtimeRoot, from, to)
+  } catch (error) {
+    await writeFile(path.join(target, appEntries.manifest), original).catch(() => undefined)
+    await rename(target, source).catch(() => undefined)
+    throw error
+  }
+  const summary = await readSummary(target, to)
+  if (summary === undefined) throw new RegistryError('app-not-registered', `app is not registered: ${to}`)
+  return summary
+}
+
+async function writeManifestId(file: string, original: string, id: string): Promise<void> {
+  const parsed: unknown = JSON.parse(original)
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new ContractError('manifest-invalid', 'manifest must be an object')
+  }
+  const next = { ...parsed, id }
+  await writeFile(file, `${JSON.stringify(next, null, 2)}\n`)
+}
+
+async function renameTrashCopies(runtimeRoot: string, from: string, to: string): Promise<void> {
+  const trash = hostTrashDir(runtimeRoot)
+  let names: string[] = []
+  try {
+    names = await readdir(trash)
+  } catch {
+    return
+  }
+  const prefix = `${from}${hostLayout.trashSep}`
+  for (const name of names) {
+    if (!name.startsWith(prefix)) continue
+    const destName = `${to}${name.slice(from.length)}`
+    const dest = path.join(trash, destName)
+    if (await exists(dest)) throw new RegistryError('app-duplicate', `trash already has ${to}`)
+    const source = path.join(trash, name)
+    await rename(source, dest)
+    const manifest = path.join(dest, appEntries.manifest)
+    const text = await readFile(manifest, 'utf8').catch(() => undefined)
+    if (text !== undefined) await writeManifestId(manifest, text, to)
+    await commitApp(dest, `Rename ${from} to ${to}`)
   }
 }
 

@@ -23,6 +23,7 @@ export interface PanelControls {
   showNotice(appId: string, table: string): void
   unavailable(appId: string): void
   setWorkbench(appId: string): void
+  renameApp(from: string, to: string): void
 }
 
 /**
@@ -67,6 +68,10 @@ export function PanelSurface(props: {
       showNotice: (appId, table) => dispatch({ type: 'show-notice', appId, table }),
       unavailable: appId => dispatch({ type: 'unavailable', appId }),
       setWorkbench: appId => setDesk(appId === 'default' ? undefined : appId),
+      renameApp: (from, to) => {
+        dispatch({ type: 'rename-app', from, to })
+        setDesk(current => current === from ? to : current)
+      },
     })
   }, [props.onControls])
   useEffect(() => {
@@ -207,6 +212,7 @@ export function PanelSurface(props: {
         </>
       )}
       {...state.focus === undefined ? {} : { focus: state.focus }}
+      {...state.renamed === undefined ? {} : { renamed: state.renamed }}
       {...props.frame === undefined ? {} : { frame: props.frame }}
       {...props.onClosePanel === undefined ? {} : { onClosePanel: props.onClosePanel }}
     />

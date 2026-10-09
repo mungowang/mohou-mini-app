@@ -43,6 +43,7 @@ export const authorToolNames = [
   'mini_app_write',
   'mini_app_delete',
   'mini_app_register',
+  'mini_app_rename',
   'mini_app_reload',
   'mini_app_call',
   'mini_app_mcp_list',
@@ -108,6 +109,7 @@ interface Registry {
   register: (appId: string, files: Record<string, string>) => Promise<AppSummary>
   trash: (appId: string) => Promise<void>
   restoreTrashed: (appId: string) => Promise<AppSummary>
+  rename: (appId: string, newAppId: string) => Promise<AppSummary>
 }
 
 /**
@@ -138,6 +140,8 @@ export function createAuthorTools(options: {
   readonly reservedKeyframes?: readonly string[]
   /** Time of an open. Tests pass a fixed clock. */
   readonly now?: () => string
+  /** The live homepage pin, when the renamed id was that pin. */
+  readonly onWorkbenchRenamed?: (from: string, to: string) => void
 }) {
   const live = new Map<string, LiveApp>()
   const hostEvents = createHostEvents()
@@ -275,6 +279,8 @@ async function invoke(
       const registered = await options.registry.register(requiredString(input, 'appId'), registerManifest(input))
       return { ...registered, needed: neededFiles(registered.directory) }
     }
+    case 'mini_app_rename':
+      return renameRegistered(options, live, requiredString(input, 'appId'), requiredString(input, 'newAppId'))
     case 'mini_app_reload':
       return reload(options, live, requiredString(input, 'appId'), optionalCleanCaches(input.cleanCaches))
     case 'mini_app_call':
@@ -519,6 +525,30 @@ async function restoreAppStorage(
   live.get(app.id)?.storage.close()
   live.delete(app.id)
   restoreStorageBackup(app.directory)
+}
+
+async function renameRegistered(
+  options: {
+    registry: Registry
+    errors: ReturnType<typeof createErrorRing>
+    views: ReturnType<typeof createViewQueries>
+    hostEvents: ReturnType<typeof createHostEvents>
+    onWorkbenchRenamed?: (from: string, to: string) => void
+  },
+  live: Map<string, LiveApp>,
+  appId: string,
+  newAppId: string,
+) {
+  const renamed = await options.registry.rename(appId, newAppId)
+  live.get(appId)?.storage.close()
+  live.delete(appId)
+  options.errors.forget(appId)
+  options.views.forgetAlive(appId)
+  await purgeAutogen(renamed.directory)
+  const commit = await commitApp(renamed.directory, `Rename ${appId} to ${renamed.id}`)
+  options.hostEvents.publish({ type: 'app:rename', from: appId, to: renamed.id })
+  options.onWorkbenchRenamed?.(appId, renamed.id)
+  return { ...renamed, commit }
 }
 
 async function removeApp(

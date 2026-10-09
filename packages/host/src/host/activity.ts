@@ -69,6 +69,32 @@ export function recordOpen(runtimeRoot: string, appId: string, openedAt: string)
   return next
 }
 
+/**
+ * Move one app's usage to a new id. A missing file, or a missing key, is unchanged.
+ * @param runtimeRoot - host runtime root
+ * @param from - current id
+ * @param to - id to use
+ */
+export function renameActivityApp(runtimeRoot: string, from: string, to: string): void {
+  const current = readActivity(runtimeRoot)
+  const moved = current.apps[from]
+  if (moved === undefined) return
+  const { [from]: _gone, ...rest } = current.apps
+  void _gone
+  const apps = { ...rest }
+  const existing = apps[to]
+  apps[to] = existing === undefined
+    ? moved
+    : {
+      ...existing,
+      ...moved,
+      openCount: existing.openCount + moved.openCount,
+      lastOpenedAt: existing.lastOpenedAt > moved.lastOpenedAt ? existing.lastOpenedAt : moved.lastOpenedAt,
+    }
+  writeFileSync(hostActivityPath(runtimeRoot), `${JSON.stringify({ apps }, null, 2)}
+`)
+}
+
 function admitActivity(text: string): Activity {
   let value: unknown
   try {

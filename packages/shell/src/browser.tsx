@@ -51,6 +51,8 @@ events.onmessage = (event) => {
     data?: unknown
     seq?: number
     since?: number
+    from?: string
+    to?: string
   }
   if (data.type === 'app:event' && typeof data.appId === 'string' && typeof data.name === 'string' && typeof data.seq === 'number') {
     frames.push({ appId: data.appId, name: data.name, data: data.data, seq: data.seq })
@@ -65,6 +67,9 @@ events.onmessage = (event) => {
   }
   if (data.type === 'workbench:default' && typeof data.appId === 'string') {
     controls?.setWorkbench(data.appId)
+  }
+  if (data.type === 'app:rename' && typeof data.from === 'string' && typeof data.to === 'string') {
+    controls?.renameApp(data.from, data.to)
   }
   if (data.type === 'storage-size' && typeof data.appId === 'string' && typeof data.table === 'string') {
     controls?.showNotice(data.appId, data.table)

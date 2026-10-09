@@ -11,6 +11,7 @@ export interface PanelBridge {
   showNotice(appId: string, table: string): void
   unavailable(appId: string): void
   setWorkbench(appId: string): void
+  renameApp(from: string, to: string): void
 }
 
 /**
@@ -50,6 +51,9 @@ export function applyHostEvent(event: HostEvent, panel: PanelBridge, frame?: Fra
       return
     case 'workbench:default':
       panel.setWorkbench(event.appId)
+      return
+    case 'app:rename':
+      panel.renameApp(event.from, event.to)
       return
     case 'storage-size':
       panel.showNotice(event.appId, event.table)

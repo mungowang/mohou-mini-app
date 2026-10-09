@@ -13,6 +13,7 @@ import {
   deletePrompt,
   initialTabs,
   openAppTab,
+  renameAppTab,
   type PanelTabs,
   switchTab,
   type DeletePrompt,
@@ -43,6 +44,7 @@ export type GalleryAction =
   | { readonly type: 'listed'; readonly apps: readonly GalleryApp[] }
   | { readonly type: 'search'; readonly query: string }
   | { readonly type: 'open'; readonly appId: string; readonly title?: string }
+  | { readonly type: 'rename-app'; readonly from: string; readonly to: string }
   | { readonly type: 'open-failed'; readonly message?: string }
   | { readonly type: 'drop-app'; readonly appId: string }
   | { readonly type: 'switch'; readonly index: number }
@@ -100,6 +102,13 @@ export function reduceGallery(state: GalleryState, action: GalleryAction): Galle
       return { ...state, query: action.query }
     case 'open':
       return { ...omitOpenError(state), tabs: openAppTab(state.tabs, action.appId, action.title).tabs }
+    case 'rename-app':
+      return {
+        ...state,
+        apps: state.apps.map(app => app.id === action.from ? { ...app, id: action.to } : app),
+        tabs: renameAppTab(state.tabs, action.from, action.to),
+        ...state.pendingDeleteId === action.from ? { pendingDeleteId: action.to } : {},
+      }
     case 'open-failed':
       return { ...omitOpenError(state), ...action.message ? { openError: action.message } : { openError: '' } }
     case 'drop-app':

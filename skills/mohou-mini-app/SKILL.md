@@ -67,6 +67,7 @@ mini_app_register({
 | List source files | `mini_app_list_files({ appId })` |
 | Read one file | `mini_app_read({ appId, path })` |
 | Create an app | `mini_app_register({ appId, name, description, version })` — optional `tags`, `acronym`, `kind`. Writes `manifest.json`, returns `directory` and `needed` |
+| Rename an app | `mini_app_rename({ appId, newAppId })` — moves the directory, manifest id, usage, homepage pin, and trash copies, then commits that tree. Does not rewrite source text. |
 | Write / edit / delete source | your file tools on `directory` / `needed`. Not MCP. |
 | Compile | `mini_app_reload({ appId })` — success commits a dirty tree |
 | Add a backend library | `mini_app_install({ appId, packages: [{ name: "exceljs" }] })` — never `lodash` / `motion` / `react` / a UI library |

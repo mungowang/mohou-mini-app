@@ -44,5 +44,6 @@ function recorder(): PanelBridge & { shown: unknown[]; notices: unknown[]; missi
     showNotice: (appId, table) => notices.push({ appId, table }),
     unavailable: appId => missing.push(appId),
     setWorkbench: () => undefined,
+    renameApp: () => undefined,
   }
 }

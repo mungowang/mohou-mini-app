@@ -72,6 +72,14 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
       required: ['appId', 'name', 'description', 'version'],
     },
   },
+  mini_app_rename: {
+    description: 'Rename a mini-app id. Moves the directory, manifest id, usage, and homepage pin.',
+    inputSchema: {
+      type: 'object',
+      properties: { appId, newAppId: { type: 'string' } },
+      required: ['appId', 'newAppId'],
+    },
+  },
   mini_app_reload: {
     description: reloadMessage,
     inputSchema: { type: 'object', properties: { appId, cleanCaches: { type: 'boolean' } }, required: ['appId'] },

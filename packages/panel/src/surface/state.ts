@@ -9,6 +9,7 @@ export interface SurfaceState {
   readonly focus?: { readonly appId: string; readonly title?: string }
   readonly notice?: string
   readonly unavailable?: string
+  readonly renamed?: { readonly from: string; readonly to: string }
 }
 
 export type SurfaceAction =
@@ -18,6 +19,7 @@ export type SurfaceAction =
   | { readonly type: 'show-app'; readonly appId: string; readonly title?: string }
   | { readonly type: 'show-notice'; readonly appId: string; readonly table: string }
   | { readonly type: 'unavailable'; readonly appId: string }
+  | { readonly type: 'rename-app'; readonly from: string; readonly to: string }
 
 /** The gallery section is first. */
 export function surfaceState(): SurfaceState {
@@ -60,8 +62,28 @@ export function reduceSurface(state: SurfaceState, action: SurfaceAction): Surfa
       }
     case 'unavailable':
       return { ...state, section: 'gallery', themeOpen: false, unavailable: action.appId }
+    case 'rename-app':
+      return {
+        ...state,
+        renamed: { from: action.from, to: action.to },
+        ...renamedFocus(state.focus, action.from, action.to),
+      }
     default:
       return action satisfies never
+  }
+}
+
+function renamedFocus(
+  focus: SurfaceState['focus'],
+  from: string,
+  to: string,
+): { focus: { appId: string; title?: string } } | Record<string, never> {
+  if (focus?.appId !== from) return {}
+  return {
+    focus: {
+      appId: to,
+      ...focus.title === undefined ? {} : { title: focus.title },
+    },
   }
 }
 

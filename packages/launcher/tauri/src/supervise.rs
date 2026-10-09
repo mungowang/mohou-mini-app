@@ -953,6 +953,11 @@ fn apply_pending_update(prefix: &Path, runtime: &Path, reporter: &Reporter, clos
     cmd.args(&args)
         .current_dir(prefix)
         .env("PATH", &launch.path)
+        // Node's bundled certificates cannot verify the mirror. The sidecar sets the same variable.
+        .env(
+            "NODE_USE_SYSTEM_CA",
+            std::env::var("NODE_USE_SYSTEM_CA").unwrap_or_else(|_| "1".to_string()),
+        )
         .stdin(Stdio::null())
         .stdout(Stdio::from(out))
         .stderr(Stdio::from(err));

@@ -4,6 +4,7 @@ import type { RuntimeProvider } from '@mohou/runtime-provider'
 import type { CredentialProvider } from '../credentials/provider.ts'
 
 import { listedApp, type AppSummary } from '../apps/registry.ts'
+import { spellFields, type AppSpelling } from '../apps/spelling.ts'
 import { readActivity } from '../host/activity.ts'
 import { historyBounds } from '../history/store.ts'
 import { cachedUiBundle } from '../compile/autogen.ts'
@@ -88,7 +89,7 @@ export function bindLoopback(input: {
       const listed = await input.registry.list()
       const activity = readActivity(input.runtimeRoot)
       return Promise.all(listed.apps.map(async app => ({
-        ...listedApp(app, await historyBounds(app.directory), activity.apps[app.id]),
+        ...withSpelling(listedApp(app, await historyBounds(app.directory), activity.apps[app.id])),
         pin: await input.owner.themes.readPin(app.id),
         appFile: await input.owner.themes.appFile(app.id),
       })))
@@ -96,7 +97,7 @@ export function bindLoopback(input: {
     listTrash: async () => {
       const trashed = await input.registry.listTrash()
       const activity = readActivity(input.runtimeRoot)
-      return Promise.all(trashed.map(async app => listedApp(app, await historyBounds(app.directory), activity.apps[app.id])))
+      return Promise.all(trashed.map(async app => withSpelling(listedApp(app, await historyBounds(app.directory), activity.apps[app.id]))))
     },
     deleteApp: appId => input.author.deleteApp(appId),
     undeleteApp: appId => input.author.undeleteApp(appId),
@@ -211,6 +212,19 @@ export function bindLoopback(input: {
     },
     removeCredential: name => input.credentials.remove(name),
   }
+}
+
+function withSpelling<T extends {
+  name: string
+  description: string
+  tags?: readonly string[]
+}>(app: T): T | (T & { spelling: AppSpelling }) {
+  const spelling = spellFields({
+    name: app.name,
+    description: app.description,
+    ...app.tags === undefined ? {} : { tags: app.tags },
+  })
+  return spelling === undefined ? app : { ...app, spelling }
 }
 
 function bearer(header: string | undefined): string | undefined {

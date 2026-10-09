@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-10-03
+updated: 2026-10-09
 ---
 
 # Panel
@@ -12,6 +12,7 @@ Panel is a client of Host over HTTP. It never constructs Host and never imports 
 The shipped Shell window is standalone: the panel is the window, so close-panel is hidden. The control still exists for a window that embeds the panel beside other UI. That embedder is out of scope; the control is specified so the panel component is complete. The panel has no dock mode.
 
 - [List and open](list.md)
+- [Command palette](palette.md)
 - [Workbench](workbench.md)
 - [Close panel](dock.md)
 - [Responsive layout](responsive.md)

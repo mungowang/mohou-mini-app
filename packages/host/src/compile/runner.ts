@@ -2,7 +2,7 @@ import { renderViewBridge } from '../events/view-bridge.ts'
 import { appResource, httpLayout } from '../http/layout.ts'
 import { diagnosticUrl } from '../tools/diagnostics.ts'
 import { platformImportMap } from './allowlist.ts'
-import { leaveGuardSource } from './leave.ts'
+import { chordForwardSource, leaveGuardSource } from './leave.ts'
 import { hostWrapperBinding, renderHostWrapper } from './wrapper.ts'
 
 /** Thin bar on WKWebView and WebView2. `scrollbar-width` covers the rest. */
@@ -37,6 +37,7 @@ ${JSON.stringify({ imports: platformImportMap() })}
 ${appearanceScript(input.appearance)}
 <script>
 ${leaveGuardSource()}
+${chordForwardSource()}
 </script>
 </head>
 <body>

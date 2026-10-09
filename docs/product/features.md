@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 
 # Product features
@@ -55,6 +55,7 @@ Adapters that embed this platform in another agent product are out of scope.
 | MCP server | [Authoring tools](mcp-server/tools.md) |
 | Panel | [Owner surface](owner-surface.md) |
 | Panel | [List and open](panel/list.md) |
+| Panel | [Command palette](panel/palette.md) |
 | Panel | [Workbench](panel/workbench.md) |
 | Panel | [Close panel](panel/dock.md) |
 | Panel | [Responsive layout](panel/responsive.md) |

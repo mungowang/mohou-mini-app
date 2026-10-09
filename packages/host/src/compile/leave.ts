@@ -4,6 +4,22 @@
  * `javascript:` still runs. A same-origin URL stays. `http` and `https` off this origin, and `mailto:`, open outside.
  * An app script can remove the listeners. That is the same limit as the sandbox attribute.
  */
+/**
+ * Capture Mod+Shift+P inside the app document and tell the parent.
+ * A listener the parent adds on the iframe window does not see the key in WKWebView.
+ */
+export function chordForwardSource(): string {
+  return `document.addEventListener('keydown', (event) => {
+  if (event.altKey || !event.shiftKey) return
+  if (event.key !== 'p' && event.key !== 'P') return
+  if (!event.metaKey && !event.ctrlKey) return
+  event.preventDefault()
+  event.stopPropagation()
+  parent.postMessage({ type: 'mma-chord', key: event.key, shiftKey: true, altKey: false, metaKey: event.metaKey, ctrlKey: event.ctrlKey }, location.origin)
+}, true)
+`
+}
+
 export function leaveGuardSource(): string {
   return `function linkLeave(href, pageHref) {
   let url

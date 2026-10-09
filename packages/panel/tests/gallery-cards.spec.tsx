@@ -81,7 +81,7 @@ describe('gallery card styles and toolbar', () => {
       await Promise.resolve()
     })
     expect(actions.some(action => action.type === 'close')).toBe(true)
-    expect(actions.some(action => action.type === 'search')).toBe(true)
+    expect(actions.some(action => action.type === 'search')).toBe(false)
     expect(restored).toBe(true)
     expect(removed).toBe(true)
     expect(reloaded).toBe(true)

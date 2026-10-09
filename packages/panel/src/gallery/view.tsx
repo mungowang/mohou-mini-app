@@ -4,6 +4,8 @@ import { cloneElement, isValidElement, useEffect, useLayoutEffect, useReducer, u
 
 import type { PanelLabelMode, PanelLocale } from '../labels.ts'
 import { panelText } from '../labels.ts'
+import { bindPaletteChord, chordLabel, isMacPlatform } from '../palette/chord.ts'
+import { CommandPalette } from '../palette/view.tsx'
 import { Dialog } from '../ui/dialog.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { readCardStyle, writeCardStyle } from './card-style.ts'
@@ -117,6 +119,9 @@ export function GalleryBody(props: {
   const desks = workbenchEntries(state.apps, props.defaultWorkbenchId, label('workbench-builtin'))
   const deskId = desks.find(entry => entry.default)?.id ?? 'default'
   const [refreshing, setRefreshing] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const mac = isMacPlatform(navigator.platform, navigator.userAgent)
+  useEffect(() => bindPaletteChord(document, () => { setPaletteOpen(open => !open) }), [])
   const rail = useRef<HTMLDivElement>(null)
   const [glide, setGlide] = useState<{ left: number; width: number } | undefined>(undefined)
   const tabKey = state.tabs.tabs.map(tab => tab.kind === 'gallery' ? 'gallery' : `${tab.appId}:${tab.title ?? ''}`).join('|')
@@ -327,9 +332,11 @@ export function GalleryBody(props: {
                             className="h-11 w-full rounded-[14px] border border-foreground/10 bg-card/60 pr-4 pl-10 text-sm text-foreground outline-none backdrop-blur-md placeholder:text-muted-foreground focus:border-primary focus:bg-card"
                             type="search"
                             aria-label={label('search')}
-                            placeholder={label('search-placeholder')}
-                            value={state.query}
-                            onChange={event => dispatch({ type: 'search', query: event.target.value })}
+                            placeholder={`${label('search-placeholder')}  ${chordLabel(mac)}`}
+                            readOnly
+                            value=""
+                            onFocus={() => { setPaletteOpen(true) }}
+                            onMouseDown={(event) => { event.preventDefault(); setPaletteOpen(true) }}
                           />
                         </div>
                       </div>
@@ -370,9 +377,37 @@ export function GalleryBody(props: {
           {state.deletePrompt === 'failed' ? <p className="px-6 py-2 text-sm text-destructive">{state.deleteError !== undefined && state.deleteError.length > 0 ? state.deleteError : label('delete-failed')}</p> : null}
         </div>
         {props.overlay}
+        {paletteOpen ? (
+          <CommandPalette
+            apps={state.apps}
+            openIds={new Set(state.tabs.tabs.flatMap(tab => tab.kind === 'app' ? [tab.appId] : []))}
+            {...active?.kind === 'app' ? { currentId: active.appId } : {}}
+            {...paletteError(state, label)}
+            locale={props.locale}
+            mode={props.mode}
+            onClose={() => { setPaletteOpen(false) }}
+            onOpen={(app) => {
+              setPaletteOpen(false)
+              if (active?.kind === 'app' && active.appId === app.id) return
+              const open = state.tabs.tabs.some(tab => tab.kind === 'app' && tab.appId === app.id)
+              openApp(props.client, app.id, app.name, dispatch, open)
+            }}
+            onLibrary={() => {
+              setPaletteOpen(false)
+              const index = state.tabs.tabs.findIndex(tab => tab.kind === 'gallery')
+              if (index >= 0) dispatch({ type: 'switch', index })
+            }}
+          />
+        ) : null}
       </div>
     </section>
   )
+}
+
+function paletteError(state: GalleryState, label: (key: string) => string): { error: string } | Record<string, never> {
+  if (!state.reachable) return { error: label('host-unreachable') }
+  if (state.failed !== undefined) return { error: state.failed.length > 0 ? state.failed : label('list-failed') }
+  return {}
 }
 
 function openApp(

@@ -9,6 +9,12 @@ export interface GalleryApp {
   readonly description: string
   readonly version: string
   readonly acronym: string
+  /** Host-derived pinyin, split by field. Absent when the row has no Chinese. */
+  readonly spelling?: {
+    readonly name?: { readonly full: string; readonly initials: string }
+    readonly description?: { readonly full: string; readonly initials: string }
+    readonly tags?: { readonly full: string; readonly initials: string }
+  }
   readonly tags?: readonly string[]
   readonly createdAt?: string
   readonly updatedAt?: string

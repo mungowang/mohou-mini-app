@@ -258,7 +258,8 @@ function readImage(file: File): Promise<Held> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
-      const preview = String(reader.result ?? '')
+      const raw = reader.result
+      const preview = typeof raw === 'string' ? raw : ''
       const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(preview)
       const mimeType = match?.[1]
       const data = match?.[2]?.replace(/\s/g, '')

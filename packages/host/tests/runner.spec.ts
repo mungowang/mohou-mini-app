@@ -42,6 +42,7 @@ describe('renderRunnerDocument', () => {
     expect(html).not.toContain("'render error'")
     expect(html).not.toContain("'module error'")
     expect(html).toContain('function reportedMessage')
+    expect(html).toContain("type: 'mma-chord'")
     expect(html).not.toContain("message: event.message || 'error'")
     expect(html).toContain('AppErrorBoundary')
     expect(html).toContain('AppRuntime')

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-05
+updated: 2026-10-09
 ---
 
 # HTTP surface
@@ -15,7 +15,7 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 
 | Route | Client | Result |
 | --- | --- | --- |
-| `GET /api/apps` | Panel | app list, including pin, local palette summary, version, acronym, `tags` when set, and `createdAt` / `updatedAt` when a commit exists |
+| `GET /api/apps` | Panel | app list, including pin, local palette summary, version, acronym, `tags` when set, `spelling` when the row has Chinese, and `createdAt` / `updatedAt` when a commit exists |
 | `GET /api/activity` | Panel | `activity.json`. A missing file is no activity. A bad file is `activity-invalid` and is not an empty document. |
 | `POST /api/apps/:appId/open` | Panel | same operation as `mini_app_open` |
 | `POST /api/apps/:appId/reload` | Panel | refetch event; does not compile |

@@ -292,12 +292,37 @@ function galleryApp(value: unknown): GalleryApp {
     description: text(row.description),
     version: text(row.version),
     acronym: text(row.acronym),
+    ...spellingOf(row.spelling),
     ...tags === undefined ? {} : { tags: tagList(tags) },
     ...createdAt === undefined ? {} : { createdAt },
     ...updatedAt === undefined ? {} : { updatedAt },
     ...activity === undefined ? {} : { activity },
     ...row.kind === 'workbench' ? { kind: 'workbench' as const } : {},
   }
+}
+
+function spellingOf(value: unknown): { spelling: NonNullable<GalleryApp['spelling']> } | Record<string, never> {
+  if (typeof value !== 'object' || value === null) return {}
+  const row = value as Record<string, unknown>
+  const name = fieldSpelling(row.name)
+  const description = fieldSpelling(row.description)
+  const tags = fieldSpelling(row.tags)
+  if (name === undefined && description === undefined && tags === undefined) return {}
+  return {
+    spelling: {
+      ...name === undefined ? {} : { name },
+      ...description === undefined ? {} : { description },
+      ...tags === undefined ? {} : { tags },
+    },
+  }
+}
+
+function fieldSpelling(value: unknown): { readonly full: string; readonly initials: string } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.full !== 'string' || typeof row.initials !== 'string') return undefined
+  if (row.full.length === 0 && row.initials.length === 0) return undefined
+  return { full: row.full, initials: row.initials }
 }
 
 function activityOf(value: unknown): GalleryApp['activity'] {

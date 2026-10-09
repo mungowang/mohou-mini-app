@@ -7,6 +7,10 @@ updated: 2026-10-09
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.49
+
+`mini_app_rename` moves an app to a new id. The directory, manifest, usage, homepage pin, and trash copies follow. The tree is committed in that same step.
+
 ## 1.0.48
 
 Command+Shift+P, or Ctrl+Shift+P, opens a palette from any app, including when focus is inside that app. A name hit, including that name's pinyin, outranks a description hit. The library search field opens the same palette.

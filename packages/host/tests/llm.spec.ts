@@ -1,3 +1,7 @@
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 import type { RuntimeProvider } from '@mohou/runtime-provider'
@@ -11,6 +15,8 @@ const policy: ModelPolicy = {
   retryTimesLimit: 3,
   maxIterations: 2,
   maxIterationsLimit: 4,
+  maxImages: 2,
+  maxImageBytes: 8,
 }
 
 function brain(llm: RuntimeProvider['llm']): RuntimeProvider {
@@ -76,5 +82,33 @@ describe('ctx.llm policy', () => {
     stopped.abort()
     await expect(agent.agent('goal', { signal: stopped.signal })).rejects.toMatchObject({ code: 'cancelled' })
     await agent.stop()
+  })
+
+  it('reads a file image once and passes bytes, and rejects a web URI', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'mma-image-'))
+    const file = join(dir, 'shot.png')
+    await writeFile(file, Buffer.from('hi'))
+    let seen: unknown
+    const bound = await bindBrain({
+      provider: brain((prompt, options) => {
+        seen = options?.images
+        return Promise.resolve(prompt)
+      }),
+      appDir: '/app',
+      processDirectory: '/proc',
+      createTemp: () => '/tmp',
+      push: () => undefined,
+    }, policy)
+    expect(await bound.llm('look', { images: [{ path: file }] })).toBe('look')
+    expect(seen).toEqual([{ mimeType: 'image/png', data: Buffer.from('hi').toString('base64') }])
+    expect(await bound.llm('look', { images: [{ path: pathToFileURL(file).href }] })).toBe('look')
+    await expect(bound.llm('look', { images: [{ path: 'https://example.test/a.png' }] })).rejects.toMatchObject({
+      code: 'model-policy',
+    })
+    await expect(bound.llm('look', { images: [{ mimeType: 'image/png', data: 'aGk=' }] })).resolves.toBe('look')
+    await expect(bound.llm('look', {
+      images: [{ mimeType: 'image/png', data: 'aGk=' }, { mimeType: 'image/png', data: 'aGk=' }, { mimeType: 'image/png', data: 'aGk=' }],
+    })).rejects.toMatchObject({ code: 'model-policy' })
+    await bound.stop()
   })
 })

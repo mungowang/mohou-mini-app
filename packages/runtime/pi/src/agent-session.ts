@@ -1,6 +1,7 @@
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { ProviderError, type RuntimeAgentOptions, type RuntimeProviderConfig } from '@mohou/runtime-provider'
 
+import { piImages, requireImageInput } from './images.ts'
 import { openPiServices } from './services.ts'
 
 /**
@@ -28,6 +29,11 @@ export async function runPiAgent(
     call?.system === undefined ? undefined : { appendSystemPrompt: [call.system] },
   ).catch(unhealthy)
   const model = selectedModel(services.modelRuntime, config, call) ?? piDefaultModel(services.modelRuntime, services.settingsManager)
+  const attached = piImages(call?.images)
+  if (attached !== undefined && model === undefined) {
+    throw new ProviderError('image-unsupported', 'model does not accept images')
+  }
+  requireImageInput(model, attached)
   const { session } = await createAgentSessionFromServices({
     services,
     sessionManager: SessionManager.inMemory(cwd),
@@ -68,7 +74,7 @@ export async function runPiAgent(
   }
   call?.signal?.addEventListener('abort', abort, { once: true })
   try {
-    await session.prompt(goal)
+    await session.prompt(goal, attached === undefined ? undefined : { images: attached })
     if (call?.signal?.aborted) throw new ProviderError('cancelled', 'cancelled')
     const text = assistantText(session.messages)
     if (text.length === 0) throw new ProviderError('empty-completion', 'agent returned an empty completion')

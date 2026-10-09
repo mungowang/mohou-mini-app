@@ -57,6 +57,12 @@ describe('echo', () => {
     await expect(echo.llm('hello', { signal })).rejects.toMatchObject({ code: 'cancelled' })
     await expect(echo.llm('')).rejects.toMatchObject({ code: 'empty-completion' })
     await expect(echo.agent('')).rejects.toMatchObject({ code: 'empty-completion' })
+    await expect(echo.llm('hello', { images: [{ mimeType: 'image/png', data: 'aGk=' }] })).rejects.toMatchObject({
+      code: 'image-unsupported',
+    })
+    await expect(echo.agent('goal', { images: [{ mimeType: 'image/png', data: 'aGk=' }] })).rejects.toMatchObject({
+      code: 'image-unsupported',
+    })
     await echo.stop()
     expect(echo.healthy()).toBe(false)
   })

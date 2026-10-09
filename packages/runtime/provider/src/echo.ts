@@ -31,6 +31,9 @@ export function createEchoProvider(): RuntimeProvider {
       if (prompt.length === 0) {
         return Promise.reject(new ProviderError('empty-completion', 'llm returned an empty completion'))
       }
+      if (hasImages(options?.images)) {
+        return Promise.reject(new ProviderError('image-unsupported', 'echo cannot accept images'))
+      }
       if (options?.stream === true) {
         observeLlm(options, { type: 'status', status: 'running' })
         observeLlm(options, { type: 'text-delta', text: prompt })
@@ -44,11 +47,18 @@ export function createEchoProvider(): RuntimeProvider {
       if (goal.length === 0) {
         return Promise.reject(new ProviderError('empty-completion', 'agent returned an empty completion'))
       }
+      if (hasImages(options?.images)) {
+        return Promise.reject(new ProviderError('image-unsupported', 'echo cannot accept images'))
+      }
       observe(options, { type: 'status', status: 'running' })
       observe(options, { type: 'done', text: goal })
       return Promise.resolve(goal)
     },
   }
+}
+
+function hasImages(images: readonly unknown[] | undefined): boolean {
+  return images !== undefined && images.length > 0
 }
 
 function rejection(running: boolean, signal: AbortSignal | undefined): Promise<never> | undefined {

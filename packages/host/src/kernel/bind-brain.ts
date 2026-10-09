@@ -2,6 +2,7 @@ import type { AppAgentEvent, AppLlmEvent } from '@mohou/contract'
 import { ProviderError, assertKnownModel, type RuntimeAgentOptions, type RuntimeLlmOptions, type RuntimeProvider, type RuntimeProviderConfig } from '@mohou/runtime-provider'
 
 import { HostError } from './codes.ts'
+import { admitImages } from './images.ts'
 import { admitModelBudget, callWithRetry, stripSchemaFence, type ModelPolicy, DEFAULT_MODEL_POLICY } from './model-policy.ts'
 import { present } from './present.ts'
 import { resolveWorkingDirectory } from './working-directory.ts'
@@ -41,15 +42,18 @@ export async function bindBrain(binding: BrainBinding, policy: ModelPolicy = DEF
   return {
     async llm(prompt, options) {
       const budget = admitModelBudget(options, policy)
+      const images = await admitImages(options?.images, policy)
       await assertKnownModel(binding.provider, choice(options))
+      const forwarded = images === undefined ? options : { ...options, images }
       return callWithRetry(budget.retryTimes, options?.signal, async () => {
-        const text = await binding.provider.llm(prompt, llmCall(options, budget.maxTokens))
+        const text = await binding.provider.llm(prompt, llmCall(forwarded, budget.maxTokens))
         return options?.schema === undefined ? text : stripSchemaFence(text)
       })
     },
     async agent(goal, options) {
       try {
         const budget = admitModelBudget(options, policy)
+        const images = await admitImages(options?.images, policy)
         await assertKnownModel(binding.provider, choice(options))
         const cwd = resolveWorkingDirectory({
           ...present('cwdType', options?.cwdType),
@@ -77,6 +81,7 @@ export async function bindBrain(binding: BrainBinding, policy: ModelPolicy = DEF
         }
         return await callWithRetry(budget.retryTimes, options?.signal, () => binding.provider.agent(goal, {
           ...options,
+          ...images === undefined ? {} : { images },
           cwd,
           cwdType: 'custom',
           signal: controller.signal,

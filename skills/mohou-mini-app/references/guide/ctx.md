@@ -22,8 +22,8 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.bash(command)` | `{ stdout, stderr, exitCode }` | This machine. Do not curl through bash |
 | `ctx.pwsh(command)` | `{ stdout, stderr, exitCode }` | Windows path of the same idea |
 | `ctx.system.metrics()` | OS snapshot | `loadavg` is `null` where the OS has none |
-| `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime |
-| `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm` |
+| `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime. `images` is inline base64 or a file path the host reads |
+| `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm`. Same `images` field |
 | `ctx.mcp(serverId, toolName, args?)` | tool result | Args are the tool's own object |
 
 ## Storage

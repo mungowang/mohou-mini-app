@@ -10,6 +10,8 @@ export interface ModelPolicy {
   retryTimesLimit: number
   maxIterations: number
   maxIterationsLimit: number
+  maxImages: number
+  maxImageBytes: number
 }
 
 export const DEFAULT_MODEL_POLICY: ModelPolicy = {
@@ -19,6 +21,8 @@ export const DEFAULT_MODEL_POLICY: ModelPolicy = {
   retryTimesLimit: 3,
   maxIterations: 100,
   maxIterationsLimit: 100,
+  maxImages: 4,
+  maxImageBytes: 4 * 1024 * 1024,
 }
 
 /** Strip one markdown fence when `schema` asked for JSON. The caller still parses the string. */
@@ -45,7 +49,7 @@ export function admitModelBudget(options: {
 
 /**
  * Run a model call up to `times`, counting the first attempt.
- * Cancel is not retried. An empty string is a failed attempt.
+ * Cancel is not retried. A model that cannot accept images is not retried. An empty string is a failed attempt.
  */
 export async function callWithRetry(
   times: number,
@@ -63,6 +67,7 @@ export async function callWithRetry(
       if (isCancelled(error, signal)) {
         throw error instanceof ProviderError ? error : new ProviderError('cancelled', 'model call was cancelled', { cause: error })
       }
+      if (isImageUnsupported(error)) throw error
       last = error
     }
   }
@@ -79,5 +84,13 @@ function admitNumber(value: number | undefined, fallback: number, limit: number,
 
 function isCancelled(error: unknown, signal: AbortSignal | undefined): boolean {
   if (signal?.aborted) return true
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'cancelled'
+  return codeOf(error) === 'cancelled'
+}
+
+function isImageUnsupported(error: unknown): boolean {
+  return codeOf(error) === 'image-unsupported'
+}
+
+function codeOf(error: unknown): unknown {
+  return typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
 }

@@ -3,8 +3,9 @@ import type { RuntimeLlmOptions } from '@mohou/runtime-provider'
 import { ProviderError, type ModelListing, type RuntimeProvider, type RuntimeProviderConfig } from '@mohou/runtime-provider'
 
 import { piDefaultModel, runPiAgent, selectedModel } from './agent-session.ts'
-import { openPiServices } from './services.ts'
 import { completionReasoning } from './completion-reasoning.ts'
+import { piImages, requireImageInput } from './images.ts'
+import { openPiServices } from './services.ts'
 
 /**
  * True when Node can resolve the optional Pi packages (peer / environment).
@@ -80,9 +81,14 @@ async function complete(
   const runtime = services.modelRuntime
   const model = selectedModel(runtime, config, call) ?? piDefaultModel(runtime, services.settingsManager)
   if (model === undefined) throw new ProviderError('unknown-model', 'pi model selection is incomplete')
+  const attached = piImages(call?.images)
+  requireImageInput(model, attached)
   const reasoning = await completionReasoning(model)
+  const content = attached === undefined
+    ? prompt
+    : [{ type: 'text' as const, text: prompt }, ...attached]
   const context = {
-    messages: [{ role: 'user' as const, content: prompt, timestamp: Date.now() }],
+    messages: [{ role: 'user' as const, content, timestamp: Date.now() }],
     ...call?.system === undefined ? {} : { systemPrompt: call.system },
   }
   const request = {

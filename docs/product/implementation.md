@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-03
+updated: 2026-10-08
 ---
 
 # Implementation plan
@@ -81,6 +81,7 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `provider-missing` | no live runtime provider |
 | `provider-unhealthy` | the provider is registered and not healthy |
 | `empty-completion` | `llm` or `agent` returns an empty result |
+| `image-unsupported` | the brain or the selected model cannot accept images. Echo cannot. Not retried |
 | `cancelled` | the call's signal aborted the run |
 | `retry-exhausted` | the resolved retry budget is spent |
 | `cwd-invalid` | `cwd` and `cwdType` disagree, or `custom` is not absolute |
@@ -112,7 +113,7 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `authoring-token` | the authoring token is missing or wrong |
 | `authoring-loopback` | the authoring caller is not loopback |
 | `theme-invalid` | a pin names an unknown palette, or the app theme file cannot be used |
-| `model-policy` | `maxTokens`, `retryTimes`, or `maxIterations` is outside the resolved host policy |
+| `model-policy` | `maxTokens`, `retryTimes`, `maxIterations`, image count, decoded image size, or image mime type is outside the resolved host policy. A missing image path fails the same way |
 | `credential-invalid` | `get` was called with an empty name |
 | `credential-unreadable` | the credential file is present and cannot be read; it is not rewritten |
 | `credential-duplicate` | the same credential name is present in more than one source |

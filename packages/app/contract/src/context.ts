@@ -52,6 +52,23 @@ export interface AppHttpResponse {
 }
 
 /** Options shared by `ctx.llm` and `ctx.agent`. Omitted limits use host policy. */
+/** Image bytes the caller already holds. `data` is base64, with no `data:` prefix. */
+export interface AppImageData {
+  mimeType: string
+  data: string
+  path?: never
+}
+
+/** A file the host reads. `path` is an absolute path or a `file:` URI. */
+export interface AppImageFile {
+  path: string
+  mimeType?: string
+  data?: never
+}
+
+/** One image on `ctx.llm` or `ctx.agent`. Data or a path, not both, and not a web URL. */
+export type AppImageInput = AppImageData | AppImageFile
+
 export interface AppModelOptions {
   provider?: string
   model?: string
@@ -61,6 +78,8 @@ export interface AppModelOptions {
   /** Attempts in total, including the first. */
   retryTimes?: number
   signal?: AbortSignal
+  /** Inline bytes, or a file the host reads before the brain runs. */
+  images?: AppImageInput[]
 }
 
 /** Why an agent turn ended. `kind` stays open so a provider can add a reason. */

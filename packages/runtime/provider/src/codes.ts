@@ -8,6 +8,7 @@ export const providerCodes = [
   'cancelled',
   'unknown-model-provider',
   'unknown-model',
+  'image-unsupported',
   'retry-exhausted',
 ] as const
 

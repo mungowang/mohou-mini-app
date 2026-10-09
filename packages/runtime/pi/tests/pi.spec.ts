@@ -13,6 +13,7 @@ const piSession = vi.hoisted(() => ({
   beforeComplete: undefined as (() => void) | undefined,
   messages: [{ role: 'assistant', content: [{ type: 'text', text: 'ok' }] }] as Array<{ role: string; content?: unknown }>,
   prompt: async (_goal: string, _listen: Array<(event: Record<string, unknown>) => void>) => {},
+  lastImages: undefined as unknown,
   failCreate: false,
   defaultProvider: 'rocket' as string | undefined,
   defaultModel: 'grok-4.5' as string | undefined,
@@ -47,6 +48,7 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
           if (id === 'reasoner') return { provider, id, reasoning: true }
           if (id === 'named-off') return { provider, id, reasoning: true, thinkingLevelMap: { off: 'none' } }
           if (id === 'quiet') return { provider, id, reasoning: true, thinkingLevelMap: { off: null, minimal: null, low: 'light' } }
+          if (id === 'vision') return { provider, id, input: ['text', 'image'] }
           return { provider, id }
         },
         getModels: () => [...piSession.listed, ...piSession.listedWithExtensions],
@@ -96,7 +98,10 @@ function mockAgentSession() {
         listeners.push(listener)
         return () => {}
       },
-      prompt: (goal: string) => piSession.prompt(goal, listeners),
+      prompt: (goal: string, options?: { images?: unknown }) => {
+        piSession.lastImages = options?.images
+        return piSession.prompt(goal, listeners)
+      },
       abort: () => Promise.resolve(),
       dispose: () => {
         piSession.disposed += 1
@@ -127,6 +132,7 @@ beforeEach(() => {
   piSession.defaultProvider = 'rocket'
   piSession.defaultModel = 'grok-4.5'
   piSession.listed = [{ provider: 'rocket', id: 'grok-4.5' }]
+  piSession.lastImages = undefined
   piSession.listedWithExtensions = []
   piSession.streamDeltas = ['hi']
   piSession.messages = [
@@ -347,5 +353,28 @@ describe('createPiProvider', () => {
     }
     await expect(pi.agent('goal')).rejects.toMatchObject({ code: 'provider-unhealthy' })
     expect(piSession.disposed).toBe(2)
+  })
+
+  it('sends resolved image bytes and refuses a text-only model', async () => {
+    const pi = createPiProvider()
+    await pi.start()
+    const images = [{ mimeType: 'image/png', data: 'aGk=' }]
+    await expect(pi.llm('look', { provider: 'rocket', model: 'grok-4.5', images })).rejects.toMatchObject({
+      code: 'image-unsupported',
+    })
+    expect(piSession.completions).toHaveLength(0)
+    expect(await pi.llm('look', { provider: 'rocket', model: 'vision', images })).toBe('hi')
+    expect(piSession.completions.at(-1)?.context).toMatchObject({
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'look' },
+          { type: 'image', mimeType: 'image/png', data: 'aGk=' },
+        ],
+      }],
+    })
+    expect(await pi.agent('look', { provider: 'rocket', model: 'vision', images })).toBe('ok')
+    expect(piSession.lastImages).toEqual([{ type: 'image', mimeType: 'image/png', data: 'aGk=' }])
+    await pi.stop()
   })
 })

@@ -1,6 +1,6 @@
 {
   "name": "@mohou/runtime-pi",
-  "version": "1.0.47",
+  "version": "1.0.48",
   "license": "MIT",
   "type": "module",
   "engines": {

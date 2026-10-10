@@ -1,4 +1,5 @@
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 
 import type { AppSummary } from '../apps/registry.ts'
 import { builtinThemesDir, customThemeId, customThemePath, themeLayout, appThemeCss, appThemePin } from './layout.ts'
@@ -29,11 +30,22 @@ interface Registry {
 export function createThemePins(registry: Registry, themesDir: string) {
   return {
     listPalettes: () => listPalettes(themesDir),
+    deletePalette: (id: string) => deleteCustomPalette(themesDir, id),
     readPin: (appId: string) => readPin(registry, appId),
     appFile: (appId: string) => appFileParsed(registry, appId),
     readAppTheme: (appId: string) => readAppTheme(registry, appId),
     setPin: (appId: string, pin: AppPin) => setPin(registry, themesDir, appId, pin),
   }
+}
+
+/** Remove a user theme file. Builtin shipped themes cannot be deleted. */
+async function deleteCustomPalette(themesDir: string, id: string): Promise<void> {
+  if (!/^[a-z0-9-]+$/.test(id)) throw new ThemeError('theme-invalid', 'palette id is invalid')
+  const file = customThemePath(themesDir, id)
+  const text = await readFile(file, 'utf8').catch(() => undefined)
+  if (text === undefined) throw new ThemeError('theme-invalid', 'custom palette is missing')
+  await rm(file, { force: true })
+  await rm(path.join(themesDir, `.market-${id}.lock`), { force: true })
 }
 
 async function listPalettes(themesDir: string): Promise<PaletteList> {

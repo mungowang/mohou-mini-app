@@ -80,6 +80,24 @@ async function request(app: Hono<HostEnv>, path: string, init?: RequestInit) {
 }
 
 describe('mountOwner', () => {
+  it('deletes a custom palette and refuses when the route has no writer', async () => {
+    const removed: string[] = []
+    const app = new Hono<HostEnv>()
+    mountOwner(app, basePorts({
+      deletePalette: async (id: string) => {
+        removed.push(id)
+      },
+    }))
+    const gone = await request(app, `${httpLayout.palettes}/forest`, { method: 'DELETE' })
+    expect(gone.status).toBe(200)
+    expect(removed).toEqual(['forest'])
+
+    const bare = new Hono<HostEnv>()
+    mountOwner(bare, basePorts({ deletePalette: undefined }))
+    const refused = await request(bare, `${httpLayout.palettes}/forest`, { method: 'DELETE' })
+    expect(refused.status).toBe(400)
+  })
+
   it('lists and installs market rows through the owner routes', async () => {
     const app = new Hono<HostEnv>()
     const installed: { id: string; confirm: boolean }[] = []

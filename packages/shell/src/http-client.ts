@@ -130,6 +130,7 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
       const body = await getJson(origin, appsResource(appId, httpLayout.storage, table))
       return { rows: arrayOf(resultOf(body).rows, row => row) }
     },
+    deletePalette: id => sendOk(origin, 'DELETE', `${httpLayout.palettes}/${encodeURIComponent(id)}`),
     listPalettes: async () => {
       const body = await getJson(origin, httpLayout.palettes)
       return {

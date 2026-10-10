@@ -30,6 +30,15 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
   app.get(httpLayout.palettes, async (c) => {
     return c.json(await ports.listPalettes())
   })
+  app.delete(`${httpLayout.palettes}/:id`, (c) => {
+    if (ports.deletePalette === undefined) {
+      return c.json({ ok: false, error: { code: 'theme-invalid', message: 'palette delete is not available' } }, 400)
+    }
+    return ok(c, async () => {
+      if (ports.deletePalette === undefined) throw new Error('palette delete is not available')
+      await ports.deletePalette(c.req.param('id'))
+    })
+  })
   app.get(httpLayout.hostConfig, c => c.json({ ok: true, policy: ports.readPolicy() }))
   app.post(httpLayout.hostConfig, (c) => {
     const denied = rejectWithoutToken(c, ports)

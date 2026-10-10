@@ -121,6 +121,7 @@ export function bindLoopback(input: {
     installSamples: () => installStartupSamples(input.runtimeRoot, input.authorSkill?.source),
     providers: input.providers,
     listPalettes: () => input.owner.themes.listPalettes(),
+    deletePalette: id => input.owner.themes.deletePalette(id),
     readPin: appId => input.owner.themes.readPin(appId),
     setPin: (appId, pin) => input.owner.themes.setPin(appId, pin),
     appFile: appId => input.owner.themes.appFile(appId),

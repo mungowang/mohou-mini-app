@@ -26,6 +26,8 @@ export type ThemePin =
 /** Theme reads and pin writes. Absent means the picker is hidden. No route string lives here. */
 export interface ThemeClient {
   listPalettes(): Promise<{ palettes: readonly PaletteChip[]; ignored: readonly IgnoredPalette[] }>
+  /** Remove a custom theme file. Builtin palettes cannot be deleted. */
+  deletePalette?(id: string): Promise<void>
   readPin?(appId: string): Promise<ThemePin>
   setPin(appId: string, pin: ThemePin): Promise<ThemePin>
   appFile?(appId: string): Promise<boolean>

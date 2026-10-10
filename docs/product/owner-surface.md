@@ -92,6 +92,13 @@ Owner `restoreStorage` closes the live storage handle, then calls `restoreStorag
 - Output: theme files, each `{ id, name, swatch, style, origin }`, and ignored files with a reason. `origin` is `builtin` or `custom`. `swatch` is that file's light `--primary`. `style` is the first-paint CSS for both modes, so the picker can apply it without reloading a document. A shipped file and a user file with the same id appear once. The user file wins, and that row is `custom`. The panel refetches when the picker opens.
 - An ignored file is not a selectable chip.
 
+## deletePalette
+
+- Input: palette `id` for a custom file under the host themes directory.
+- Output: that file is removed. A market lock beside it is removed when present. Builtin shipped themes cannot be deleted.
+- Failure: a missing custom id or an invalid id is refused. The previous list stays until the next fetch.
+- Non-goals: deleting a shipped theme; editing CSS.
+
 ## reloadView
 
 - Input: the open `appId`.

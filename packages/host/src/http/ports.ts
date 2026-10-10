@@ -50,6 +50,7 @@ export interface LoopbackPorts {
   installSamples(): Promise<StartupSampleInstall>
   providers: readonly RuntimeProvider[]
   listPalettes(): Promise<unknown>
+  deletePalette?(id: string): Promise<void>
   readPin(appId: string): Promise<AppPin>
   setPin(appId: string, pin: AppPin): Promise<AppPin>
   appFile(appId: string): Promise<boolean>

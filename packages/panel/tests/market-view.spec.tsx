@@ -231,3 +231,49 @@ describe('market view', () => {
     expect(unavailable.textContent).toContain('Market is not available')
   })
 })
+
+describe('market refresh', () => {
+  it('reads the catalog again when chrome bumps the tick and after an install', async () => {
+    const untracked = { ...appRow, tracked: false }
+    const installed = { ...appRow, tracked: true, installedVersion: appRow.version }
+    let calls = 0
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let tick = 0
+    const render = () => act(() => {
+      root.render(
+        <MarketView
+          locale="en"
+          mode="production"
+          refreshTick={tick}
+          list={async () => {
+            calls += 1
+            // The third read is the one after the install lands.
+            return calls < 3 ? [untracked] : [installed]
+          }}
+          install={async () => undefined}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    render()
+    await act(async () => { await Promise.resolve() })
+    expect(calls).toBe(1)
+    tick = 1
+    render()
+    await act(async () => { await Promise.resolve() })
+    expect(calls).toBe(2)
+    // A finished install reads the catalog again instead of trusting the row in memory.
+    const card = host.querySelector('[data-market-card="com.example.desk"]') as HTMLElement
+    const ask = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('Replace'))
+    await act(async () => { ask?.click() })
+    const confirm = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('Confirm'))
+    await act(async () => { confirm?.click() })
+    await act(async () => {
+      for (let round = 0; round < 8; round += 1) await Promise.resolve()
+    })
+    expect(calls).toBe(3)
+    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Installed'))).toBe(true)
+  })
+})

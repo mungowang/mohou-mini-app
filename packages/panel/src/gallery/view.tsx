@@ -129,6 +129,8 @@ export function GalleryBody(props: {
   const desks = workbenchEntries(state.apps, props.defaultWorkbenchId, label('workbench-builtin'))
   const deskId = desks.find(entry => entry.default)?.id ?? 'default'
   const [refreshing, setRefreshing] = useState(false)
+  /** Bumped to make an open market tab read the catalog again. */
+  const [marketTick, setMarketTick] = useState(0)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const mac = isMacPlatform(navigator.platform, navigator.userAgent)
   useEffect(() => bindPaletteChord(document, () => { setPaletteOpen(open => !open) }), [])
@@ -236,6 +238,8 @@ export function GalleryBody(props: {
               className="inline-flex size-8 items-center justify-center rounded-lg transition-colors duration-150 hover:bg-muted"
               aria-label={appTab ? label('reload') : label('refresh')}
               onClick={() => {
+                // The market tab owns its own data: a refresh reads the catalog again.
+                if (marketTab) { setMarketTick(value => value + 1); return }
                 void refreshList(props.client, appTab && active?.kind === 'app' ? active.appId : undefined, !appTab ? desk?.id : undefined, dispatch, setRefreshing)
               }}
             >
@@ -307,6 +311,7 @@ export function GalleryBody(props: {
                 mode={props.mode}
                 list={props.client.listMarket}
                 install={props.client.installMarket}
+                refreshTick={marketTick}
                 onInstalled={() => { void refreshList(props.client, undefined, undefined, dispatch, setRefreshing) }}
               />
             </div>

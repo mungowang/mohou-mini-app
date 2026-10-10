@@ -1,8 +1,9 @@
-import { Download, Hash, Package, PackageSearch, Store, Tag, User } from 'lucide-react'
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { Download, Hash, Loader2, Package, PackageSearch, Store, Tag, User } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import type { MarketRow } from '../gallery/client.ts'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
+import { ThemeDualPreview, type ThemeDualTokens } from '../theme/preview.tsx'
 
 /**
  * Market tab. Apps and themes are separate grids. The card click confirms before a replace.
@@ -13,6 +14,8 @@ export function MarketView(props: {
   readonly install?: ((id: string, confirm: boolean) => Promise<void>) | undefined
   readonly locale: PanelLocale
   readonly mode: PanelLabelMode
+  /** Bumped when chrome asks for a refresh, so the catalog is read again. */
+  readonly refreshTick?: number
   readonly onInstalled: () => void
 }): ReactNode {
   const label = (key: string) => panelText(props.locale, key, props.mode)
@@ -26,18 +29,23 @@ export function MarketView(props: {
   const [pending, setPending] = useState<string>()
   const [busy, setBusy] = useState<string>()
   const [done, setDone] = useState<string>()
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
+  function load(): void {
     if (props.list === undefined) {
       setError(label('market-unavailable'))
       return
     }
+    setLoading(true)
     void props.list().then((next) => {
       setRows(next)
       setError(undefined)
       if (!next.some(row => row.kind === 'app') && next.some(row => row.kind === 'theme')) setKind('theme')
     }).catch(failure => setError(failure instanceof Error ? failure.message : label('market-failed')))
-  }, [props.list])
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [props.list, props.refreshTick])
 
   const kinds = useMemo(() => {
     const set = new Set(rows.map(row => row.kind))
@@ -119,10 +127,9 @@ export function MarketView(props: {
     setError(undefined)
     try {
       await props.install(row.id, confirm)
-      setRows(current => current.map(item => item.id === row.id
-        ? { ...item, installedVersion: row.version, tracked: true, modified: false }
-        : item))
       setDone(row.id)
+      // The lock is on disk now, so the rows and the filter counts are read again.
+      load()
       props.onInstalled()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : label('market-failed'))
@@ -134,7 +141,10 @@ export function MarketView(props: {
   return (
     <div className="h-full overflow-auto px-8 py-8" data-market="">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="m-0 text-3xl font-semibold tracking-tight">{label('market')}</h1>
+        <h1 className="m-0 flex items-center gap-2 text-3xl font-semibold tracking-tight">
+          {label('market')}
+          {loading && rows.length > 0 ? <Loader2 size={16} className="animate-spin text-muted-foreground" aria-label={label('market-refreshing')} /> : null}
+        </h1>
         <input
           className="h-9 w-56 rounded-lg border bg-background px-3 text-sm text-foreground outline-none"
           value={query}
@@ -323,18 +333,20 @@ function Card(props: {
           ))}
         </p>
       )}
-      <div className="mt-auto flex items-center gap-3 border-t border-border/70 pt-3 pb-3 text-xs text-muted-foreground">
-        <span className="tabular-nums">{`v${row.version}`}</span>
-        {row.requires === undefined ? null : (
-          <span className="rounded-md border border-border/80 px-1.5 py-0.5 text-[11px] tabular-nums">{`mohou ≥ ${row.requires}`}</span>
-        )}
-        {noticeExtra === undefined ? null : <span className="text-[11px]">{noticeExtra}</span>}
-        {row.downloads === undefined ? null : (
-          <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
-            <Download size={12} strokeWidth={2} />
-            {row.downloads}
-          </span>
-        )}
+      <div className="mt-auto pt-4">
+        <div className="flex items-center gap-3 border-t border-border/70 pt-3 pb-3 text-xs text-muted-foreground" data-market-meta="">
+          <span className="tabular-nums">{`v${row.version}`}</span>
+          {row.requires === undefined ? null : (
+            <span className="rounded-md border border-border/80 px-1.5 py-0.5 text-[11px] tabular-nums">{`mohou ≥ ${row.requires}`}</span>
+          )}
+          {noticeExtra === undefined ? null : <span className="text-[11px]">{noticeExtra}</span>}
+          {row.downloads === undefined ? null : (
+            <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
+              <Download size={12} strokeWidth={2} />
+              {row.downloads}
+            </span>
+          )}
+        </div>
       </div>
     </article>
   )
@@ -386,52 +398,29 @@ function Action(props: {
 }
 
 function ThemePreview(props: { readonly row: MarketRow; readonly label: (key: string) => string }): ReactNode {
-  const preview = props.row.preview
-  if (preview !== undefined) {
-    return (
-      <div className="mb-3 grid h-[4.5rem] grid-cols-2 gap-px overflow-hidden rounded-lg border">
-        <ModePane mode={props.label('market-light')} tokens={preview.light} label={props.label} />
-        <ModePane mode={props.label('market-dark')} tokens={preview.dark} label={props.label} />
-      </div>
-    )
-  }
-  if (props.row.colors === undefined || props.row.colors.length < 4) return null
+  const tokens = marketPreviewTokens(props.row)
+  if (tokens === undefined) return null
   return (
-    <div className="mb-3 grid h-14 grid-cols-2 overflow-hidden rounded-lg">
-      <div style={{ background: props.row.colors[1], color: props.row.colors[0] }} className="flex items-end p-2 text-[10px] leading-none">{props.label('market-light')}</div>
-      <div style={{ background: props.row.colors[3], color: props.row.colors[2] }} className="flex items-end p-2 text-[10px] leading-none">{props.label('market-dark')}</div>
-    </div>
+    <ThemeDualPreview
+      size="card"
+      tokens={tokens}
+      lightLabel={props.label('market-light')}
+      darkLabel={props.label('market-dark')}
+      primaryLabel={props.label('market-preview-primary')}
+      secondaryLabel={props.label('market-preview-secondary')}
+    />
   )
 }
 
-function ModePane(props: {
-  readonly mode: string
-  readonly tokens: NonNullable<MarketRow['preview']>['light']
-  readonly label: (key: string) => string
-}): ReactNode {
-  const background = props.tokens.background
-  const foreground = props.tokens.foreground
-  const card = props.tokens.card ?? background
-  const border = props.tokens.border ?? 'transparent'
-  const muted = props.tokens['muted-foreground'] ?? props.tokens.muted ?? foreground
-  const secondary = props.tokens.secondary ?? 'transparent'
-  const secondaryFg = props.tokens['secondary-foreground'] ?? foreground
-  const primary = props.tokens.primary
-  const primaryFg = props.tokens['primary-foreground'] ?? background
-  const style = { background, color: foreground } satisfies CSSProperties
-  return (
-    <div className="relative flex flex-col px-2 py-1.5 text-[10px] leading-tight" style={style}>
-      <span className="opacity-65">{props.mode}</span>
-      <div className="mt-1 flex min-h-0 flex-1 items-center gap-1.5">
-        <div className="min-w-0 flex-1 rounded border px-1.5 py-1" style={{ background: card, borderColor: border, color: foreground }}>
-          <div className="truncate">Aa</div>
-          <div className="truncate opacity-80" style={{ color: muted }}>{props.mode}</div>
-        </div>
-        <span className="shrink-0 rounded px-1.5 py-1 text-[9px] font-medium" style={{ background: secondary, color: secondaryFg }}>{props.label('market-preview-secondary')}</span>
-        <span className="shrink-0 rounded px-1.5 py-1 text-[9px] font-medium" style={{ background: primary, color: primaryFg }}>{props.label('market-preview-primary')}</span>
-      </div>
-    </div>
-  )
+function marketPreviewTokens(row: MarketRow): ThemeDualTokens | undefined {
+  if (row.preview !== undefined) return row.preview
+  if (row.colors === undefined || row.colors.length < 4) return undefined
+  const [lp, lb, dp, db] = row.colors
+  if (lp === undefined || lb === undefined || dp === undefined || db === undefined) return undefined
+  return {
+    light: { primary: lp, background: lb, foreground: lp },
+    dark: { primary: dp, background: db, foreground: dp },
+  }
 }
 
 function SourceIcon(props: {

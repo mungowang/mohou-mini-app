@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -625,5 +625,216 @@ describe('list and local theme install', () => {
         confirm: true,
       })
     }).toThrow(MarketError)
+  })
+})
+
+const goodTheme = [
+  '/* name: Ink */',
+  ':root[data-mode="light"] { --background: #fff; --foreground: #111; --primary: #2563eb; --card: #fafafa; --border: #ddd; --muted-foreground: #666; --secondary: #eee; --primary-foreground: #fff; }',
+  ':root[data-mode="dark"] { --background: #000; --foreground: #eee; --primary: #3b82f6; --card: #111; --border: #333; --muted-foreground: #aaa; --secondary: #222; --primary-foreground: #000; }',
+].join('\n')
+
+describe('themes package', () => {
+  /** Two themes in one tarball, the published shape for @mohou-apps/themes. */
+  function stageThemeTarball(root: string, name: string, withSum = true): string {
+    const stage = path.join(root, 'stage')
+    const themes = path.join(stage, 'package', 'themes')
+    mkdirSync(themes, { recursive: true })
+    writeFileSync(path.join(themes, 'theme-ink.css'), goodTheme)
+    writeFileSync(path.join(themes, 'theme-plum.css'), goodTheme.replace('Ink', 'Plum'))
+    const sum = themesPackageSum(path.join(stage, 'package'))
+    writeFileSync(
+      path.join(stage, 'package', 'package.json'),
+      JSON.stringify({ name: '@mohou-apps/themes', ...(withSum ? { mohou: { sum } } : {}) }),
+    )
+    const tar = path.join(root, name)
+    expect(spawnSync('tar', ['-czf', tar, '-C', stage, 'package']).status).toBe(0)
+    return tar
+  }
+
+  function themeRow(id: string, file: string) {
+    return {
+      id,
+      name: id,
+      description: id,
+      package: '@mohou-apps/themes',
+      version: '1.0.0',
+      kind: 'theme' as const,
+      source: 'local' as const,
+      file,
+    }
+  }
+
+  it('installs both themes from one tarball and caches the package for previews', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-theme-tar-'))
+    stageThemeTarball(root, 'themes.tgz')
+    writeFileSync(path.join(root, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [themeRow('ink', 'themes.tgz'), themeRow('plum', 'themes.tgz')] },
+    }))
+    const home = path.join(root, 'home')
+    const env = { MINI_APP_MARKET_DIR: root }
+    const listed = await listMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      localDist: true,
+      env,
+      home,
+    })
+    // Both rows get a preview from the one extracted package.
+    expect(listed.map(row => row.preview?.light.primary)).toEqual(['#2563eb', '#2563eb'])
+    const ink = await installMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      id: 'ink',
+      confirm: false,
+      localDist: true,
+      env,
+      home,
+    })
+    expect(ink).toEqual({ id: 'ink', kind: 'theme' })
+    expect(readFileSync(path.join(home, '.mini-app/themes/theme-ink.css'), 'utf8')).toBe(goodTheme)
+    const after = await listMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      localDist: true,
+      env,
+      home,
+    })
+    expect(after.find(row => row.id === 'ink')).toMatchObject({ tracked: true, installedVersion: '1.0.0', modified: false })
+    // A hand edit to the installed file is the modified state.
+    writeFileSync(path.join(home, '.mini-app/themes/theme-ink.css'), 'edited')
+    const edited = await listMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      localDist: true,
+      env,
+      home,
+    })
+    expect(edited.find(row => row.id === 'ink')).toMatchObject({ tracked: true, modified: true })
+  })
+
+  it('lists a theme with no file on disk as not installed', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-theme-none-'))
+    stageThemeTarball(root, 'themes.tgz')
+    writeFileSync(path.join(root, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [themeRow('ink', 'themes.tgz')] },
+    }))
+    const listed = await listMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      localDist: true,
+      env: { MINI_APP_MARKET_DIR: root },
+      home: path.join(root, 'home'),
+    })
+    expect(listed[0]).toMatchObject({ id: 'ink' })
+    expect(listed[0]?.tracked).toBeUndefined()
+  })
+
+  it('refuses a themes tarball with no sum, and a tarball that is missing', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-theme-nosum-'))
+    stageThemeTarball(root, 'themes.tgz', false)
+    writeFileSync(path.join(root, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [themeRow('ink', 'themes.tgz')] },
+    }))
+    await expect(installMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      id: 'ink',
+      confirm: true,
+      localDist: true,
+      env: { MINI_APP_MARKET_DIR: root },
+      home: path.join(root, 'home'),
+    })).rejects.toMatchObject({ code: 'market-sum' })
+    const empty = mkdtempSync(path.join(tmpdir(), 'mohou-theme-notar-'))
+    writeFileSync(path.join(empty, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [themeRow('ink', 'themes.tgz')] },
+    }))
+    await expect(installMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(empty, 'runtime'),
+      id: 'ink',
+      confirm: true,
+      localDist: true,
+      env: { MINI_APP_MARKET_DIR: empty },
+      home: empty,
+    })).rejects.toMatchObject({ code: 'market-package' })
+  })
+
+  it('reads a theme that ships at the package root, not under themes/', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-theme-root-'))
+    const stage = path.join(root, 'stage')
+    mkdirSync(path.join(stage, 'package'), { recursive: true })
+    writeFileSync(path.join(stage, 'package', 'theme-ink.css'), goodTheme)
+    writeFileSync(
+      path.join(stage, 'package', 'package.json'),
+      JSON.stringify({ name: '@mohou-apps/themes', mohou: { sum: themesPackageSum(path.join(stage, 'package')) } }),
+    )
+    expect(spawnSync('tar', ['-czf', path.join(root, 'themes.tgz'), '-C', stage, 'package']).status).toBe(0)
+    writeFileSync(path.join(root, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [themeRow('ink', 'themes.tgz')] },
+    }))
+    const home = path.join(root, 'home')
+    await installMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      id: 'ink',
+      confirm: true,
+      localDist: true,
+      env: { MINI_APP_MARKET_DIR: root },
+      home,
+    })
+    expect(existsSync(path.join(home, '.mini-app/themes/theme-ink.css'))).toBe(true)
+  })
+
+  it('returns the app kind from a local app install', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-app-kind-'))
+    const stage = path.join(root, 'stage')
+    mkdirSync(path.join(stage, 'package', 'app'), { recursive: true })
+    writeFileSync(path.join(stage, 'package', 'app', 'manifest.json'), JSON.stringify({ id: row.id }))
+    writeFileSync(path.join(stage, 'package', 'app', 'ui.tsx'), 'x')
+    writeFileSync(
+      path.join(stage, 'package', 'package.json'),
+      JSON.stringify({ mohou: { sum: sourceSum(path.join(stage, 'package', 'app')) } }),
+    )
+    expect(spawnSync('tar', ['-czf', path.join(root, 'desk.tgz'), '-C', stage, 'package']).status).toBe(0)
+    writeFileSync(path.join(root, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [{ ...row, source: 'local', file: 'desk.tgz' }] },
+    }))
+    const installed = await installMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      id: row.id,
+      confirm: true,
+      localDist: true,
+      env: { MINI_APP_MARKET_DIR: root },
+    })
+    expect(installed).toEqual({ id: row.id, kind: 'app' })
+  })
+
+  it('refuses an app tarball whose package.json has no sum', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-app-nosum-'))
+    const stage = path.join(root, 'stage')
+    mkdirSync(path.join(stage, 'package', 'app'), { recursive: true })
+    writeFileSync(path.join(stage, 'package', 'app', 'manifest.json'), JSON.stringify({ id: row.id }))
+    writeFileSync(path.join(stage, 'package', 'package.json'), JSON.stringify({ name: 'x' }))
+    expect(spawnSync('tar', ['-czf', path.join(root, 'desk.tgz'), '-C', stage, 'package']).status).toBe(0)
+    writeFileSync(path.join(root, 'market-catalog.json'), JSON.stringify({
+      version: '1.0.0',
+      mohou: { apps: [{ ...row, source: 'local', file: 'desk.tgz' }] },
+    }))
+    await expect(installMarket({
+      registry: 'https://invalid.example',
+      runtimeRoot: path.join(root, 'runtime'),
+      id: row.id,
+      confirm: true,
+      localDist: true,
+      env: { MINI_APP_MARKET_DIR: root },
+    })).rejects.toMatchObject({ code: 'market-sum' })
   })
 })

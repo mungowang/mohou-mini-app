@@ -7,6 +7,10 @@ updated: 2026-10-10
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.54
+
+Settings can delete a custom palette, with an inline confirm, and its palette cards now paint the same light and dark dummy as the market. The market card footer has a gap above its rule. The refresh control reads the catalog again on the market tab, and a finished install reads it again so the rows and the filter counts are the host's answer. Settings asks 取消修改 beside Save while the form is dirty. The first tab reads 首页.
+
 ## 1.0.53
 
 Market filters show counts. Status filters cover all / not installed / updates / installed. An empty filter result shows a placeholder. Card and filter chrome are tightened.

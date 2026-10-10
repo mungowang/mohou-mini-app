@@ -20,6 +20,8 @@ export function ThemeMenu(props: {
   readonly appTitle?: string
   readonly hostPolicy?: PanelPolicy
   readonly onHostPolicy?: (policy: PanelPolicy) => void
+  /** Bumps when a market theme install finishes so the menu refetches palettes. */
+  readonly paletteTick?: number
 }): ReactNode {
   const [palettes, setPalettes] = useState<readonly PaletteChip[]>([])
   const [failed, setFailed] = useState('')
@@ -37,7 +39,7 @@ export function ThemeMenu(props: {
       listed => setPalettes(listed.palettes),
       (error: unknown) => setFailed(error instanceof Error && error.message.length > 0 ? error.message : label('theme-save-failed')),
     )
-  }, [props.theme])
+  }, [props.theme, props.paletteTick])
   useEffect(() => {
     if (props.settings === undefined) return
     void props.settings.readPolicy().then((policy) => {

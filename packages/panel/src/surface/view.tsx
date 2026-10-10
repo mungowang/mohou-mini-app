@@ -24,6 +24,7 @@ export interface PanelControls {
   unavailable(appId: string): void
   setWorkbench(appId: string): void
   renameApp(from: string, to: string): void
+  marketInstalled(kind: 'app' | 'theme', id: string): void
 }
 
 /**
@@ -51,6 +52,8 @@ export function PanelSurface(props: {
   const [hostPolicy, setHostPolicy] = useState<PanelPolicy | undefined>(undefined)
   const [chromeLocale, setChromeLocale] = useState<PanelLocale>(props.locale)
   const [updateCard, setUpdateCard] = useState<UpdateCard | undefined>(undefined)
+  const [libraryTick, setLibraryTick] = useState(0)
+  const [paletteTick, setPaletteTick] = useState(0)
   useEffect(() => {
     const check = props.settings?.checkUpdate
     if (check === undefined) return
@@ -72,6 +75,10 @@ export function PanelSurface(props: {
         dispatch({ type: 'rename-app', from, to })
         setDesk(current => current === from ? to : current)
       },
+      marketInstalled: (kind) => {
+        if (kind === 'app') setLibraryTick(value => value + 1)
+        if (kind === 'theme') setPaletteTick(value => value + 1)
+      },
     })
   }, [props.onControls])
   useEffect(() => {
@@ -87,7 +94,7 @@ export function PanelSurface(props: {
       listed => setPalettes(listed.palettes),
       () => setPalettes([]),
     )
-  }, [props.theme])
+  }, [props.theme, paletteTick])
   const label = (key: string) => panelText(chromeLocale, key, props.mode)
   useEffect(() => {
     document.title = panelText(chromeLocale, 'product-name', props.mode)
@@ -108,6 +115,7 @@ export function PanelSurface(props: {
       locale={chromeLocale}
       mode={props.mode}
       shell={props.shell}
+      libraryTick={libraryTick}
       {...desk === undefined ? {} : { defaultWorkbenchId: desk }}
       {...props.settings === undefined ? {} : { onSetDefaultWorkbench: (id: string) => { void writeDefault(props.settings, id, setDesk) } }}
       {...props.theme === undefined ? {} : {
@@ -119,6 +127,7 @@ export function PanelSurface(props: {
         <ThemeMenu
           locale={chromeLocale}
           mode={props.mode}
+          paletteTick={paletteTick}
           {...props.theme === undefined ? {} : { theme: props.theme }}
           {...props.settings === undefined ? {} : { settings: props.settings }}
           {...app === undefined ? {} : { appId: app.id, appTitle: app.title }}

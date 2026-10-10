@@ -6,6 +6,8 @@ export type HostEvent =
   | { type: 'workbench:default'; appId: string }
   | { type: 'app:reload'; appId: string }
   | { type: 'storage-size'; appId: string; table: string; keys: string[] }
+  /** A market install finished. App installs refresh the library; theme installs refresh palettes. */
+  | { type: 'market:install'; kind: 'app' | 'theme'; id: string }
   | {
     type: 'app:eval'
     appId: string

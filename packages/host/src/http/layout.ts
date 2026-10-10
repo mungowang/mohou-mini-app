@@ -11,6 +11,8 @@ export const httpLayout = {
   palettes: '/api/palettes',
   about: '/api/about',
   updates: '/api/updates',
+  market: '/api/market',
+  marketInstall: '/api/market/install',
   updateInstall: '/api/updates/install',
   updateAck: '/api/updates/ack',
   providers: '/api/runtime-providers',

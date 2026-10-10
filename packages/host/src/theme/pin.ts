@@ -41,6 +41,7 @@ async function listPalettes(themesDir: string): Promise<PaletteList> {
   const ignored: PaletteList['ignored'] = []
   const names = await readdir(themesDir).catch(() => [])
   for (const file of names) {
+    if (file.startsWith('.') || file.endsWith('.lock')) continue
     const id = customThemeId(file)
     if (id === undefined) {
       ignored.push({ file, reason: 'file name is not theme-<id>.css' })

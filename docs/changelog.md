@@ -1,11 +1,27 @@
 ---
 status: locked
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.53
+
+Market filters show counts. Status filters cover all / not installed / updates / installed. An empty filter result shows a placeholder. Card and filter chrome are tightened.
+
+## 1.0.52
+
+The market tab is titled 应用市场. Filter rows are ranked (kind, type/tone, tags). A finished install publishes `market:install` so the library and palette list refresh. App market locks are `.market.lock`.
+
+## 1.0.51
+
+Market cards show the row id, author and tags with small icons, and a clearer notice when the app is already on this machine without a market lock. The market tab is its own stage; the store control is its own chrome section. Theme install from `@mohou-apps/themes` is included.
+
+## 1.0.50
+
+The market lists published apps and themes from `@mohou-apps/catalog`, installs one package into this machine, and keeps `storage/` in place. A store icon opens the market tab. Author tools are `mini_app_market_list` and `mini_app_market_install`. Local tarballs work only on a local dist.
 
 ## 1.0.49
 

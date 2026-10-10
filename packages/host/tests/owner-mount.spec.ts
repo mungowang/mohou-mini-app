@@ -80,6 +80,30 @@ async function request(app: Hono<HostEnv>, path: string, init?: RequestInit) {
 }
 
 describe('mountOwner', () => {
+  it('lists and installs market rows through the owner routes', async () => {
+    const app = new Hono<HostEnv>()
+    const installed: { id: string; confirm: boolean }[] = []
+    mountOwner(app, basePorts({
+      listMarket: async () => [{ id: 'com.example.desk', kind: 'app', name: 'Desk' }],
+      installMarket: async (id: string, confirm: boolean) => {
+        installed.push({ id, confirm })
+      },
+    }))
+    const listed = await request(app, httpLayout.market)
+    expect(listed.status).toBe(200)
+    expect(JSON.parse(listed.body)).toMatchObject({
+      ok: true,
+      result: [{ id: 'com.example.desk', kind: 'app' }],
+    })
+    const install = await request(app, httpLayout.marketInstall, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'com.example.desk', confirm: true }),
+    })
+    expect(install.status).toBe(200)
+    expect(installed).toEqual([{ id: 'com.example.desk', confirm: true }])
+  })
+
   it('lists, writes, and removes a credential, and refuses a half row', async () => {
     const app = new Hono<HostEnv>()
     const written: string[] = []

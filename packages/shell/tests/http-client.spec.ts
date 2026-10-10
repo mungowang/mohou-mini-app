@@ -74,6 +74,9 @@ describe('httpPanelClients', () => {
       await client.removeCredential?.('github')
       expect((await client.readCredentials?.())?.credentials).toEqual([])
       await expect(httpPanelClients('http://127.0.0.1:1').list()).rejects.toMatchObject({ code: 'unreachable' })
+      if (client.listMarket === undefined || client.installMarket === undefined) throw new Error('market client is missing')
+      await expect(client.listMarket()).rejects.toMatchObject({ code: 'failed' })
+      await expect(client.installMarket('missing', false)).rejects.toMatchObject({ code: 'failed' })
     } finally {
       await host.dispose()
     }

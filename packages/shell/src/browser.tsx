@@ -53,6 +53,8 @@ events.onmessage = (event) => {
     since?: number
     from?: string
     to?: string
+    kind?: string
+    id?: string
   }
   if (data.type === 'app:event' && typeof data.appId === 'string' && typeof data.name === 'string' && typeof data.seq === 'number') {
     frames.push({ appId: data.appId, name: data.name, data: data.data, seq: data.seq })
@@ -73,6 +75,9 @@ events.onmessage = (event) => {
   }
   if (data.type === 'storage-size' && typeof data.appId === 'string' && typeof data.table === 'string') {
     controls?.showNotice(data.appId, data.table)
+  }
+  if (data.type === 'market:install' && (data.kind === 'app' || data.kind === 'theme') && typeof data.id === 'string') {
+    controls?.marketInstalled(data.kind, data.id)
   }
   if ((data.type === 'app:reload' || data.type === 'app:eval') && typeof data.appId === 'string') {
     if (!postToAppFrame(data.appId, data) && data.type === 'app:eval') reportAbsent(data.appId)

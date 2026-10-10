@@ -87,6 +87,7 @@ function recorder(): PanelBridge & { shown: Array<{ appId: string; title?: strin
     unavailable: appId => missing.push(appId),
     setWorkbench: () => undefined,
     renameApp: () => undefined,
+    marketInstalled: () => undefined,
   }
 }
 

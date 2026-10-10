@@ -14,6 +14,8 @@ import { historyBounds } from '../history/store.ts'
 import { ensureVendorFiles, vendorOutputDir } from '../compile/build-vendor.ts'
 import { renderRunnerDocument } from '../compile/runner.ts'
 import { bindLoopback } from '../http/bind.ts'
+import { tarballChannel } from '../http/updates.ts'
+import { installMarket, listMarket } from '../market/service.ts'
 import { appResource, httpLayout } from '../http/layout.ts'
 import { createOwnerReads, reloadView } from '../owner/read.ts'
 import { resolveFirstPaint } from '../theme/paint.ts'
@@ -140,6 +142,24 @@ export async function createHost(options: {
     readMcpFailures,
     recordMcpFailures,
     ...options.env === undefined ? {} : { env: options.env },
+    market: {
+      list: () => listMarket({
+        registry: policy.updateRegistry ?? 'https://registry.npmjs.org',
+        runtimeRoot: registry.runtimeRoot,
+        localDist: tarballChannel(options.env ?? process.env),
+        ...options.env === undefined ? {} : { env: options.env },
+      }),
+      install: async (id, _kind, overwrite) => {
+        await installMarket({
+          registry: policy.updateRegistry ?? 'https://registry.npmjs.org',
+          runtimeRoot: registry.runtimeRoot,
+          id,
+          confirm: overwrite,
+          localDist: tarballChannel(options.env ?? process.env),
+          ...options.env === undefined ? {} : { env: options.env },
+        })
+      },
+    },
     onTreeChanged: (appId) => {
       author.hostEvents.publish({ type: 'app:reload', appId })
     },

@@ -8,7 +8,11 @@ export interface GalleryTab {
   readonly kind: 'gallery'
 }
 
-export type PanelTab = GalleryTab | AppTab
+export interface MarketTab {
+  readonly kind: 'market'
+}
+
+export type PanelTab = GalleryTab | AppTab | MarketTab
 
 export interface PanelTabs {
   readonly tabs: readonly PanelTab[]
@@ -19,6 +23,13 @@ export interface TabChange {
   readonly tabs: PanelTabs
   /** Tab switch never reloads the document. Opening an already open tab does not either. */
   readonly reload: false
+}
+
+/** Open the market tab, or focus it when it is already open. */
+export function openMarketTab(state: PanelTabs): TabChange {
+  const existing = state.tabs.findIndex(tab => tab.kind === 'market')
+  if (existing >= 0) return { tabs: { tabs: state.tabs, active: existing }, reload: false }
+  return { tabs: { tabs: [...state.tabs, { kind: 'market' }], active: state.tabs.length }, reload: false }
 }
 
 /** The gallery tab is always present and is not closable. */

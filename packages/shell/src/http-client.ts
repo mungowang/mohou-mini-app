@@ -3,6 +3,7 @@ import {
   panelUpdateFailureCodes,
   PanelClientError,
   type GalleryApp,
+  type MarketRow,
   type HistoryClient,
   type HistoryCommit,
   type HistoryDetail,
@@ -38,6 +39,12 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
     deleteApp: appId => sendOk(origin, 'DELETE', `${httpLayout.app}/${encodeURIComponent(appId)}`),
     undeleteApp: appId => postOk(origin, `${httpLayout.trash}/${encodeURIComponent(appId)}/${httpLayout.restore}`),
     reload: appId => postOk(origin, appsResource(appId, httpLayout.reload)),
+    listMarket: async () => {
+      const result = (await getJson(origin, httpLayout.market)).result
+      if (!Array.isArray(result)) throw new PanelClientError('failed', 'market list is invalid')
+      return result as MarketRow[]
+    },
+    installMarket: (id, confirm) => postOk(origin, httpLayout.marketInstall, { id, confirm }),
     readPolicy: async () => publicPolicy((await getJson(origin, httpLayout.hostConfig)).policy),
     writePolicy: async (policy) => {
       const body = await sendJson(origin, 'POST', httpLayout.hostConfig, policy, true)

@@ -273,6 +273,11 @@ function updateFailureCode(value: unknown): UpdateFailureCode | undefined {
     : undefined
 }
 
+/** True only for a local dist prefix. A registry install is not this channel. */
+export function tarballChannel(env: NodeJS.ProcessEnv = process.env, cwd = process.cwd()): boolean {
+  return readPrefixUpdate(cwd, env)?.channel === 'tarball'
+}
+
 function readPrefixUpdate(cwd: string, env: NodeJS.ProcessEnv): PrefixUpdate | undefined {
   const dir = findPrefix(cwd)
   if (dir === undefined) return undefined

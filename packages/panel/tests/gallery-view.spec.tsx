@@ -11,6 +11,8 @@ const client: PanelClient = {
   list: () => Promise.resolve([todo]),
   open: () => Promise.resolve(),
   deleteApp: () => Promise.resolve(),
+  listMarket: async () => [],
+  installMarket: async () => undefined,
 }
 
 describe('GalleryBody', () => {
@@ -62,6 +64,23 @@ describe('GalleryBody', () => {
     expect(markup(reduceGallery(ready, { type: 'open-failed', message: 'missing' }))).toContain('missing')
     expect(markup(reduceGallery(ready, { type: 'open-failed' }))).toContain('Open failed')
     expect(markup(reduceGallery(reduceGallery(ready, { type: 'open-failed', message: 'missing' }), { type: 'open', appId: todo.id, title: 'Todo' }))).not.toContain('missing')
+  })
+
+  it('opens the market tab from its own chrome section and shows market content, not the library', () => {
+    const ready = reduceGallery(galleryState('standalone'), { type: 'listed', apps: [todo] })
+    expect(markup(ready)).toContain('data-market-chrome')
+    expect(markup(ready)).toContain('aria-label="App Market"')
+    const market = reduceGallery(ready, { type: 'open-market' })
+    const html = markup(market)
+    expect(html).toContain('data-market-stage')
+    expect(html).toContain('data-market=""')
+    expect(html).toContain('data-market-open="1"')
+    expect(html).not.toContain('Host ready')
+    expect(html).toContain('>App Market</span>')
+    // Library stage stays mounted but is not the shown stage.
+    expect(html).toContain('data-gallery-stage')
+    expect(html).toMatch(/class="[^"]*opacity-0[^"]*"[^>]*data-gallery-stage|data-gallery-stage=""[^>]*class="[^"]*opacity-0/)
+    expect(html).toMatch(/class="[^"]*opacity-100[^"]*"[^>]*data-market-stage|data-market-stage=""[^>]*class="[^"]*opacity-100/)
   })
 
   it('marks a workbench app, offers set-default, and replaces the library when that app is the desk', () => {

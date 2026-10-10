@@ -1,10 +1,11 @@
 import { WorkbenchLibrary, workbenchEntries } from '@mohou/app-view'
-import { ArrowUpRight, Palette, Pin, RefreshCw, Search, Settings, Trash2 } from 'lucide-react'
+import { ArrowUpRight, Palette, Pin, RefreshCw, Search, Settings, Store, Trash2 } from 'lucide-react'
 import { cloneElement, isValidElement, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
 
 import type { PanelLabelMode, PanelLocale } from '../labels.ts'
 import { panelText } from '../labels.ts'
 import { bindPaletteChord, chordLabel, isMacPlatform } from '../palette/chord.ts'
+import { MarketView } from '../market/view.tsx'
 import { CommandPalette } from '../palette/view.tsx'
 import { Dialog } from '../ui/dialog.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
@@ -44,6 +45,8 @@ export function PanelGallery(props: {
   readonly locale: PanelLocale
   readonly mode: PanelLabelMode
   readonly shell: PanelShell
+  /** Bumps when a market app install finishes so the library refetches. */
+  readonly libraryTick?: number
   readonly frame?: (appId: string) => ReactNode
   readonly focus?: { readonly appId: string; readonly title?: string }
   readonly renamed?: { readonly from: string; readonly to: string }
@@ -64,7 +67,7 @@ export function PanelGallery(props: {
   useEffect(() => {
     void loadGallery(props.client, dispatch)
     void loadTrash(props.client, dispatch)
-  }, [props.client])
+  }, [props.client, props.libraryTick])
   useEffect(() => {
     if (props.focus === undefined) return
     dispatch({ type: 'open', appId: props.focus.appId, ...props.focus.title === undefined ? {} : { title: props.focus.title } })
@@ -117,6 +120,8 @@ export function GalleryBody(props: {
   const active = state.tabs.tabs[state.tabs.active]
   const kind = viewKind(state)
   const appTab = active?.kind === 'app'
+  const marketTab = active?.kind === 'market'
+  const galleryStage = active?.kind === 'gallery'
   const openRecord = appTab ? state.apps.find(app => app.id === active.appId) : undefined
   const workbenchTab = openRecord?.kind === 'workbench'
   const homePinned = openRecord?.kind === 'workbench' && props.defaultWorkbenchId === openRecord.id
@@ -129,7 +134,7 @@ export function GalleryBody(props: {
   useEffect(() => bindPaletteChord(document, () => { setPaletteOpen(open => !open) }), [])
   const rail = useRef<HTMLDivElement>(null)
   const [glide, setGlide] = useState<{ left: number; width: number } | undefined>(undefined)
-  const tabKey = state.tabs.tabs.map(tab => tab.kind === 'gallery' ? 'gallery' : `${tab.appId}:${tab.title ?? ''}`).join('|')
+  const tabKey = state.tabs.tabs.map(tab => tab.kind === 'app' ? `${tab.appId}:${tab.title ?? ''}` : tab.kind).join('|')
   useLayoutEffect(() => {
     const root = rail.current
     if (root === null) return
@@ -146,14 +151,14 @@ export function GalleryBody(props: {
           )}
           {state.tabs.tabs.map((tab, index) => (
             <button
-              key={tab.kind === 'gallery' ? 'gallery' : tab.appId}
+              key={tab.kind === 'app' ? tab.appId : tab.kind}
               type="button"
               className="mma-pill"
               data-active={index === state.tabs.active ? '1' : '0'}
               onClick={() => dispatch({ type: 'switch', index })}
             >
-              <span>{tab.kind === 'gallery' ? label('gallery') : tab.title ?? tab.appId}</span>
-              {tab.kind === 'app' ? (
+              <span>{tab.kind === 'gallery' ? label('gallery') : tab.kind === 'market' ? label('market') : tab.title ?? tab.appId}</span>
+              {tab.kind === 'gallery' ? null : (
                 <span
                   className="ml-1.5 text-[13px] leading-none text-muted-foreground hover:text-foreground"
                   role="button"
@@ -165,7 +170,7 @@ export function GalleryBody(props: {
                 >
                   ×
                 </span>
-              ) : null}
+              )}
             </button>
           ))}
         </div>
@@ -185,6 +190,20 @@ export function GalleryBody(props: {
             }}
           />
         )}
+        {/* Market is its own chrome section: after the desk switcher, before refresh. */}
+        <div className="mma-toolbar" data-market-chrome="">
+          <Tooltip text={label('market')}>
+            <button
+              type="button"
+              className="inline-flex size-8 items-center justify-center rounded-lg transition-colors duration-150 hover:bg-muted"
+              data-market-open={marketTab ? '1' : '0'}
+              aria-label={label('market')}
+              onClick={() => dispatch({ type: 'open-market' })}
+            >
+              <Store size={16} strokeWidth={2} />
+            </button>
+          </Tooltip>
+        </div>
         {appTab ? (
           <div className="mma-toolbar">
             {workbenchTab ? (
@@ -254,7 +273,7 @@ export function GalleryBody(props: {
         <button type="button" aria-label={label('pane-close')} data-theme-scrim="" className="fixed inset-0 z-30 cursor-default bg-transparent" onPointerDown={(event) => { event.preventDefault(); props.onToggleTheme?.() }} />
       ) : null}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {appTab ? null : (
+        {galleryStage ? (
           <div className="mma-status">
             <span className="mma-dot" data-status={statusDot(kind)} />
             <span>{kind === 'unreachable' || kind === 'failed' ? label('host-unreachable') : label('status-ready')}</span>
@@ -279,9 +298,19 @@ export function GalleryBody(props: {
               </Tooltip>
             )}
           </div>
-        )}
+        ) : null}
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          {state.tabs.tabs.map(tab => tab.kind === 'app' ? (
+          {state.tabs.tabs.map(tab => tab.kind === 'market' ? (
+            <div key="market" className={stageClass(marketTab, 'flex flex-col')} data-market-stage="">
+              <MarketView
+                locale={props.locale}
+                mode={props.mode}
+                list={props.client.listMarket}
+                install={props.client.installMarket}
+                onInstalled={() => { void refreshList(props.client, undefined, undefined, dispatch, setRefreshing) }}
+              />
+            </div>
+          ) : tab.kind === 'app' ? (
             <div key={tab.appId} className={stageClass(active?.kind === 'app' && active.appId === tab.appId, 'flex flex-col')}>
               {active?.kind === 'app' && active.appId === tab.appId && state.frameError !== undefined ? <p className="px-6 py-2 text-sm text-destructive">{state.frameError.length > 0 ? state.frameError : label('reload-failed')}</p> : null}
               <div className="mma-stage">
@@ -289,7 +318,7 @@ export function GalleryBody(props: {
               </div>
             </div>
           ) : null)}
-          <div className={stageClass(!appTab, 'flex flex-col')}>
+          <div className={stageClass(galleryStage, 'flex flex-col')} data-gallery-stage="">
             <div className="mma-stage mma-app-frame">
               {desk !== undefined ? (
                 <div className="mma-frame [&_iframe]:block [&_iframe]:size-full [&_iframe]:border-0">

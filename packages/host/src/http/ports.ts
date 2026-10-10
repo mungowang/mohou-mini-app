@@ -75,6 +75,8 @@ export interface LoopbackPorts {
   subscribeHost(listener: (event: unknown) => void): () => void
   subscribeFrames(listener: (event: unknown) => void): () => void
   subscribeApp(appId: string, since: number, listener: (event: unknown) => void): () => void
+  listMarket(): Promise<unknown>
+  installMarket(id: string, confirm: boolean): Promise<void>
   checkUpdate(): Promise<UpdateCheck>
   /** Where an update would come from. Reads the prefix; no network. */
   updateSource(): Promise<UpdateSource>

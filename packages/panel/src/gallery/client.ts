@@ -8,6 +8,49 @@ export interface PanelClient {
   reload?(appId: string): Promise<void>
   listTrash?(): Promise<readonly GalleryApp[]>
   undeleteApp?(appId: string): Promise<void>
+  listMarket?(): Promise<readonly MarketRow[]>
+  installMarket?(id: string, confirm: boolean): Promise<void>
+}
+
+/** One catalog row plus local lock state. */
+export interface MarketRow {
+  readonly id: string
+  readonly name: string
+  readonly description: string
+  readonly package: string
+  readonly version: string
+  readonly kind: 'app' | 'theme'
+  readonly appKind?: 'workbench'
+  readonly tags?: readonly string[]
+  readonly requires?: string
+  readonly author?: string
+  readonly downloads?: number
+  readonly official?: boolean
+  readonly source: 'npm' | 'local'
+  readonly colors?: readonly string[]
+  readonly tone?: string
+  readonly installedVersion?: string
+  readonly localVersion?: string
+  readonly modified?: boolean
+  readonly tracked?: boolean
+  readonly installable?: boolean
+  readonly preview?: {
+    readonly light: ThemeModePreview
+    readonly dark: ThemeModePreview
+  }
+}
+
+export interface ThemeModePreview {
+  readonly background?: string
+  readonly foreground?: string
+  readonly card?: string
+  readonly border?: string
+  readonly muted?: string
+  readonly 'muted-foreground'?: string
+  readonly secondary?: string
+  readonly 'secondary-foreground'?: string
+  readonly primary?: string
+  readonly 'primary-foreground'?: string
 }
 
 /** A client failure the view can tell from an empty list. */

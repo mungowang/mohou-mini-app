@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-08
+updated: 2026-10-10
 ---
 
 # Implementation plan
@@ -106,6 +106,13 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `history-unknown-commit` | the commit id is not in the app history |
 | `install-denied` | the package is on the denylist, or the name or version is not a plain npm spec |
 | `install-failed` | npm is missing, the install times out, or the network fails; the last good lockfile stays |
+| `market-catalog` | the market list is missing, a row is missing, or `local` is used outside a local dist |
+| `market-sum` | the tarball bytes do not match `mohou.sum` |
+| `market-id` | the package id does not match the catalog row |
+| `market-schema` | an applied schema file would change or disappear |
+| `market-package` | the tarball or theme file is missing |
+| `market-confirm` | local source would be replaced and confirm was not passed. Records stay. Keep edits by backing up that app history and replaying them after the update, or by renaming the local app, installing the official id, and merging one into the other |
+| `market-install` | the market write failed and the previous tree stays |
 | `commit-failed` | compile succeeded and the history commit did not |
 | `unknown-tool` | the authoring name is not in the mounted catalog |
 | `tool-args` | a tool argument is missing or the wrong shape |

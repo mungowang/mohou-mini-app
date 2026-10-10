@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 
 # Product features
@@ -71,6 +71,12 @@ Adapters that embed this platform in another agent product are out of scope.
 | Shell | [Construction](shell/construction.md) |
 | Shell | [Window and event bridge](shell/window.md) |
 | Shell | [Embedded navigation](shell/navigation.md) |
+| Market | [Market](market/README.md) |
+| Market | [Market tab](market/tab.md) |
+| Market | [Market card](market/card.md) |
+| Market | [Install an app](market/install.md) |
+| Market | [Publish](market/publish.md) |
+| Market | [Install a theme](market/theme.md) |
 | Author skill | [Write loop](author-skill/write-loop.md) |
 | Author skill | [Facades and looks](author-skill/facades.md) |
 | Author skill | [What the skill must keep true](author-skill/skill-contract.md) |

@@ -14,6 +14,8 @@ describe('frame bridge', () => {
     applyHostEvent({ type: 'app:open', appId: 'com.example.app', title: 'Example' }, panel, frame)
     applyHostEvent({ type: 'app:reload', appId: 'com.example.app' }, panel, frame)
     applyHostEvent({ type: 'storage-size', appId: 'com.example.app', table: 'kv', keys: ['a'] }, panel, frame)
+    applyHostEvent({ type: 'market:install', kind: 'theme', id: 'forest' }, panel, frame)
+    applyHostEvent({ type: 'market:install', kind: 'app', id: 'com.example.app' }, panel, frame)
     applyHostEvent({
       type: 'app:eval',
       appId: 'com.example.app',
@@ -26,24 +28,31 @@ describe('frame bridge', () => {
     }, panel)
     expect(panel.shown).toEqual([{ appId: 'com.example.app', title: 'Example' }])
     expect(panel.notices).toEqual([{ appId: 'com.example.app', table: 'kv' }])
+    expect(panel.market).toEqual([
+      { kind: 'theme', id: 'forest' },
+      { kind: 'app', id: 'com.example.app' },
+    ])
     expect(panel.missing).toEqual(['com.example.app'])
     expect(posted[0]).toEqual({ message: { type: 'theme', variables: { '--background': 'black' } }, origin: 'http://127.0.0.1:9743' })
     expect(posted[1]).toMatchObject({ message: { type: 'app:reload', appId: 'com.example.app' } })
   })
 })
 
-function recorder(): PanelBridge & { shown: unknown[]; notices: unknown[]; missing: string[] } {
+function recorder(): PanelBridge & { shown: unknown[]; notices: unknown[]; market: unknown[]; missing: string[] } {
   const shown: unknown[] = []
   const notices: unknown[] = []
+  const market: unknown[] = []
   const missing: string[] = []
   return {
     shown,
     notices,
+    market,
     missing,
     showApp: (appId, title) => shown.push({ appId, title }),
     showNotice: (appId, table) => notices.push({ appId, table }),
     unavailable: appId => missing.push(appId),
     setWorkbench: () => undefined,
     renameApp: () => undefined,
+    marketInstalled: (kind, id) => market.push({ kind, id }),
   }
 }

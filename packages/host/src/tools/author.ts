@@ -18,6 +18,11 @@ import { createViewQueries } from '../events/view-eval.ts'
 import { createFileTools, type FileCommit } from '../files/tools.ts'
 import { commitApp, listHistory, resetApp } from '../history/store.ts'
 import { DEFAULT_STORAGE_NOTICE_BYTES } from '../storage/open.ts'
+import type { HostEvent } from '../events/host-events.ts'
+import type { MarketKind } from '../market/catalog.ts'
+import { MarketError } from '../market/error.ts'
+import { searchMarket } from '../market/search.ts'
+import type { MarketListRow } from '../market/service.ts'
 import { restoreStorageBackup } from '../storage/schema.ts'
 import type { CredentialProvider } from '../credentials/provider.ts'
 import { hostAuthoringToken } from '../host/layout.ts'
@@ -36,6 +41,8 @@ import { AuthorError } from './codes.ts'
 /** Tools this implementation can run. The rest of the catalog is not mounted. */
 export const authorToolNames = [
   'mini_app_list',
+  'mini_app_market_list',
+  'mini_app_market_install',
   'mini_app_get',
   'mini_app_list_files',
   'mini_app_read',
@@ -142,6 +149,10 @@ export function createAuthorTools(options: {
   readonly now?: () => string
   /** The live homepage pin, when the renamed id was that pin. */
   readonly onWorkbenchRenamed?: (from: string, to: string) => void
+  readonly market?: {
+    list: () => Promise<MarketListRow[]>
+    install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+  }
 }) {
   const live = new Map<string, LiveApp>()
   const hostEvents = createHostEvents()
@@ -236,6 +247,10 @@ async function invoke(
     runNpm?: NpmRun
     installTimeoutMs?: number
     storageNoticeBytes?: number
+    market?: {
+      list: () => Promise<MarketListRow[]>
+      install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+    }
   },
   live: Map<string, LiveApp>,
   name: string,
@@ -279,6 +294,10 @@ async function invoke(
       const registered = await options.registry.register(requiredString(input, 'appId'), registerManifest(input))
       return { ...registered, needed: neededFiles(registered.directory) }
     }
+    case 'mini_app_market_list':
+      return marketList(options, input)
+    case 'mini_app_market_install':
+      return marketInstall(options, input)
     case 'mini_app_rename':
       return renameRegistered(options, live, requiredString(input, 'appId'), requiredString(input, 'newAppId'))
     case 'mini_app_reload':
@@ -798,6 +817,46 @@ function record(value: unknown): Record<string, unknown> {
     throw new AuthorError('tool-args', 'tool arguments must be an object')
   }
   return value as Record<string, unknown>
+}
+
+async function marketList(
+  options: { readonly market?: { list: () => Promise<MarketListRow[]> } },
+  input: Record<string, unknown>,
+): Promise<{ apps: MarketListRow[] }> {
+  if (options.market === undefined) throw new MarketError('market-catalog', 'market is not available')
+  const kind = input.kind
+  if (kind !== undefined && kind !== 'app' && kind !== 'theme') {
+    throw new AuthorError('tool-args', 'market kind must be app or theme')
+  }
+  const rows = await options.market.list()
+  const filtered = kind === undefined ? rows : rows.filter(row => row.kind === kind)
+  const query = typeof input.search === 'string' ? input.search : undefined
+  return { apps: searchMarket(filtered, query) }
+}
+
+async function marketInstall(
+  options: {
+    readonly market?: {
+      list: () => Promise<MarketListRow[]>
+      install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+    }
+    readonly hostEvents?: { publish: (event: HostEvent) => void }
+  },
+  input: Record<string, unknown>,
+): Promise<{ id: string; kind: MarketKind }> {
+  if (options.market === undefined) throw new MarketError('market-catalog', 'market is not available')
+  const id = requiredString(input, 'appId')
+  const kind = requiredString(input, 'kind')
+  if (kind !== 'app' && kind !== 'theme') {
+    throw new AuthorError('tool-args', 'market kind must be app or theme')
+  }
+  const rows = await options.market.list()
+  const row = rows.find(item => item.id === id)
+  if (row === undefined) throw new MarketError('market-catalog', 'catalog row is missing')
+  if (row.kind !== kind) throw new AuthorError('tool-args', 'market kind does not match the catalog row')
+  await options.market.install(id, kind, input.overwrite === true)
+  options.hostEvents?.publish({ type: 'market:install', kind, id })
+  return { id, kind }
 }
 
 function requiredString(args: Record<string, unknown>, key: string): string {

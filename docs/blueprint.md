@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-01
+updated: 2026-10-10
 ---
 
 # Blueprint
@@ -35,6 +35,6 @@ What 1.0 already shipped, and what waits after, stay in [the 1.0 plan](../.agent
 These have no feature page and no RFC. Do not raise one unless the user names it.
 
 - Adapters that embed this platform in another agent product.
-- Sharing or installing third-party mini-app packages.
+- An internal app market. [Market](product/market/README.md). Why: [.agents/notes/implemented/feature/2026-10-10-app-catalog.md](../.agents/notes/implemented/feature/2026-10-10-app-catalog.md).
 - A Linux panel window.
 - Shell launcher vs `@mohou/shell` npm sidecar split (Tauri out of the shell package; Settings can update shell via the package manager without a new launcher build). Proposal: [.agents/notes/proposed/architecture/2026-09-23-shell-sidecar-and-launcher.md](../.agents/notes/proposed/architecture/2026-09-23-shell-sidecar-and-launcher.md). Update loops (skill-in-shell, K≡S, local tarball install): [.agents/notes/proposed/architecture/2026-09-23-update-loops.md](../.agents/notes/proposed/architecture/2026-09-23-update-loops.md).

@@ -32,7 +32,7 @@ export {
   type PanelTabs,
   type TabChange,
 } from './gallery/tabs.ts'
-export { PanelClientError, type PanelClient } from './gallery/client.ts'
+export { PanelClientError, type MarketRow, type PanelClient } from './gallery/client.ts'
 export {
   loadGallery,
   loadTrash,

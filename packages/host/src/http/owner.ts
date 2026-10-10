@@ -46,6 +46,13 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
       tools: authorMcpToolList().map(tool => ({ name: tool.name, description: tool.description })),
     },
   }))
+  app.get(httpLayout.market, c => ok(c, () => ports.listMarket()))
+  app.post(httpLayout.marketInstall, async (c) => {
+    const body = await readBody(c)
+    const id = isRecord(body) && typeof body.id === 'string' ? body.id : ''
+    const confirm = isRecord(body) && body.confirm === true
+    return ok(c, () => ports.installMarket(id, confirm))
+  })
   app.get(httpLayout.updates, async (c) => {
     return c.json({ ok: true, ...await ports.checkUpdate() })
   })

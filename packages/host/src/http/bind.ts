@@ -17,7 +17,8 @@ import type { LoopbackPorts } from './ports.ts'
 import { authoringTokenMatches } from './guard.ts'
 import { probeBrain, type HostPolicy } from '../host/config.ts'
 import { installStartupSamples } from '../apps/startup-seed.ts'
-import { checkPackageUpdate, discardUpdateResult, readUpdateResult, readUpdateSource, stagePackageUpdate, updateEnv } from './updates.ts'
+import { checkPackageUpdate, discardUpdateResult, readUpdateResult, readUpdateSource, stagePackageUpdate, tarballChannel, updateEnv } from './updates.ts'
+import { installMarket, listMarket } from '../market/service.ts'
 import { McpError } from '@mohou/mcp-client'
 
 import { admitMcpText } from '../host/mcp-import.ts'
@@ -150,6 +151,23 @@ export function bindLoopback(input: {
     subscribeHost: listener => input.author.hostEvents.subscribe(listener),
     subscribeFrames: listener => forwardFrames(input.author.appEvents, listener),
     subscribeApp: (appId, since, listener) => input.author.appEvents.subscribe(appId, since, listener),
+    listMarket: () => listMarket({
+      registry: marketRegistry(input.policy().updateRegistry, input.env),
+      runtimeRoot: input.runtimeRoot,
+      localDist: tarballChannel(input.env),
+      env: input.env,
+    }),
+    installMarket: async (id, confirm) => {
+      const installed = await installMarket({
+        registry: marketRegistry(input.policy().updateRegistry, input.env),
+        runtimeRoot: input.runtimeRoot,
+        id,
+        confirm,
+        localDist: tarballChannel(input.env),
+        env: input.env,
+      })
+      input.author.hostEvents.publish({ type: 'market:install', kind: installed.kind, id: installed.id })
+    },
     updateSource: () => Promise.resolve(readUpdateSource(updateEnv(input.policy()))),
     checkUpdate: async () => {
       const attempt = readUpdateResult(input.runtimeRoot)
@@ -225,6 +243,13 @@ function withSpelling<T extends {
     ...app.tags === undefined ? {} : { tags: app.tags },
   })
   return spelling === undefined ? app : { ...app, spelling }
+}
+
+function marketRegistry(policy: string | undefined, env: NodeJS.ProcessEnv): string {
+  const fromPolicy = policy?.trim()
+  if (fromPolicy !== undefined && fromPolicy.length > 0) return fromPolicy
+  const fromEnv = env.MINI_APP_NPM_REGISTRY?.trim()
+  return fromEnv !== undefined && fromEnv.length > 0 ? fromEnv : 'https://registry.npmjs.org'
 }
 
 function bearer(header: string | undefined): string | undefined {

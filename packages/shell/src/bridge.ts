@@ -12,6 +12,7 @@ export interface PanelBridge {
   unavailable(appId: string): void
   setWorkbench(appId: string): void
   renameApp(from: string, to: string): void
+  marketInstalled(kind: 'app' | 'theme', id: string): void
 }
 
 /**
@@ -57,6 +58,9 @@ export function applyHostEvent(event: HostEvent, panel: PanelBridge, frame?: Fra
       return
     case 'storage-size':
       panel.showNotice(event.appId, event.table)
+      return
+    case 'market:install':
+      panel.marketInstalled(event.kind, event.id)
       return
     case 'app:reload':
     case 'app:eval':

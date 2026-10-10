@@ -19,6 +19,28 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
     description: 'List mini-apps on this host.',
     inputSchema: { type: 'object', properties: {} },
   },
+  mini_app_market_list: {
+    description: 'List market apps and themes. Optional search matches name, pinyin, id, tags, and description. Optional kind limits the list.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        search: { type: 'string' },
+        kind: { type: 'string', enum: ['app', 'theme'] },
+      },
+    },
+  },
+  mini_app_market_install: {
+    description: 'Install one market row. kind must match the catalog. overwrite defaults to false. A local edit returns market-confirm and writes nothing. Records stay. To keep the edits, back up that app history first, then replay them after the update. Or rename the local app, install the official id, and merge one into the other.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        appId,
+        kind: { type: 'string', enum: ['app', 'theme'] },
+        overwrite: { type: 'boolean' },
+      },
+      required: ['appId', 'kind'],
+    },
+  },
   mini_app_get: {
     description: 'Read one mini-app name, version, and directory.',
     inputSchema: { type: 'object', properties: { appId }, required: ['appId'] },

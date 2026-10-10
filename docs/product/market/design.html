@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>市场</title>
+<style>
+  :root {
+    --bg: #f6f6f7;
+    --fg: #141414;
+    --card: #fff;
+    --muted: #6b6b6b;
+    --line: #ececee;
+    --soft: #f3f3f4;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #dedee2; color: var(--fg); }
+  .window {
+    width: min(1120px, calc(100vw - 48px));
+    height: 820px;
+    margin: 28px auto;
+    background: var(--bg);
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,.16);
+  }
+  header {
+    display: flex; align-items: center; gap: 16px;
+    height: 56px; padding: 0 18px; background: #fff;
+    border-bottom: 1px solid var(--line);
+  }
+  .tabs { display: flex; gap: 6px; flex: 1; }
+  .tab, .pill, .icon {
+    border: 0; background: transparent; color: var(--fg);
+    height: 32px; border-radius: 999px; font: inherit;
+  }
+  .tab { padding: 0 12px; color: var(--muted); }
+  .tab.on { background: var(--soft); color: var(--fg); }
+  .desk, .tools { display: flex; align-items: center; gap: 4px; }
+  .pill { padding: 0 10px; color: var(--muted); }
+  .icon { width: 32px; }
+  .icon.on { color: var(--fg); }
+  main { flex: 1; overflow: auto; padding: 36px 40px 48px; }
+  h1 { margin: 0; font-size: 32px; font-weight: 620; letter-spacing: -0.04em; }
+  .search {
+    margin-top: 22px; width: min(440px, 100%); height: 40px;
+    border: 0; border-radius: 10px; background: #fff;
+    box-shadow: inset 0 0 0 1px var(--line);
+    padding: 0 14px; font: inherit; color: var(--fg);
+  }
+  .search::placeholder { color: #9a9a9a; }
+  .kinds { display: flex; gap: 22px; margin-top: 28px; }
+  .kinds button, .filters button {
+    border: 0; background: transparent; padding: 0 0 8px; font: inherit; cursor: pointer; color: var(--muted);
+  }
+  .kinds button.on { color: var(--fg); box-shadow: inset 0 -1.5px 0 var(--fg); }
+  .filters { display: flex; gap: 18px; margin-top: 18px; }
+  .filters[hidden] { display: none; }
+  .swatch { width: 36px; height: 22px; border-radius: 6px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+  .confirm { display: flex; align-items: center; gap: 8px; }
+  button.text {
+    border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; padding: 0;
+  }
+  .filters button.on { color: var(--fg); }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    margin-top: 28px; align-items: stretch;
+  }
+  .grid[hidden], .filters[hidden] { display: none; }
+  .card:has(.dummy) { overflow: hidden; }
+  .pair { order: -1; display: grid; grid-template-columns: 1fr 1fr; margin: -22px -22px 16px; }
+  .dummy { height: 148px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 8px; color: var(--t); background: var(--s); }
+  .dummy .bar:last-child { margin-top: auto; }
+  .dummy .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .dummy b { font-size: 12px; font-weight: 620; }
+  .dummy .panel { background: var(--c); border: 1px solid var(--b); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .dummy .line { height: 4px; border-radius: 99px; background: var(--t); opacity: .85; }
+  .dummy .line.short { width: 62%; opacity: .35; }
+  .dummy .btn { height: 18px; padding: 0 8px; border-radius: 99px; background: var(--p); color: var(--pf); font-size: 10px; display: grid; place-items: center; }
+  .dummy .quiet { font-size: 10px; color: var(--m); }
+  .colors i { flex: 1; }
+  .card {
+    background: var(--card); border-radius: 18px;
+    box-shadow: inset 0 0 0 1px var(--line);
+    padding: 22px 22px 0;
+    min-height: 188px; height: 100%;
+    display: flex; flex-direction: column;
+  }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+  h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.03em; }
+  .name { display: flex; align-items: center; gap: 8px; }
+  .src { width: 15px; height: 15px; color: #cb3837; display: block; flex: none; }
+  .house { display: inline-flex; align-items: center; gap: 5px; }
+  .house i {
+    width: 14px; height: 14px; border-radius: 50%;
+    box-shadow: inset 0 0 0 1px currentColor;
+    display: grid; place-items: center;
+    font-style: normal; font-size: 8px; font-weight: 650;
+  }
+  .role { margin-top: 4px; color: var(--muted); font-size: 13px; }
+  .act { display: flex; align-items: center; gap: 12px; flex: none; padding-top: 2px; }
+  .note { color: var(--muted); font-size: 12px; }
+  button.action, button.done {
+    border: 0; height: 32px; padding: 0 14px; border-radius: 999px;
+    font: inherit; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  button.action { background: var(--fg); color: #fff; cursor: pointer; }
+  button.done { background: transparent; color: #9a9a9a; box-shadow: inset 0 0 0 1px var(--line); }
+  .desc { margin: 14px 0 0; font-size: 14px; line-height: 1.55; color: #3a3a3a; }
+  .topics { margin-top: 8px; color: var(--muted); font-size: 13px; letter-spacing: 0.01em; }
+  .byline { margin-top: 8px; color: var(--muted); font-size: 13px; }
+  .meta {
+    margin-top: auto; padding: 14px 0 16px;
+    display: flex; align-items: baseline; gap: 16px;
+    color: var(--muted); font-size: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .meta .stat { margin-left: auto; }
+  .req {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
+    border-radius: 5px; background: #f6f1ea; color: #7c4a2d;
+    font-size: 11px; letter-spacing: -0.01em;
+  }
+</style>
+</head>
+<body>
+<div class="window">
+  <header>
+    <div class="tabs">
+      <button class="tab" type="button">全部</button>
+      <button class="tab" type="button">刻度清单</button>
+      <button class="tab on" type="button">市场</button>
+    </div>
+    <div class="desk">
+      <button class="pill" type="button">小程序库</button>
+      <button class="pill" type="button">Daily Work</button>
+    </div>
+    <div class="tools">
+      <button class="icon on" type="button" aria-label="市场">店</button>
+      <button class="icon" type="button" aria-label="刷新">↻</button>
+      <button class="icon" type="button" aria-label="主题">色</button>
+      <button class="icon" type="button" aria-label="设置">设</button>
+    </div>
+  </header>
+  <main>
+    <h1>市场</h1>
+    <input class="search" placeholder="搜索" aria-label="搜索">
+    <div class="kinds">
+      <button class="on" type="button" data-kind="app">应用</button>
+      <button type="button" data-kind="theme">主题</button>
+    </div>
+    <div class="filters" data-for="app">
+      <button class="on" type="button">全部</button>
+      <button type="button">小程序</button>
+      <button type="button">工作台</button>
+    </div>
+    <div class="grid" data-for="app">
+      <article class="card">
+        <div class="head">
+          <div class="name"><h2>刻度清单</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+          <div class="act">
+            <span class="note">更新后会覆盖本地改动</span>
+            <button class="action" type="button">更新</button>
+          </div>
+        </div>
+        <p class="desc">先做完今天。收集和之后是同一张清单的另外两面。</p>
+        <div class="topics">日常、待办</div>
+        <div class="meta"><span>v0.3.0</span><span class="req">mohou ≥ 1.0</span><span class="house"><i>M</i>官方</span><span class="stat">↓ 128</span></div>
+      </article>
+      <article class="card">
+        <div class="head">
+          <div>
+            <div class="name"><h2>Daily Work</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+            <div class="role">工作台</div>
+          </div>
+          <button class="action" type="button">↓ 安装</button>
+        </div>
+        <p class="desc">今天的单子、日程和工时记录。</p>
+        <div class="meta"><span>v1.4.0</span><span class="house"><i>M</i>官方</span><span class="stat">↓ 86</span></div>
+      </article>
+      <article class="card">
+        <div class="head">
+          <div class="name"><h2>每日站会</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+          <button class="done" type="button" disabled>已安装</button>
+        </div>
+        <p class="desc">CN 组的站会、Sprint 和日历。</p>
+        <div class="meta"><span>v1.0.2</span><span class="house"><i>M</i>官方</span></div>
+      </article>
+      <article class="card">
+        <div class="head">
+          <div>
+            <div class="name"><h2>Fuze 密钥</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+            <div class="role">pwang</div>
+          </div>
+          <div class="act">
+            <span class="note">非市场安装</span>
+            <button class="action" type="button">↓ 安装</button>
+          </div>
+        </div>
+        <p class="desc">查看、编辑、对比密钥。确认后才覆盖现有源码。</p>
+        <div class="meta"><span>v1.1.0</span><span class="stat">↓ 12</span></div>
+      </article>
+    </div>
+    <div class="filters" data-for="theme" hidden>
+      <button class="on" type="button">全部</button>
+      <button type="button">暖色</button>
+      <button type="button">红色</button>
+      <button type="button">暗色</button>
+    </div>
+    <div class="grid" data-for="theme" hidden>
+      <article class="card">
+        <div class="head">
+          <div class="name"><h2>紫穗</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+          <button class="action" type="button" data-go="install">↓ 安装</button>
+        </div>
+        <div class="pair"><div class="dummy" style="--s:#F4F5F1;--t:#15191E;--c:#fff;--b:#D5D8CE;--m:#6A6578;--p:#766DA7;--pf:#fff"><div class="bar"><b>浅色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div><div class="dummy" style="--s:#15191E;--t:#E6E4DC;--c:#1E232A;--b:#323842;--m:#A8A4B4;--p:#A99ED4;--pf:#15191E"><div class="bar"><b>深色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div></div>
+        <p class="desc">浅色与深色一对。写入主题目录，不进入小程序库。</p>
+        <div class="meta"><span>v1.0.0</span><span class="house"><i>M</i>官方</span><span class="stat">↓ 40</span></div>
+      </article>
+      <article class="card">
+        <div class="head">
+          <div class="name"><h2>樱巷</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+          <div class="act">
+            <span class="note">更新后会覆盖本地改动</span>
+            <button class="action" type="button" data-go="dirty">更新</button>
+          </div>
+        </div>
+        <div class="pair"><div class="dummy" style="--s:#F2EDEB;--t:#2C3E46;--c:#FBF8F6;--b:#E4D8D2;--m:#6E7E86;--p:#405F6C;--pf:#F7F3F1"><div class="bar"><b>浅色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div><div class="dummy" style="--s:#1C282E;--t:#F2EDEB;--c:#243238;--b:#3A4A52;--m:#A8B4B8;--p:#D5AB93;--pf:#2C241F"><div class="bar"><b>深色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div></div>
+        <p class="desc">已安装的主题文件有本地改动。</p>
+        <div class="meta"><span>v1.1.0</span><span class="house"><i>M</i>官方</span><span class="stat">↓ 18</span></div>
+      </article>
+      <article class="card">
+        <div class="head">
+          <div class="name"><h2>东京</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+          <button class="done" type="button" disabled>已安装</button>
+        </div>
+        <div class="pair"><div class="dummy" style="--s:#d5d6db;--t:#343b59;--c:#f2f3f8;--b:#c9ccd9;--m:#7c82a4;--p:#2e7de9;--pf:#fff"><div class="bar"><b>浅色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div><div class="dummy" style="--s:#1a1b26;--t:#a9b1d6;--c:#16161e;--b:#2b2e3d;--m:#787c99;--p:#7aa2f7;--pf:#1a1b26"><div class="bar"><b>深色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div></div>
+        <p class="desc">系统主题。市场版本与本地一致。</p>
+        <div class="meta"><span>v1.0.0</span><span class="house"><i>M</i>官方</span></div>
+      </article>
+      <article class="card">
+        <div class="head">
+          <div>
+            <div class="name"><h2>私藏</h2><svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg></div>
+            <div class="role">pwang</div>
+          </div>
+          <div class="act">
+            <span class="note">非市场安装</span>
+            <button class="action" type="button" data-go="untracked">↓ 安装</button>
+          </div>
+        </div>
+        <div class="pair"><div class="dummy" style="--s:#FBF6F1;--t:#1E3A3C;--c:#FFF9F5;--b:#E8D4C8;--m:#6E7E7C;--p:#C45C5C;--pf:#fff"><div class="bar"><b>浅色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div><div class="dummy" style="--s:#14383C;--t:#F6E3D6;--c:#1C474C;--b:#2E5A5E;--m:#B7D0D0;--p:#E07A6A;--pf:#14383C"><div class="bar"><b>深色</b><span class="quiet">次要</span></div><div class="panel"><span class="line"></span><span class="line short"></span></div><div class="bar"><span class="btn">主按钮</span><span class="quiet">取消</span></div></div></div>
+        <p class="desc">本机已有同名主题文件。</p>
+        <div class="meta"><span>v1.0.0</span><span class="stat">↓ 3</span></div>
+      </article>
+    </div>
+  </main>
+</div>
+<script>
+  const npm = '<svg class="src" viewBox="0 0 16 16" aria-label="npm"><path fill="currentColor" d="M0 0h16v16H0z"/><path fill="#fff" d="M3 3h10v10H8V6H6v7H3z"/></svg>'
+  for (const button of document.querySelectorAll('.kinds button')) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('.kinds button')) other.classList.toggle('on', other === button)
+      const kind = button.dataset.kind
+      for (const pane of document.querySelectorAll('[data-for]')) pane.hidden = pane.dataset.for !== kind
+    })
+  }
+  function finish(button) {
+    const act = button.closest('.act') || button.parentElement
+    act.innerHTML = '<button class="done" type="button" disabled>已安装</button>'
+    const note = act.parentElement.querySelector('.note')
+    if (note) note.remove()
+  }
+  function run(button) {
+    button.disabled = true
+    button.textContent = '安装中'
+    setTimeout(() => finish(button), 700)
+  }
+  function arm(button, label) {
+    const act = button.closest('.act') || button.parentElement
+    const saved = act.innerHTML
+    act.innerHTML = '<button class="text" type="button" data-no>取消</button><button class="action" type="button" data-yes>' + label + '</button>'
+    act.querySelector('[data-no]').addEventListener('click', () => { act.innerHTML = saved; bind(act) })
+    act.querySelector('[data-yes]').addEventListener('click', (event) => run(event.currentTarget))
+  }
+  function bind(root) {
+    for (const button of root.querySelectorAll('.action')) {
+      button.addEventListener('click', () => {
+        const go = button.dataset.go
+        if (go === 'dirty' || go === 'untracked') arm(button, go === 'dirty' ? '确认更新' : '确认安装')
+        else run(button)
+      }, { once: true })
+    }
+  }
+  for (const button of document.querySelectorAll('.grid .action')) {
+    if (button.dataset.go) continue
+    const note = button.parentElement.querySelector('.note')
+    button.dataset.go = note && note.textContent.includes('覆盖') ? 'dirty' : note ? 'untracked' : 'install'
+  }
+  bind(document)
+</script>
+</body>
+</html>

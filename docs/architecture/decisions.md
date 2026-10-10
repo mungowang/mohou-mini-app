@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-09-23
+updated: 2026-10-10
 ---
 
 # Product decisions
@@ -45,7 +45,7 @@ One fact per bullet. Feature pages under `docs/product/` rely on these sentences
 - `schema` on `ctx.llm` and `ctx.agent` does not change the return type. The caller parses the string.
 - `ctx.llm` and `ctx.agent` with `stream: true` return a pull stream. The method reads it. Those events are not copied onto `streamCall`. `streamCall` yields only what the method yields. Awaiting it is the method return.
 - Credentials are one provider Shell injects: `list` and `get` for callers, `put` and `remove` for the panel editor. The app gets one secret by that name and nothing else. An absent name is `undefined`. One account is one name. An MCP server value may name a credential or an environment variable instead of holding the secret.
-- First-run approval of installed npm packages is not part of this product. Sharing or installing third-party mini-app packages is not part of this product.
+- First-run approval of installed npm packages is not part of this product. The market installs a published app or theme from the catalog. It does not install an arbitrary third-party package.
 - `date-fns` and `zod` are not platform modules.
 - Platform chrome strings exist in `en` and `zh-CN`. A new chrome string lands in both locales in the same change.
 - Panel history is read-only. Rollback is an authoring tool.

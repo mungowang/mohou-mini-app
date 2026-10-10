@@ -150,6 +150,8 @@ export function PanelSurface(props: {
                 locale={chromeLocale}
                 mode={props.mode}
                 palettes={palettes}
+                {...props.theme === undefined ? {} : { theme: props.theme }}
+                onPalettesChange={setPalettes}
                 cardStyle={chrome.cardStyle}
                 onCardStyle={chrome.setCard}
                 client={props.settings}

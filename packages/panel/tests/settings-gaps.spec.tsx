@@ -72,7 +72,7 @@ describe('PanelSettings gaps', () => {
     expect(button(host, '中文')?.getAttribute('data-on')).toBe('1')
     expect(button(host, 'Slate')?.getAttribute('data-on')).toBe('1')
     await act(async () => {
-      button(host, '还原')?.click()
+      button(host, '取消修改')?.click()
     })
     expect(host.textContent).toContain('放弃未保存的修改？')
     await act(async () => {

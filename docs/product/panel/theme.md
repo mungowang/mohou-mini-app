@@ -9,9 +9,9 @@ updated: 2026-09-29
 Layer: [Panel](README.md). Index: [features.md](../features.md).
 
 - Owner: Panel.
-- Operations: [setAppPin](../owner-surface.md#setapppin), [listPalettes](../owner-surface.md#listpalettes), and [writePolicy](../owner-surface.md#writepolicy) for global appearance. The app-local row appears only in app scope and only when `theme.css` parsed. A shipped palette is marked system. A file from the themes directory is marked custom. The app file is marked app. Its label is the file's name when the header has one.
-- Failure: a failed save shows the host error and leaves the previous pin. No message uses the panel label. An ignored theme file does not appear as a selectable chip; its reason is available from the palette response.
-- Non-goals: editing theme CSS in the picker; a disabled "custom palettes are unavailable" row.
+- Operations: [setAppPin](../owner-surface.md#setapppin), [listPalettes](../owner-surface.md#listpalettes), [deletePalette](../owner-surface.md#deletepalette), and [writePolicy](../owner-surface.md#writepolicy) for global appearance. The app-local row appears only in app scope and only when `theme.css` parsed. A shipped palette is marked system. A file from the themes directory is marked custom and can be deleted from Settings. The app file is marked app. Its label is the file's name when the header has one. Deleting the selected custom palette falls back to default and writes that policy.
+- Failure: a failed save shows the host error and leaves the previous pin. A failed delete shows the host error and leaves the file. No message uses the panel label. An ignored theme file does not appear as a selectable chip; its reason is available from the palette response.
+- Non-goals: editing theme CSS in the picker; deleting a shipped system palette; a disabled "custom palettes are unavailable" row.
 
 ## Implementation
 

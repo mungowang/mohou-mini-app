@@ -84,8 +84,13 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
         writable: result.writable === true,
       }
     },
-    putCredential: async (name, description, secret) => {
-      await sendJson(origin, 'POST', httpLayout.credentials, { name, description, secret }, true)
+    putCredential: async (name, description, secret, placeholder) => {
+      await sendJson(origin, 'POST', httpLayout.credentials, {
+        name,
+        description,
+        secret,
+        ...placeholder === true ? { placeholder: true } : {},
+      }, true)
     },
     removeCredential: async (name) => {
       await sendJson(origin, 'POST', httpLayout.credentialRemove, { name }, true)

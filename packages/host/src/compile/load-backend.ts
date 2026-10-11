@@ -2,7 +2,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 
-import { appEntries, ContractError, type AppApiMethod } from '@mohou/contract'
+import { appEntries, ContractError, type AppApiMethod, type AppContext, type HostNotice } from '@mohou/contract'
 import * as esbuild from 'esbuild'
 
 import { CompileError } from './codes.ts'
@@ -13,6 +13,7 @@ const require = createRequire(import.meta.url)
 
 export interface LoadedBackend {
   api: Record<string, AppApiMethod>
+  onHostEvents?: (ctx: AppContext, event: HostNotice) => unknown
 }
 
 /**
@@ -50,7 +51,10 @@ export async function loadBackend(appDir: string, logLevel?: 'silent'): Promise<
   if (!isRecord(app) || !isRecord(app.api)) {
     throw new CompileError('backend-invalid', 'backend must default-export defineApp(...)')
   }
-  return { api: app.api as Record<string, AppApiMethod> }
+  const api = app.api as Record<string, AppApiMethod>
+  const onHostEvents = app.onHostEvents
+  if (!isHostHook(onHostEvents)) return { api }
+  return { api, onHostEvents }
 }
 
 function allowlistPlugin(appDir: string, stopped: { code: string; message: string }): esbuild.Plugin {
@@ -92,4 +96,8 @@ function insideApp(appDir: string, importer: string): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isHostHook(value: unknown): value is NonNullable<LoadedBackend['onHostEvents']> {
+  return typeof value === 'function'
 }

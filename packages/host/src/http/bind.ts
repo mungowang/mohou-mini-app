@@ -118,7 +118,13 @@ export function bindLoopback(input: {
     readPolicy: () => input.policy(),
     writePolicy: raw => input.writePolicy(raw),
     probe: id => input.probe(id),
-    installSamples: () => installStartupSamples(input.runtimeRoot, input.authorSkill?.source),
+    installSamples: async () => {
+      const result = await installStartupSamples(input.runtimeRoot, input.authorSkill?.source)
+      for (const appId of result.installed) {
+        input.author.hostEvents.publish({ type: 'app:changed', appId, change: 'created' })
+      }
+      return result
+    },
     providers: input.providers,
     listPalettes: () => input.owner.themes.listPalettes(),
     deletePalette: id => input.owner.themes.deletePalette(id),
@@ -168,6 +174,13 @@ export function bindLoopback(input: {
         env: input.env,
       })
       input.author.hostEvents.publish({ type: 'market:install', kind: installed.kind, id: installed.id })
+      if (installed.kind === 'app') {
+        input.author.hostEvents.publish({
+          type: 'app:changed',
+          appId: installed.id,
+          change: confirm ? 'updated' : 'created',
+        })
+      }
     },
     updateSource: () => Promise.resolve(readUpdateSource(updateEnv(input.policy()))),
     checkUpdate: async () => {
@@ -220,7 +233,15 @@ export function bindLoopback(input: {
       return readMcpImport(file)
     },
     readCredentials: async () => ({ credentials: await input.credentials.list(), writable: input.credentials.writable }),
-    putCredential: async (name, description, secret) => {
+    putCredential: async (name, description, secret, placeholder) => {
+      // A placeholder names a row before the secret exists. An existing account, empty secret
+      // included, stays as stored so a second click does not wipe a password.
+      if (placeholder === true) {
+        const existing = await input.credentials.get(name)
+        if (existing !== undefined) return
+        await input.credentials.put(name, description, '')
+        return
+      }
       // A blank field means "keep the stored secret". Host resolves it here: the panel never reads a
       // secret back, so it has no value to send, and the store stays a store with one write op.
       const keep = secret === undefined || secret.length === 0 ? await input.credentials.get(name) : secret

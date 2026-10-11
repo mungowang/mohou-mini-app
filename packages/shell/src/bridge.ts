@@ -13,6 +13,7 @@ export interface PanelBridge {
   setWorkbench(appId: string): void
   renameApp(from: string, to: string): void
   marketInstalled(kind: 'app' | 'theme', id: string): void
+  appChanged(event: { readonly appId: string; readonly change: 'created' | 'updated' | 'deleted' | 'restored' | 'renamed'; readonly from?: string }): void
 }
 
 /**
@@ -61,6 +62,13 @@ export function applyHostEvent(event: HostEvent, panel: PanelBridge, frame?: Fra
       return
     case 'market:install':
       panel.marketInstalled(event.kind, event.id)
+      return
+    case 'app:changed':
+      panel.appChanged({
+        appId: event.appId,
+        change: event.change,
+        ...event.from === undefined ? {} : { from: event.from },
+      })
       return
     case 'app:reload':
     case 'app:eval':

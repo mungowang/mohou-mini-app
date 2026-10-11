@@ -11,6 +11,7 @@ import type {
   AppStorage,
   AppSystemMetrics,
   AppWorkbench,
+  HostNotice,
 } from '@mohou/contract'
 
 import type { CredentialProvider } from '../credentials/provider.ts'
@@ -59,6 +60,21 @@ export async function runCall<State extends object>(
   const ctx: AppContext<State> = contextFor(capabilities, controller.signal)
   try {
     return await readMethod(method(ctx, args), publish)
+  } finally {
+    controller.abort()
+  }
+}
+
+/** Run `defineApp.onHostEvents` inside a context built from the same ports as a call. */
+export async function runNotice<State extends object>(
+  capabilities: CallCapabilities<State>,
+  hook: (ctx: AppContext<State>, event: HostNotice) => unknown,
+  event: HostNotice,
+): Promise<void> {
+  const controller = new AbortController()
+  const ctx = contextFor(capabilities, controller.signal)
+  try {
+    await hook(ctx, event)
   } finally {
     controller.abort()
   }

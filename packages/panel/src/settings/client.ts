@@ -159,9 +159,10 @@ export interface PanelSettingsClient {
   /**
    * Save one account. An omitted secret keeps the one already stored, which is how the form edits a
    * description without the owner pasting a secret again. Host reads the stored value; the panel
-   * never receives one.
+   * never receives one. `placeholder` creates an empty secret when the name is absent, and leaves
+   * an existing account as stored.
    */
-  putCredential?(name: string, description: string, secret?: string): Promise<void>
+  putCredential?(name: string, description: string, secret?: string, placeholder?: boolean): Promise<void>
   removeCredential?(name: string): Promise<void>
   listMcp?(): Promise<PanelMcpList>
   writeMcp?(servers: readonly McpServerDraft[]): Promise<{ unresolved: readonly PanelMcpFailure[] }>

@@ -249,22 +249,22 @@ describe('McpSettings', () => {
     host.remove()
   })
 
-  it('fills a form per preset and creates the credentials each one references', async () => {
+  it('writes a preset server and creates the empty credentials it names', async () => {
     // Table-driven on purpose: a preset that forgets its credentials or its package fails here.
     for (const preset of mcpPresets) {
-      const created: Array<{ name: string; description: string }> = []
-      let wrote = 0
+      const created: Array<{ name: string; description: string; placeholder?: boolean }> = []
+      const written: McpServerDraft[][] = []
       const client: PanelSettingsClient = {
         readPolicy: () => Promise.resolve(policy),
         writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
         probe: () => Promise.resolve({ healthy: true }),
         listMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
-        writeMcp: () => {
-          wrote += 1
-          return Promise.resolve({ servers: [], unresolved: [] })
+        writeMcp: (servers) => {
+          written.push([...servers])
+          return Promise.resolve({ servers, unresolved: [] })
         },
-        putCredential: (name, description) => {
-          created.push({ name, description })
+        putCredential: (name, description, _secret, placeholder) => {
+          created.push({ name, description, ...placeholder === true ? { placeholder } : {} })
           return Promise.resolve()
         },
       }
@@ -280,18 +280,57 @@ describe('McpSettings', () => {
         host.querySelector(`button[data-preset="${preset.id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
-      const values = [...host.querySelectorAll('input')].map(input => input.value)
-      expect(values).toContain(preset.id)
-      expect(values).toContain('npx')
-      expect(values).toContain(`-y ${preset.packageName}`)
-      const env = [...host.querySelectorAll('textarea')].map(area => area.value).join('\n')
-      for (const [key, value] of Object.entries(preset.env)) expect(env).toContain(`${key}=${value}`)
+      const server = written.at(-1)?.find(item => item.id === preset.id)
+      expect(server?.command).toBe('npx')
+      expect(server?.args).toEqual(['-y', preset.packageName])
+      expect(server?.env).toEqual(preset.env)
       expect(created.map(item => item.name)).toEqual(preset.credentials.map(credential => credential.name))
-      // The credentials exist before the server is saved, and nothing is written until then.
-      expect(wrote).toBe(0)
+      expect(created.every(item => item.placeholder === true)).toBe(true)
+      expect(host.textContent).toContain(`Added ${preset.label}.`)
+      expect(host.textContent).toContain('Set each secret in Credentials, then restart the host.')
+      expect([...host.querySelectorAll('input')].some(input => input instanceof HTMLInputElement && input.value === preset.id)).toBe(false)
       await act(async () => { root.unmount() })
       host.remove()
     }
+  })
+
+  it('creates an empty credential for each saved placeholder that has no entry', async () => {
+    const created: string[] = []
+    const client: PanelSettingsClient = {
+      readPolicy: () => Promise.resolve(policy),
+      writePolicy: () => Promise.resolve({ policy, restartRequired: false }),
+      probe: () => Promise.resolve({ healthy: true }),
+      listMcp: () => Promise.resolve({
+        servers: [{
+          id: 'git',
+          command: 'npx',
+          env: { TOKEN: '${credential:MISSING}', HOME: '${env:HOME}', KEPT: '${credential:THERE}' },
+          args: ['--note', '${credential:MISSING}'],
+        }],
+        unresolved: [],
+      }),
+      writeMcp: () => Promise.resolve({ servers: [], unresolved: [] }),
+      readCredentials: () => Promise.resolve({ credentials: [{ name: 'THERE', description: 'kept' }], writable: true }),
+      putCredential: (name) => {
+        created.push(name)
+        return Promise.resolve()
+      },
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<McpSettings client={client} locale="en" mode="production" />)
+    })
+    await flush()
+    await act(async () => {
+      host.querySelector('button[data-credential-scan]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await flush()
+    expect(created).toEqual(['MISSING'])
+    expect(host.textContent).toContain('Empty credentials created: MISSING.')
+    await act(async () => { root.unmount() })
+    host.remove()
   })
 
   it('shows load and import failures, and empty paste', async () => {

@@ -119,4 +119,19 @@ describe('loadBackend', () => {
     expect(message).toContain('main.api.ts:1:')
     expect(message).toContain('No matching export in "helper.ts" for import "missing"')
   })
+
+  it('keeps onHostEvents when the module defines it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'mma-backend-hook-'))
+    await writeFile(join(dir, 'main.api.ts'), `
+      import { defineApp } from '@mohou/contract'
+      export default defineApp({
+        name: 'Example',
+        description: 'One line',
+        onHostEvents(ctx, event) { ctx.push('desk', event) },
+        api: { ping() { return 'ok' } },
+      })
+    `)
+    const loaded = await loadBackend(dir)
+    expect(typeof loaded.onHostEvents).toBe('function')
+  })
 })

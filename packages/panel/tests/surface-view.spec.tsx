@@ -372,6 +372,66 @@ it('shows the outcome the launcher recorded, acknowledges it, and offers again a
   again.remove()
 })
 
+it('offers the writing-skill update on the card that confirms the running version', async () => {
+  sessionStorage.clear()
+  const installed: string[][] = []
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  const skill = {
+    skillId: 'mohou-mini-app',
+    version: '1.0.54',
+    agents: [{
+      id: 'claude',
+      label: 'Claude',
+      skillsDir: '/tmp/claude',
+      homePresent: true,
+      dest: '/tmp/claude/mohou-mini-app',
+      installed: true,
+      version: '1.0.54',
+      updateAvailable: false,
+    }],
+    customs: [],
+  }
+  await act(async () => {
+    root.render(<PanelSurface
+      client={client()}
+      locale="en"
+      mode="production"
+      shell="standalone"
+      settings={{
+        ...settings(),
+        checkUpdate: () => Promise.resolve({
+          name: '@mohou/shell',
+          current: '1.0.17',
+          latest: '1.0.17',
+          updateAvailable: false,
+          lastAttempt: { state: 'done', to: '1.0.17', at: 2 },
+        }),
+        ackUpdate: () => Promise.resolve(),
+        readSkill: () => Promise.resolve(skill),
+        installSkill: (ids) => {
+          installed.push([...ids])
+          return Promise.resolve(skill)
+        },
+        revealSkill: () => Promise.resolve(),
+      }}
+    />)
+  })
+  await act(async () => { await Promise.resolve() })
+  expect(host.textContent).toContain('Updated to 1.0.17')
+  expect(host.textContent).toContain('Update it in Settings → Agent, or update it here.')
+  expect(host.querySelector('details')?.open).toBe(false)
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>('[data-skill-update]')?.click()
+    await Promise.resolve()
+  })
+  expect(installed).toEqual([['claude']])
+  expect(host.textContent).toContain('Installed')
+  root.unmount()
+  host.remove()
+})
+
 function pending<T>(): Promise<T> {
   return new Promise(() => undefined)
 }

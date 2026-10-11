@@ -1,11 +1,16 @@
 import { defineApp } from '@mohou/contract'
 
+import { deskEvent } from './shared/events.ts'
+
 type FocusItem = { id: string; title: string; detail: string }
 type TrashItem = { id: string; name: string }
 
 export default defineApp({
   name: '工作台',
   description: '第一屏是今天要处理的事，应用列表在旁边',
+  onHostEvents(ctx, event) {
+    ctx.push(deskEvent, event)
+  },
   api: {
     // ⭐ key: the homepage shows what this person wants first.
     //          Replace `focus` from ctx.http, ctx.mcp, or this app's storage.

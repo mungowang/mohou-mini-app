@@ -3,13 +3,13 @@ import { closeSync, openSync, writeSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { appEntries, resolveManifest, type AppApiMethod, type AppConfig, type AppId, type AppWorkbench } from '@mohou/contract'
+import { appEntries, resolveManifest, type AppApiMethod, type AppConfig, type AppContext, type AppId, type AppWorkbench, type HostNotice } from '@mohou/contract'
 import type { McpClient } from '@mohou/mcp-client'
 import type { RuntimeProvider } from '@mohou/runtime-provider'
 
 import type { AppSummary } from '../apps/registry.ts'
 import { cachedUiBundle, purgeAutogen } from '../compile/autogen.ts'
-import { loadBackend } from '../compile/load-backend.ts'
+import { loadBackend, type LoadedBackend } from '../compile/load-backend.ts'
 import { reviewApp, type ReviewNotice } from '../compile/review.ts'
 import { DEFAULT_APP_EVENT_TAIL, createAppEvents, type AppEvents } from '../events/app-events.ts'
 import { createErrorRing } from '../events/error-ring.ts'
@@ -18,7 +18,7 @@ import { createViewQueries } from '../events/view-eval.ts'
 import { createFileTools, type FileCommit } from '../files/tools.ts'
 import { commitApp, listHistory, resetApp } from '../history/store.ts'
 import { DEFAULT_STORAGE_NOTICE_BYTES } from '../storage/open.ts'
-import type { HostEvent } from '../events/host-events.ts'
+import { type HostEvent } from '../events/host-events.ts'
 import type { MarketKind } from '../market/catalog.ts'
 import { MarketError } from '../market/error.ts'
 import { searchMarket } from '../market/search.ts'
@@ -32,8 +32,8 @@ import { recordOpen } from '../host/activity.ts'
 import { InstallError } from '../install/codes.ts'
 import { installApp, type InstallRequest, type NpmRun } from '../install/install.ts'
 import { installLayout } from '../install/layout.ts'
-import { bindBrain } from '../kernel/bind-brain.ts'
-import { runCall, type CallCapabilities } from '../kernel/call.ts'
+import { bindBrain, type BoundBrain } from '../kernel/bind-brain.ts'
+import { runCall, runNotice, type CallCapabilities } from '../kernel/call.ts'
 import { openStorage, type StorageFile } from '../storage/open.ts'
 import { listMcpForAuthor, toolsMcpForAuthor } from './mcp-list.ts'
 import { AuthorError } from './codes.ts'
@@ -102,7 +102,9 @@ export interface AuthorCallPorts {
 }
 
 interface LiveApp {
+  id: AppId
   api: Record<string, AppApiMethod>
+  onHostEvents?: (ctx: AppContext, event: HostNotice) => unknown
   storage: StorageFile
   directory: string
   ui?: string
@@ -172,6 +174,14 @@ export function createAuthorTools(options: {
     inflight.add(tracked)
     return tracked
   }
+  // `observe` delivers the notice. `connected` stays the panel subscriber.
+  const stopNotices = hostEvents.observe((event) => {
+    if (!isHostNotice(event)) return
+    const notice = event
+    void track(deliverHostNotice(bound, live, notice)).catch((error: unknown) => {
+      if (error instanceof AuthorError && error.code === 'cancelled') return
+    })
+  })
   return {
     names: authorToolNames,
     hostEvents,
@@ -192,6 +202,7 @@ export function createAuthorTools(options: {
     },
     dispose() {
       stopping = true
+      stopNotices()
       for (const app of live.values()) app.storage.close()
       live.clear()
       appEvents.dispose()
@@ -273,25 +284,38 @@ async function invoke(
         windowOf(input),
         input.numbered === true,
       )
-    case 'mini_app_edit':
-      return filesFor(options, requiredString(input, 'appId')).edit(
+    case 'mini_app_edit': {
+      const appId = requiredString(input, 'appId')
+      const edited = await filesFor(options, appId).edit(
         requiredString(input, 'path'),
         editsOf(input),
         input.commit !== false,
       )
-    case 'mini_app_write':
-      return filesFor(options, requiredString(input, 'appId')).write(
+      publishChanged(options.hostEvents, appId, 'updated')
+      return edited
+    }
+    case 'mini_app_write': {
+      const appId = requiredString(input, 'appId')
+      const written = await filesFor(options, appId).write(
         requiredString(input, 'path'),
         requiredString(input, 'content'),
         input.commit !== false,
       )
-    case 'mini_app_delete':
-      return filesFor(options, requiredString(input, 'appId')).delete(
+      publishChanged(options.hostEvents, appId, 'updated')
+      return written
+    }
+    case 'mini_app_delete': {
+      const appId = requiredString(input, 'appId')
+      const removed = await filesFor(options, appId).delete(
         requiredString(input, 'path'),
         input.commit !== false,
       )
+      publishChanged(options.hostEvents, appId, 'updated')
+      return removed
+    }
     case 'mini_app_register': {
       const registered = await options.registry.register(requiredString(input, 'appId'), registerManifest(input))
+      publishChanged(options.hostEvents, registered.id, 'created')
       return { ...registered, needed: neededFiles(registered.directory) }
     }
     case 'mini_app_market_list':
@@ -409,6 +433,7 @@ async function historyReset(
   if (result.changed) {
     options.onTreeChanged?.(app.id)
     options.hostEvents.publish({ type: 'app:reload', appId: app.id })
+    publishChanged(options.hostEvents, app.id, 'updated')
   }
   return result
 }
@@ -566,12 +591,17 @@ async function renameRegistered(
   await purgeAutogen(renamed.directory)
   const commit = await commitApp(renamed.directory, `Rename ${appId} to ${renamed.id}`)
   options.hostEvents.publish({ type: 'app:rename', from: appId, to: renamed.id })
+  options.hostEvents.publish({ type: 'app:changed', appId: renamed.id, change: 'renamed', from: appId })
   options.onWorkbenchRenamed?.(appId, renamed.id)
   return { ...renamed, commit }
 }
 
 async function removeApp(
-  options: { registry: Registry; errors: ReturnType<typeof createErrorRing> },
+  options: {
+    registry: Registry
+    errors: ReturnType<typeof createErrorRing>
+    hostEvents: ReturnType<typeof createHostEvents>
+  },
   live: Map<string, LiveApp>,
   appId: string,
 ) {
@@ -580,13 +610,16 @@ async function removeApp(
   live.delete(app.id)
   options.errors.forget(app.id)
   await options.registry.trash(app.id)
+  publishChanged(options.hostEvents, app.id, 'deleted')
 }
 
 async function restoreDeleted(
-  options: { registry: Registry },
+  options: { registry: Registry; hostEvents: ReturnType<typeof createHostEvents> },
   appId: string,
 ) {
-  return options.registry.restoreTrashed(appId)
+  const restored = await options.registry.restoreTrashed(appId)
+  publishChanged(options.hostEvents, restored.id, 'restored')
+  return restored
 }
 
 async function reload(
@@ -632,7 +665,7 @@ async function reload(
     }
     await cachedUiBundle(app.directory)
     const previous = live.get(app.id)
-    live.set(app.id, { api: loaded.api, storage: opened, directory: app.directory })
+    live.set(app.id, withKind(liveRecord(loaded, opened, app.directory, app.id), app.kind))
     previous?.storage.close()
     const committed = await commitApp(app.directory, reloadMessage).catch((error: unknown) => ({
       status: 'failed' as const,
@@ -643,6 +676,7 @@ async function reload(
     options.views.forgetAlive(app.id)
     const views = options.hostEvents.connected ? 'refetch' as const : 'not-open' as const
     options.hostEvents.publish({ type: 'app:reload', appId: app.id })
+    publishChanged(options.hostEvents, app.id, 'updated')
     return {
       ok: committed.status !== 'failed',
       errors: committed.status === 'failed' ? [{ code: 'commit-failed', message: committed.reason ?? 'commit failed' }] : [],
@@ -744,16 +778,16 @@ async function ensureLive(
   options: { registry: Registry; hostEvents: ReturnType<typeof createHostEvents>; storageNoticeBytes?: number },
   live: Map<string, LiveApp>,
   appId: string,
-): Promise<LiveApp & { id: AppId }> {
+): Promise<LiveApp> {
   const summary = await options.registry.get(appId)
   const cached = live.get(summary.id)
-  if (cached !== undefined && cached.directory === summary.directory) return { ...withKind(cached, summary.kind), id: summary.id }
+  if (cached !== undefined && cached.directory === summary.directory) return withKind(cached, summary.kind)
   const storage = await openStorage(summary.directory, storageNotice(options, summary.id))
   try {
     const loaded = await loadBackend(summary.directory)
-    const next = withKind({ api: loaded.api, storage, directory: summary.directory }, summary.kind)
+    const next = withKind(liveRecord(loaded, storage, summary.directory, summary.id), summary.kind)
     live.set(summary.id, next)
-    return { ...next, id: summary.id }
+    return next
   } catch (error) {
     storage.close()
     throw error
@@ -762,7 +796,7 @@ async function ensureLive(
 
 function capabilitiesFor(
   options: { mcp: McpClient; ports: AuthorCallPorts; appEvents: AppEvents },
-  app: LiveApp & { id: AppId },
+  app: LiveApp,
   brain: CallCapabilities['brain'],
 ): CallCapabilities {
   const ports = options.ports
@@ -784,6 +818,78 @@ function capabilitiesFor(
     mcp: (serverId, toolName, args) => options.mcp.call(serverId, toolName, args ?? {}),
     brain,
     ...app.kind === 'workbench' && ports.workbench !== undefined ? { workbench: ports.workbench } : {},
+  }
+}
+
+function liveRecord(loaded: LoadedBackend, storage: StorageFile, directory: string, id: AppId): LiveApp {
+  return {
+    id,
+    api: loaded.api,
+    storage,
+    directory,
+    ...loaded.onHostEvents === undefined ? {} : { onHostEvents: loaded.onHostEvents },
+  }
+}
+
+function isHostNotice(event: HostEvent): event is HostNotice {
+  switch (event.type) {
+    case 'app:open':
+    case 'app:rename':
+    case 'app:changed':
+    case 'workbench:default':
+    case 'app:reload':
+    case 'storage-size':
+    case 'market:install':
+      return true
+    case 'app:eval':
+      return false
+    default: {
+      const unreachable: never = event
+      return unreachable
+    }
+  }
+}
+
+async function deliverHostNotice(
+  options: { mcp: McpClient; ports: AuthorCallPorts; appEvents: AppEvents },
+  live: Map<string, LiveApp>,
+  event: HostNotice,
+): Promise<void> {
+  for (const app of [...live.values()]) {
+    if (app.onHostEvents === undefined || live.get(app.id) !== app) continue
+    const brain = lazyBrain(options, app, app.id)
+    try {
+      await runNotice(capabilitiesFor(options, app, brain), app.onHostEvents, event)
+    } catch (error) {
+      options.ports.log(app.id, `onHostEvents failed: ${error instanceof Error ? error.message : 'failed'}`)
+    } finally {
+      await brain.stop()
+    }
+  }
+}
+
+function lazyBrain(
+  options: { ports: AuthorCallPorts; appEvents: AppEvents },
+  app: LiveApp,
+  appId: string,
+): BoundBrain {
+  let started: Promise<BoundBrain> | undefined
+  const ready = (): Promise<BoundBrain> => {
+    started ??= bindBrain({
+      provider: options.ports.provider,
+      appDir: app.directory,
+      processDirectory: options.ports.processDirectory,
+      createTemp: options.ports.createTemp,
+      push: (name, params) => {
+        options.appEvents.push(appId, name, params)
+      },
+    })
+    return started
+  }
+  return {
+    llm: (prompt, llmOptions) => ready().then(brain => brain.llm(prompt, llmOptions)),
+    agent: (goal, agentOptions) => ready().then(brain => brain.agent(goal, agentOptions)),
+    stop: () => started === undefined ? Promise.resolve() : started.then(brain => brain.stop()),
   }
 }
 
@@ -856,7 +962,22 @@ async function marketInstall(
   if (row.kind !== kind) throw new AuthorError('tool-args', 'market kind does not match the catalog row')
   await options.market.install(id, kind, input.overwrite === true)
   options.hostEvents?.publish({ type: 'market:install', kind, id })
+  if (kind === 'app') {
+    options.hostEvents?.publish({
+      type: 'app:changed',
+      appId: id,
+      change: input.overwrite === true ? 'updated' : 'created',
+    })
+  }
   return { id, kind }
+}
+
+function publishChanged(
+  hostEvents: { publish(event: HostEvent): void },
+  appId: string,
+  change: 'created' | 'updated' | 'deleted' | 'restored',
+): void {
+  hostEvents.publish({ type: 'app:changed', appId, change })
 }
 
 function requiredString(args: Record<string, unknown>, key: string): string {

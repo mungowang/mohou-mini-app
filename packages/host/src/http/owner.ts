@@ -227,10 +227,11 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     const name = isRecord(body) && typeof body.name === 'string' ? body.name : undefined
     const secret = isRecord(body) && typeof body.secret === 'string' ? body.secret : undefined
     const description = isRecord(body) && typeof body.description === 'string' ? body.description : ''
+    const placeholder = isRecord(body) && body.placeholder === true
     if (name === undefined) {
       return c.json({ ok: false, error: { code: 'credential-invalid', message: 'a credential needs a name' } }, 400)
     }
-    return ok(c, () => ports.putCredential(name, description, secret))
+    return ok(c, () => ports.putCredential(name, description, secret, placeholder))
   })
   app.post(httpLayout.credentialRemove, async (c) => {
     if (!ports.authorized(c.req.header('authorization'))) return authoringDenied(c)

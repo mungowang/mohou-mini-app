@@ -103,9 +103,10 @@ export interface LoopbackPorts {
   /**
    * Write one account. An absent or empty secret keeps the stored one, so an owner can fix a
    * description without pasting a secret they may no longer hold. A name with no account and no
-   * secret has nothing to keep: `credential-invalid`.
+   * secret has nothing to keep: `credential-invalid`. `placeholder` creates that name with an empty
+   * secret when it is absent, and leaves an existing account as stored.
    */
-  putCredential(name: string, description: string, secret: string | undefined): Promise<void>
+  putCredential(name: string, description: string, secret: string | undefined, placeholder?: boolean): Promise<void>
   removeCredential(name: string): Promise<void>
 }
 

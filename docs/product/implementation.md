@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-10
+updated: 2026-10-11
 ---
 
 # Implementation plan
@@ -52,7 +52,7 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `manifest-invalid` | manifest JSON is broken, or a required key is missing or empty |
 | `import-forbidden` | a specifier is outside the allowlist, or it crosses `ui/` and `api/` |
 | `import-escape` | a relative import leaves the app directory |
-| `define-app-invalid` | `name`, `description`, or `api` fails the `defineApp` check |
+| `define-app-invalid` | `name`, `description`, `api`, or `onHostEvents` fails the `defineApp` check |
 | `backend-invalid` | backend syntax or an undefined name in `main.api.ts` or `api/**` |
 | `ui-invalid` | UI bundle failure or an undefined name in `ui.tsx` or `ui/**` |
 | `shared-invalid` | an undefined name in `shared/**` |

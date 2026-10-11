@@ -71,10 +71,24 @@ describe('httpPanelClients', () => {
         code: 'failed',
         message: expect.stringContaining('credential has no secret to keep: gitlab'),
       })
+      await client.putCredential?.('jira', 'Jira', undefined, true)
+      expect(JSON.parse(readFileSync(join(root, 'credentials.json'), 'utf8'))).toMatchObject({
+        github: { description: 'Personal GitHub', secret: 'ghp_test' },
+        jira: { description: 'Jira', secret: '' },
+      })
+      await client.putCredential?.('jira', 'Jira again', undefined, true)
+      await client.putCredential?.('github', 'nope', undefined, true)
+      expect(JSON.parse(readFileSync(join(root, 'credentials.json'), 'utf8'))).toEqual({
+        github: { description: 'Personal GitHub', secret: 'ghp_test' },
+        jira: { description: 'Jira', secret: '' },
+      })
       await client.removeCredential?.('github')
-      expect((await client.readCredentials?.())?.credentials).toEqual([])
+      expect((await client.readCredentials?.())?.credentials).toEqual([{ name: 'jira', description: 'Jira' }])
       await expect(httpPanelClients('http://127.0.0.1:1').list()).rejects.toMatchObject({ code: 'unreachable' })
       if (client.listMarket === undefined || client.installMarket === undefined) throw new Error('market client is missing')
+      // A closed registry keeps this assertion off the public catalog.
+      const current = await client.readPolicy()
+      await client.writePolicy({ ...current, updateRegistry: 'http://127.0.0.1:1/' })
       await expect(client.listMarket()).rejects.toMatchObject({ code: 'failed' })
       await expect(client.installMarket('missing', false)).rejects.toMatchObject({ code: 'failed' })
     } finally {

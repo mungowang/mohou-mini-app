@@ -7,8 +7,7 @@ export interface McpPresetCredential {
 }
 
 /**
- * One server this product publishes, offered as a form the person completes.
- * The package name is the fact; the form, not this table, is what reaches `mcp.json`.
+ * One server this product publishes. Quick add writes this shape and creates its credentials.
  */
 export interface McpPreset {
   readonly id: string
@@ -93,7 +92,7 @@ export const mcpPresets: readonly McpPreset[] = [
   },
 ]
 
-/** The form a preset opens. Nothing is written to `mcp.json` until the person saves it. */
+/** The server a preset writes. The same click creates the credentials this env names. */
 export function presetDraft(preset: McpPreset): Draft {
   return {
     id: preset.id,

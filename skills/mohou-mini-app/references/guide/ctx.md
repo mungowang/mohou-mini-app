@@ -91,6 +91,8 @@ Restore is a panel action. The app does not restore backups.
 
 An unknown id, or an app that is not a workbench, does not change the stored id. The field does not delete an app, read another app's files, or change settings.
 
+A loaded workbench can take host notices with `defineApp({ onHostEvents(ctx, event) })`. The host calls that hook. The view does not. `event` is `app:open`, `app:rename`, `app:changed`, `workbench:default`, `app:reload`, `storage-size`, or `market:install`. `app:changed` carries `appId` and `change` (`created`, `updated`, `deleted`, `restored`, `renamed`). `from` is the previous id when `change` is `renamed`. The sample pushes one name of its own from the hook. The view refetches `listApps` and the trash from `useApp().on` of that name. An omitted hook is skipped. An instance that is not loaded is skipped.
+
 ## Shared event names
 
 `ctx.push("stage", …)` and `useApp().on("stage", …)` are joined by a string. Declare names in `shared/` — the only tree both sides may import. The same literal on both sides without that declaration is `event-undeclared`. A name used on one side only is not that failure. `on("*")` is not an event name.

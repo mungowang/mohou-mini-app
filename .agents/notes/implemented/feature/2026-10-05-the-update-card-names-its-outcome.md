@@ -2,6 +2,8 @@
 
 Status: implemented
 
+The done card also updates the writing skill. See [Library changes, empty credentials, and the update card](2026-10-11-library-changes-and-the-update-card.md).
+
 ## Problem
 
 Installing a version from the panel was a wait with no feedback and an outcome with no reason.

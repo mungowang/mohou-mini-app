@@ -4,7 +4,9 @@ import { Loader2 } from 'lucide-react'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import { Dialog } from '../ui/dialog.tsx'
 
-import type { PanelUpdateAttempt, PanelUpdateFailureCode, PanelUpdateSource } from './client.ts'
+import type { PanelSkillStatus, PanelUpdateAttempt, PanelUpdateFailureCode, PanelUpdateSource } from './client.ts'
+import { SkillInstall } from './skill-install.tsx'
+import { readSkillAgentIds, readSkillCustomDirs } from './skill-dirs.ts'
 import { UpdateSourceChip } from './update-source.tsx'
 
 /** The one update card. The on-open check and the settings check open this card. */
@@ -58,12 +60,20 @@ export function attemptCard(attempt: PanelUpdateAttempt, current: string): Updat
  * One update card: offer, install in progress, failure, or the version now running.
  * @param props - card state and the two actions the card offers
  */
+/** Writing-skill install the done card can run without leaving for Settings. */
+export interface UpdateSkillActions {
+  readonly readSkill: (customDirs?: readonly string[]) => Promise<PanelSkillStatus>
+  readonly installSkill: (agentIds: readonly string[], customDirs: readonly string[]) => Promise<PanelSkillStatus>
+  readonly revealSkill?: (dest: string) => Promise<void>
+}
+
 export function UpdateDialog(props: {
   readonly locale: PanelLocale
   readonly mode: PanelLabelMode
   readonly card: UpdateCard
   readonly onClose: () => void
   readonly onInstall: (version: string) => void
+  readonly skill?: UpdateSkillActions
 }): ReactNode {
   const label = (key: string) => panelText(props.locale, key, props.mode)
   return (
@@ -72,7 +82,7 @@ export function UpdateDialog(props: {
         {props.card.kind === 'offer' ? <Offer card={props.card} label={label} onClose={props.onClose} onInstall={props.onInstall} /> : null}
         {props.card.kind === 'installing' ? <Installing card={props.card} label={label} /> : null}
         {props.card.kind === 'failed' ? <Failed card={props.card} label={label} onClose={props.onClose} onInstall={props.onInstall} /> : null}
-        {props.card.kind === 'done' ? <Done card={props.card} label={label} onClose={props.onClose} /> : null}
+        {props.card.kind === 'done' ? <Done card={props.card} label={label} onClose={props.onClose} {...props.skill === undefined ? {} : { skill: props.skill }} /> : null}
       </Dialog>
     </div>
   )
@@ -175,11 +185,14 @@ function Done(props: {
   readonly card: Extract<UpdateCard, { kind: 'done' }>
   readonly label: (key: string) => string
   readonly onClose: () => void
+  readonly skill?: UpdateSkillActions
 }): ReactNode {
   return (
     <>
       <h3 className="m-0 text-base font-semibold">{props.label('update-card-done-title').replace('{n}', props.card.version)}</h3>
       <p className="mt-3 text-sm text-muted-foreground">{props.label('update-card-done-note')}</p>
+      <p className="mt-2 text-sm">{props.label('update-skill-note')}</p>
+      {props.skill === undefined ? null : <SkillShortcut label={props.label} skill={props.skill} />}
       <div className="mt-5 flex justify-end">
         <button type="button" className="h-8 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground" onClick={props.onClose}>
           {props.label('update-card-ok')}
@@ -187,6 +200,57 @@ function Done(props: {
       </div>
     </>
   )
+}
+
+function SkillShortcut(props: {
+  readonly label: (key: string) => string
+  readonly skill: UpdateSkillActions
+}): ReactNode {
+  const [busy, setBusy] = useState(false)
+  const [installed, setInstalled] = useState(false)
+  const [failed, setFailed] = useState(false)
+  return (
+    <>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          data-skill-update=""
+          className="h-8 rounded-lg border px-3 text-sm hover:bg-muted disabled:opacity-60"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true)
+            setFailed(false)
+            setInstalled(false)
+            void updateInstalledSkill(props.skill).then(
+              () => setInstalled(true),
+              () => setFailed(true),
+            ).finally(() => setBusy(false))
+          }}
+        >{busy ? '…' : props.label('skill-update-install')}</button>
+        {installed ? <span className="text-xs text-muted-foreground">{props.label('skill-installed')}</span> : null}
+        {failed ? <span className="text-xs text-destructive">{props.label('skill-failed')}</span> : null}
+      </div>
+      <details className="mt-4 rounded-xl border px-3 py-2">
+        <summary className="cursor-pointer text-sm">{props.label('update-skill-choose')}</summary>
+        <div className="mt-3">
+          <SkillInstall
+            label={props.label}
+            readSkill={props.skill.readSkill}
+            installSkill={props.skill.installSkill}
+            {...props.skill.revealSkill === undefined ? {} : { revealSkill: props.skill.revealSkill }}
+          />
+        </div>
+      </details>
+    </>
+  )
+}
+
+/** Install into the assistants this browser already chose, or every assistant whose home exists. */
+async function updateInstalledSkill(skill: UpdateSkillActions): Promise<void> {
+  const customDirs = readSkillCustomDirs()
+  const saved = readSkillAgentIds()
+  const agentIds = saved ?? (await skill.readSkill(customDirs)).agents.filter(agent => agent.homePresent).map(agent => agent.id)
+  await skill.installSkill(agentIds, customDirs)
 }
 
 function Version(props: { readonly caption: string; readonly version: string; readonly strong?: boolean }): ReactNode {

@@ -131,8 +131,8 @@ describe('mountOwner', () => {
         credentials: [{ name: 'github', description: '个人 GitHub' }],
         writable: true,
       }),
-      putCredential: async (name: string, description: string, secret: string | undefined) => {
-        written.push(`${name}:${description}:${secret === undefined ? 'kept' : secret.length}`)
+      putCredential: async (name: string, description: string, secret: string | undefined, placeholder?: boolean) => {
+        written.push(`${name}:${description}:${secret === undefined ? 'kept' : secret.length}${placeholder === true ? ':placeholder' : ''}`)
       },
       removeCredential: async (name: string) => {
         removed.push(name)
@@ -160,6 +160,13 @@ describe('mountOwner', () => {
     })
     expect(noSecret.status).toBe(200)
     expect(written).toEqual(['gitlab:GitLab:10', 'gitlab:GitLab again:kept'])
+    const placeholder = await request(app, httpLayout.credentials, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'jira', description: 'Jira', placeholder: true }),
+    })
+    expect(placeholder.status).toBe(200)
+    expect(written).toEqual(['gitlab:GitLab:10', 'gitlab:GitLab again:kept', 'jira:Jira:kept:placeholder'])
     const noName = await request(app, httpLayout.credentials, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

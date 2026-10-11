@@ -7,7 +7,7 @@ import { PanelHistory } from '../history/view.tsx'
 import type { HistoryClient } from '../history/client.ts'
 import { isPanelLocale, panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import type { PanelPolicy, PanelSettingsClient, PanelUpdateCheck } from '../settings/client.ts'
-import { attemptCard, UpdateDialog, type UpdateCard } from '../settings/update-dialog.tsx'
+import { attemptCard, UpdateDialog, type UpdateCard, type UpdateSkillActions } from '../settings/update-dialog.tsx'
 import { checkSource } from '../settings/update-source.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { PanelSettings } from '../settings/view.tsx'
@@ -25,6 +25,7 @@ export interface PanelControls {
   setWorkbench(appId: string): void
   renameApp(from: string, to: string): void
   marketInstalled(kind: 'app' | 'theme', id: string): void
+  appChanged(event: { readonly appId: string; readonly change: 'created' | 'updated' | 'deleted' | 'restored' | 'renamed'; readonly from?: string }): void
 }
 
 /**
@@ -79,6 +80,7 @@ export function PanelSurface(props: {
         if (kind === 'app') setLibraryTick(value => value + 1)
         if (kind === 'theme') setPaletteTick(value => value + 1)
       },
+      appChanged: () => setLibraryTick(value => value + 1),
     })
   }, [props.onControls])
   useEffect(() => {
@@ -201,6 +203,7 @@ export function PanelSurface(props: {
               locale={chromeLocale}
               mode={props.mode}
               card={updateCard}
+              {...skillActions(updateCard, props.settings)}
               onClose={() => {
                 if (updateCard.kind === 'offer') sessionStorage.setItem(updateDismissedKey, updateCard.latest)
                 setUpdateCard(undefined)
@@ -246,6 +249,21 @@ async function writeDefault(
 
 /** An offer the owner put away stays away for this window. */
 const updateDismissedKey = 'mini-app.update-dismissed'
+
+/** The done card can update the writing skill. Other cards leave that section on the settings page. */
+function skillActions(
+  card: UpdateCard,
+  settings: PanelSettingsClient | undefined,
+): { readonly skill: UpdateSkillActions } | Record<string, never> {
+  if (card.kind !== 'done' || settings?.readSkill === undefined || settings.installSkill === undefined) return {}
+  return {
+    skill: {
+      readSkill: settings.readSkill,
+      installSkill: settings.installSkill,
+      ...settings.revealSkill === undefined ? {} : { revealSkill: settings.revealSkill },
+    },
+  }
+}
 
 /**
  * The card one check opens, if any. A recorded outcome outranks a fresh offer, and the host is told

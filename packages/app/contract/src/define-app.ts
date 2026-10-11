@@ -1,5 +1,6 @@
 import type { AppContext } from './context.ts'
 import { ContractError } from './codes.ts'
+import type { HostNotice } from './host-notice.ts'
 
 /** One backend method as the host calls it. `args` is the unchecked JSON. */
 export type AppApiMethod<State extends object = Record<string, never>> = (
@@ -25,6 +26,11 @@ export interface AppDefinition<State extends object = Record<string, never>> {
   description: string
   api: Record<string, DeclaredMethod<State>>
   state?: State
+  /**
+   * Called on this loaded instance when a host notice is published.
+   * Not an `api` method. The view does not receive the notice on `useApp().on`.
+   */
+  onHostEvents?: (ctx: AppContext<State>, event: HostNotice) => unknown
 }
 
 function isObject(value: unknown): value is object {
@@ -47,6 +53,9 @@ export function defineApp<State extends object, Definition extends AppDefinition
   }
   if (def.state !== undefined && !isObject(def.state)) {
     throw new ContractError('define-app-invalid', 'defineApp.state must be an object')
+  }
+  if (def.onHostEvents !== undefined && typeof def.onHostEvents !== 'function') {
+    throw new ContractError('define-app-invalid', 'defineApp.onHostEvents must be a function')
   }
   return def
 }

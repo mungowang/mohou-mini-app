@@ -114,7 +114,7 @@ describe('defineApp', () => {
     expect(kept).toBe(true)
   })
 
-  it('rejects a missing description, a bad api, and a bad state by code', () => {
+  it('rejects a missing description, a bad api, a bad state, and a bad host hook by code', () => {
     expect(() => defineApp({ name: 'Example', description: '', api: {} })).toThrow(ContractError)
     expect(() => defineApp({ name: 'Example', description: 'One line', api: [] as never })).toThrow(ContractError)
     expect(() => defineApp({
@@ -123,6 +123,24 @@ describe('defineApp', () => {
       api: {},
       state: [] as never,
     })).toThrow(ContractError)
+    expect(() => defineApp({
+      name: 'Example',
+      description: 'One line',
+      api: {},
+      onHostEvents: 'nope' as never,
+    })).toThrow(ContractError)
+  })
+
+  it('keeps onHostEvents on the returned object', () => {
+    const def = defineApp({
+      name: 'Example',
+      description: 'One line',
+      api: {},
+      onHostEvents(ctx, event) {
+        ctx.push('desk', event)
+      },
+    })
+    expect(typeof def.onHostEvents).toBe('function')
   })
 })
 

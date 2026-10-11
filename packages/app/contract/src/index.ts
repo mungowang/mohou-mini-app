@@ -14,6 +14,7 @@ export {
 } from './workbench.ts'
 export { assertImportAllowed, classifyImport, type ImportSide } from './imports.ts'
 export { defineApp, type AppApiMethod, type AppDefinition } from './define-app.ts'
+export { type AppChange, type HostNotice } from './host-notice.ts'
 export { ContractError, definitionCodes, type DefinitionCode } from './codes.ts'
 export { agentEventType, eventType, llmEventType, type AgentEventType, type EventType, type LlmEventType } from './event-type.ts'
 export type {

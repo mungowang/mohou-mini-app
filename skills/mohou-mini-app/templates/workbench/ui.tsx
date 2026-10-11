@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 
 import { AppCard, DashboardShell, LiveRefresh, PageHeader, useApp } from '@mohou/ui'
 
+import { deskEvent } from './shared/events.ts'
+
 type FocusItem = { id: string; title: string; detail: string }
 type AppItem = { id: string; name: string; description: string; version: string; acronym: string }
 type TrashItem = { id: string; name: string }
@@ -19,7 +21,7 @@ export default function Ui() {
   // ⭐ key: this file is one homepage, not the workbench type.
   //          Design what is seen first, and design how other apps are arranged and entered.
   //          The aside is one sketch. A grid, tiles, or no kit is the same kind.
-  const { call } = useApp()
+  const { call, on } = useApp()
   const [home, setHome] = useState<Home | null>(null)
   const [trash, setTrash] = useState<TrashItem[]>([])
   const [refusal, setRefusal] = useState<string | null>(null)
@@ -42,6 +44,12 @@ export default function Ui() {
       setRefusal(caught instanceof Error ? caught.message : String(caught))
     }
   }
+
+  useEffect(() => {
+    return on(deskEvent, () => {
+      void load()
+    })
+  }, [on, call])
 
   useEffect(() => {
     const gate: { alive: boolean } = { alive: true }

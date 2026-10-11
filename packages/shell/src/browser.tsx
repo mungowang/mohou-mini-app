@@ -55,6 +55,7 @@ events.onmessage = (event) => {
     to?: string
     kind?: string
     id?: string
+    change?: string
   }
   if (data.type === 'app:event' && typeof data.appId === 'string' && typeof data.name === 'string' && typeof data.seq === 'number') {
     frames.push({ appId: data.appId, name: data.name, data: data.data, seq: data.seq })
@@ -79,9 +80,20 @@ events.onmessage = (event) => {
   if (data.type === 'market:install' && (data.kind === 'app' || data.kind === 'theme') && typeof data.id === 'string') {
     controls?.marketInstalled(data.kind, data.id)
   }
+  if (data.type === 'app:changed' && typeof data.appId === 'string' && isAppChange(data.change)) {
+    controls?.appChanged({
+      appId: data.appId,
+      change: data.change,
+      ...typeof data.from === 'string' ? { from: data.from } : {},
+    })
+  }
   if ((data.type === 'app:reload' || data.type === 'app:eval') && typeof data.appId === 'string') {
     if (!postToAppFrame(data.appId, data) && data.type === 'app:eval') reportAbsent(data.appId)
   }
+}
+
+function isAppChange(value: unknown): value is 'created' | 'updated' | 'deleted' | 'restored' | 'renamed' {
+  return value === 'created' || value === 'updated' || value === 'deleted' || value === 'restored' || value === 'renamed'
 }
 
 /** The panel document holds one iframe per open app, titled with the app id. A missing frame is the panel's to report. */

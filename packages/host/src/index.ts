@@ -52,7 +52,7 @@ export {
   type AuthorEvent,
 } from './events/app-events.ts'
 export { admitErrorReport, createErrorRing, errorKinds, type AppErrorRecord, type ErrorKind } from './events/error-ring.ts'
-export { createHostEvents, type HostEvent } from './events/host-events.ts'
+export { createHostEvents, type AppChange, type HostEvent } from './events/host-events.ts'
 export {
   DEFAULT_VIEW_CODE,
   DEFAULT_VIEW_MAX_BYTES,

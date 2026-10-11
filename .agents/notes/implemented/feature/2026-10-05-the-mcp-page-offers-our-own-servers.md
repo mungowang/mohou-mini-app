@@ -2,6 +2,8 @@
 
 Status: implemented
 
+Superseded in part by [Library changes, empty credentials, and the update card](2026-10-11-library-changes-and-the-update-card.md): a preset click now writes the server.
+
 ## Problem
 
 Adding Jira or GitLab meant knowing the package name, the `npx -y` invocation, and the environment variable names each server reads — then typing them into a form, and separately creating the credential entries their `${credential:NAME}` references point at. The knowledge existed in two READMEs outside this product, and the credential step was only discoverable by saving a server and reading the warning that a reference names nothing.

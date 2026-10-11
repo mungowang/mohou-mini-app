@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import { Dialog } from '../ui/dialog.tsx'
 import type { McpCheckResult, McpServerDraft, PanelMcpFailure, PanelSettingsClient } from './client.ts'
+import { credentialNamesOfServer, ensureCredentialPlaceholders } from './mcp-credentials.ts'
 import { mcpPresets, presetDraft, type McpPreset } from './mcp-presets.ts'
 
 type Transport = 'stdio' | 'sse' | 'http'
@@ -98,11 +99,23 @@ export function McpSettings(props: {
               type="button"
               data-preset={preset.id}
               className="h-8 rounded-lg border bg-card px-3 text-sm hover:bg-muted"
-              onClick={() => { void openPreset(props.client, preset, setDraft, setNotice, label) }}
+              onClick={() => {
+                void installPreset(props.client, preset, servers, setServers, setUnresolved, setAlert, setNotice, label)
+              }}
             >
               {preset.label}
             </button>
           ))}
+          {props.client.putCredential === undefined ? null : (
+            <button
+              type="button"
+              data-credential-scan=""
+              className="h-8 rounded-lg border bg-card px-3 text-sm hover:bg-muted"
+              onClick={() => { void scanCredentialPlaceholders(props.client, servers, setNotice, label) }}
+            >
+              {label('mcp-credential-scan')}
+            </button>
+          )}
           <span className="text-xs text-muted-foreground">{label('mcp-quick-add-help')}</span>
         </div>
       )}
@@ -603,29 +616,45 @@ function toDraft(server: McpServerDraft): Draft {
 }
 
 /**
- * Open the form for one of our own servers, and make the credentials it references exist.
- * The form is not saved here: the person fills the credentials, checks the server, then saves.
+ * Write one preset server and create the empty credentials it names.
+ * An existing server with the same id is replaced. An existing credential is left as stored.
  */
-async function openPreset(
+async function installPreset(
   client: PanelSettingsClient,
   preset: McpPreset,
-  setDraft: (draft: Draft) => void,
+  servers: readonly McpServerDraft[],
+  setServers: (servers: McpServerDraft[]) => void,
+  setUnresolved: (failures: readonly PanelMcpFailure[]) => void,
+  setAlert: (alert: 'import' | 'save' | undefined) => void,
   setNotice: (notice: string) => void,
   label: (key: string) => string,
 ): Promise<void> {
-  setDraft(presetDraft(preset))
-  const put = client.putCredential
-  if (put === undefined) return
-  const created: string[] = []
-  for (const credential of preset.credentials) {
-    try {
-      await put(credential.name, credential.description)
-      created.push(credential.name)
-    } catch {
-      // A credential that cannot be written is not a reason to refuse the form.
-    }
-  }
-  if (created.length > 0) setNotice(`${label('mcp-preset-credentials')} ${created.join(', ')}`)
+  const server = fromDraft(presetDraft(preset))
+  const next = servers.filter(item => item.id !== server.id).concat(server)
+  const wrote = await commit(client, next, setServers, setUnresolved, setAlert, setNotice, label)
+  const created = await ensureCredentialPlaceholders(client, preset.credentials)
+  if (wrote) setNotice(presetNotice(label, preset.label, created))
+  else if (created.length > 0) setNotice(label('mcp-preset-fill').replace('{names}', created.join(', ')))
+}
+
+/** Create an empty credential for each `${credential:NAME}` the saved servers name and the store lacks. */
+async function scanCredentialPlaceholders(
+  client: PanelSettingsClient,
+  servers: readonly McpServerDraft[],
+  setNotice: (notice: string) => void,
+  label: (key: string) => string,
+): Promise<void> {
+  const wanted = servers.flatMap(server => credentialNamesOfServer(server).map(name => ({ name, description: '' })))
+  const created = await ensureCredentialPlaceholders(client, wanted)
+  setNotice(created.length === 0
+    ? label('mcp-credential-none')
+    : label('mcp-preset-fill').replace('{names}', created.join(', ')))
+}
+
+function presetNotice(label: (key: string) => string, name: string, created: readonly string[]): string {
+  const added = label('mcp-preset-added').replace('{id}', name)
+  if (created.length === 0) return `${added} ${label('mcp-preset-fill-none')}`
+  return `${added} ${label('mcp-preset-fill').replace('{names}', created.join(', '))}`
 }
 
 function fromDraft(draft: Draft): McpServerDraft {
@@ -679,8 +708,18 @@ async function saveDraft(
   setNotice: (message: string) => void,
   label: (key: string) => string,
 ): Promise<boolean> {
-  const next = servers.filter(server => server.id !== draft.editing && server.id !== draft.id.trim()).concat(fromDraft(draft))
-  return commit(client, next, setServers, setUnresolved, setAlert, setNotice, label)
+  const server = fromDraft(draft)
+  const next = servers.filter(item => item.id !== draft.editing && item.id !== server.id).concat(server)
+  const wrote = await commit(client, next, setServers, setUnresolved, setAlert, setNotice, label)
+  if (!wrote) return false
+  const created = await ensureCredentialPlaceholders(
+    client,
+    credentialNamesOfServer(server).map(name => ({ name, description: '' })),
+  )
+  if (created.length > 0) {
+    setNotice(`${label('mcp-saved')} ${label('mcp-preset-fill').replace('{names}', created.join(', '))}`)
+  }
+  return true
 }
 
 async function commit(

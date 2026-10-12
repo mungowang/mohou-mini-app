@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { Tooltip } from '../ui/tooltip.tsx'
 import type { PanelSkillCopy, PanelSkillStatus } from './client.ts'
@@ -14,6 +14,8 @@ export function SkillInstall(props: {
   readonly readSkill?: (customDirs?: readonly string[]) => Promise<PanelSkillStatus>
   readonly installSkill?: (agentIds: readonly string[], customDirs: readonly string[]) => Promise<PanelSkillStatus>
   readonly revealSkill?: (dest: string) => Promise<void>
+  /** Latest status from a sibling install. Replaces the last read while this instance is open. */
+  readonly status?: PanelSkillStatus
 }): ReactNode {
   const [skill, setSkill] = useState<PanelSkillStatus | undefined>(undefined)
   const [busy, setBusy] = useState(false)
@@ -22,15 +24,28 @@ export function SkillInstall(props: {
   const [customDirs, setCustomDirs] = useState<readonly string[]>(() => readSkillCustomDirs())
   const [customDraft, setCustomDraft] = useState('')
   const [customError, setCustomError] = useState(false)
+  // Bumped when a sibling install lands, so an in-flight read cannot overwrite it.
+  const generation = useRef(0)
   useEffect(() => {
     if (props.readSkill === undefined) return
+    const gen = generation.current + 1
+    generation.current = gen
     void props.readSkill(customDirs).then((status) => {
+      if (gen !== generation.current) return
       setSkill(status)
       if (readSkillAgentIds() === undefined) {
         setPicked(new Set(status.agents.filter(agent => agent.homePresent).map(agent => agent.id)))
       }
-    }, () => setSkill(undefined))
+    }, () => {
+      if (gen !== generation.current) return
+      setSkill(undefined)
+    })
   }, [props.readSkill, customDirs])
+  useEffect(() => {
+    if (props.status === undefined) return
+    generation.current += 1
+    setSkill(props.status)
+  }, [props.status])
   if (props.readSkill === undefined) return null
   return (
     <div className="rounded-2xl border bg-card px-4 py-3">

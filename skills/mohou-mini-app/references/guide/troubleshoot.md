@@ -114,6 +114,7 @@ Match `code`. The message is for a person. Full table: [loader.md](loader.md).
 | `main.api must export defineApp({ name, description, api })` | Missing `export default defineApp({...})` | Add the default export |
 | `defineApp requires name and description` | One of them is missing | Provide both |
 | `defineApp.api must be an object` | `api` written as a function or array | `api: { async list(ctx) {…} }` |
+| `defineApp.onHostEvents must be a function` | `onHostEvents` is present but not a function | Pass a function, or omit the field |
 | `backend cannot import '<spec>'. Install it first: mini_app_install(...)` | The app needs that library but it is not in its own `node_modules` | Run `mini_app_install({ appId, packages: [{ name: "<spec>" }] })`, then `mini_app_reload`. Do **not** move the import into `ui.tsx` |
 | `backend cannot import '<spec>' (no package.json)` | Same, and nothing has ever been installed for this app | `mini_app_install` creates the manifest — never hand-write `package.json` |
 | `backend cannot import '<spec>': it resolves outside this app's node_modules` | The app is reaching the plugin's/repo's dependency tree | Reinstall the package into the app; a host dependency is not an app dependency |

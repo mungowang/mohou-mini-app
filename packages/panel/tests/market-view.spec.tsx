@@ -233,6 +233,35 @@ describe('market view', () => {
 })
 
 describe('market refresh', () => {
+  it('tells chrome when a catalog read settles', async () => {
+    let settled = 0
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let tick = 0
+    const render = () => act(() => {
+      root.render(
+        <MarketView
+          locale="en"
+          mode="production"
+          refreshTick={tick}
+          list={async () => [appRow]}
+          onCatalogSettled={() => { settled += 1 }}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    render()
+    await act(async () => { await Promise.resolve() })
+    expect(settled).toBe(1)
+    tick = 1
+    render()
+    await act(async () => { await Promise.resolve() })
+    expect(settled).toBe(2)
+    await act(async () => { root.unmount() })
+    host.remove()
+  })
+
   it('reads the catalog again when chrome bumps the tick and after an install', async () => {
     const untracked = { ...appRow, tracked: false }
     const installed = { ...appRow, tracked: true, installedVersion: appRow.version }
@@ -275,5 +304,51 @@ describe('market refresh', () => {
     })
     expect(calls).toBe(3)
     expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Installed'))).toBe(true)
+  })
+
+  it('clears the post-install Installed mark when a later catalog read offers an update', async () => {
+    // Install pins `done` on the card. A chrome refresh must drop that pin so a newer catalog can show Update.
+    let phase: 'before' | 'installed' | 'update' = 'before'
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let tick = 0
+    const render = () => act(() => {
+      root.render(
+        <MarketView
+          locale="en"
+          mode="production"
+          refreshTick={tick}
+          list={async () => {
+            if (phase === 'before') return [{ ...appRow, tracked: false }]
+            if (phase === 'installed') return [{ ...appRow, tracked: true, installedVersion: appRow.version }]
+            return [{ ...appRow, version: '2.0.0', tracked: true, installedVersion: appRow.version }]
+          }}
+          install={async () => { phase = 'installed' }}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    render()
+    await act(async () => { await Promise.resolve() })
+    const card = host.querySelector('[data-market-card="com.example.desk"]') as HTMLElement
+    const ask = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('Replace'))
+    await act(async () => { ask?.click() })
+    const confirm = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('Confirm'))
+    await act(async () => { confirm?.click() })
+    await act(async () => {
+      for (let round = 0; round < 8; round += 1) await Promise.resolve()
+    })
+    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Installed'))).toBe(true)
+    phase = 'update'
+    tick = 1
+    render()
+    await act(async () => {
+      for (let round = 0; round < 8; round += 1) await Promise.resolve()
+    })
+    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('Update'))).toBe(true)
+    expect([...host.querySelectorAll('button')].some(item => item.textContent === 'Installed')).toBe(false)
+    await act(async () => { root.unmount() })
+    host.remove()
   })
 })

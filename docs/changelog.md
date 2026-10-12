@@ -1,13 +1,32 @@
 ---
 status: locked
-updated: 2026-10-10
+updated: 2026-10-12
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.58
+
+The header refresh control spins on the library, an app tab, and the market tab while the work runs.
+
+## 1.0.57
+
+Market refresh drops the temporary Installed mark left after an install click, so a newer catalog version can show Update without closing the tab.
+
+## 1.0.56
+
+
+The update done card's one-step writing-skill install refreshes the folded assistant list with the status that install returned, so the rows stop offering an older copy.
+
+## 1.0.55
+
+
+A register, write, reload, rename, trash, or restore publishes `app:changed`, and the builtin gallery and trash refetch from it. A loaded app can handle that notice with `defineApp.onHostEvents`; the sample workbench does, and its view refetches. MCP quick add writes the preset server and creates empty credentials for its `${credential:NAME}` references when those names are absent. Saving a server, or scanning the saved file, does the same. The update done card says the writing skill follows this version, and can update the copies already chosen in one step.
+
 ## 1.0.54
+
 
 Settings can delete a custom palette, with an inline confirm, and its palette cards now paint the same light and dark dummy as the market. The market card footer has a gap above its rule. The refresh control reads the catalog again on the market tab, and a finished install reads it again so the rows and the filter counts are the host's answer. Settings asks 取消修改 beside Save while the form is dirty. The first tab reads 首页.
 

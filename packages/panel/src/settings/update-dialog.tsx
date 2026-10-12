@@ -209,6 +209,7 @@ function SkillShortcut(props: {
   const [busy, setBusy] = useState(false)
   const [installed, setInstalled] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [status, setStatus] = useState<PanelSkillStatus | undefined>(undefined)
   return (
     <>
       <div className="mt-3 flex items-center gap-3">
@@ -222,7 +223,10 @@ function SkillShortcut(props: {
             setFailed(false)
             setInstalled(false)
             void updateInstalledSkill(props.skill).then(
-              () => setInstalled(true),
+              (next) => {
+                setStatus(next)
+                setInstalled(true)
+              },
               () => setFailed(true),
             ).finally(() => setBusy(false))
           }}
@@ -238,6 +242,7 @@ function SkillShortcut(props: {
             readSkill={props.skill.readSkill}
             installSkill={props.skill.installSkill}
             {...props.skill.revealSkill === undefined ? {} : { revealSkill: props.skill.revealSkill }}
+            {...status === undefined ? {} : { status }}
           />
         </div>
       </details>
@@ -246,11 +251,11 @@ function SkillShortcut(props: {
 }
 
 /** Install into the assistants this browser already chose, or every assistant whose home exists. */
-async function updateInstalledSkill(skill: UpdateSkillActions): Promise<void> {
+async function updateInstalledSkill(skill: UpdateSkillActions): Promise<PanelSkillStatus> {
   const customDirs = readSkillCustomDirs()
   const saved = readSkillAgentIds()
   const agentIds = saved ?? (await skill.readSkill(customDirs)).agents.filter(agent => agent.homePresent).map(agent => agent.id)
-  await skill.installSkill(agentIds, customDirs)
+  return skill.installSkill(agentIds, customDirs)
 }
 
 function Version(props: { readonly caption: string; readonly version: string; readonly strong?: boolean }): ReactNode {

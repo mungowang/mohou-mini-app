@@ -91,11 +91,27 @@ Restore is a panel action. The app does not restore backups.
 
 An unknown id, or an app that is not a workbench, does not change the stored id. The field does not delete an app, read another app's files, or change settings.
 
-A loaded workbench can take host notices with `defineApp({ onHostEvents(ctx, event) })`. The host calls that hook. The view does not. `event` is `app:open`, `app:rename`, `app:changed`, `workbench:default`, `app:reload`, `storage-size`, or `market:install`. `app:changed` carries `appId` and `change` (`created`, `updated`, `deleted`, `restored`, `renamed`). `from` is the previous id when `change` is `renamed`. The sample pushes one name of its own from the hook. The view refetches `listApps` and the trash from `useApp().on` of that name. An omitted hook is skipped. An instance that is not loaded is skipped.
+## Host notices
+
+`defineApp({ onHostEvents(ctx, event) })` is optional on any app. It is not an `api` method and is not limited to a workbench. The host calls it on each loaded instance that defined it, with a fresh `ctx`. The view does not receive the notice on `useApp().on`. The hook may `ctx.push` a name this app owns so the view can react. An omitted hook is skipped. An instance that is not loaded is skipped. `app:eval` is not a notice. A thrown hook is logged; later instances still run, and the write that published the notice still stands.
+
+`event.type` is one of:
+
+| `type` | Payload |
+|---|---|
+| `app:open` | `appId`, optional `title` |
+| `app:rename` | `from`, `to` |
+| `app:changed` | `appId`, `change` (`created` \| `updated` \| `deleted` \| `restored` \| `renamed`), optional `from` when `change` is `renamed` |
+| `workbench:default` | `appId` |
+| `app:reload` | `appId` |
+| `storage-size` | `appId`, `table`, `keys` |
+| `market:install` | `kind` (`app` \| `theme`), `id` |
+
+Worked example: `templates/workbench/` pushes one name of its own from the hook; the view refetches `listApps` and the trash from `useApp().on` of that name. Any app that must refresh after a library write uses the same pattern.
 
 ## Shared event names
 
-`ctx.push("stage", …)` and `useApp().on("stage", …)` are joined by a string. Declare names in `shared/` — the only tree both sides may import. The same literal on both sides without that declaration is `event-undeclared`. A name used on one side only is not that failure. `on("*")` is not an event name.
+`ctx.push("stage", …)` and `useApp().on("stage", …)` are joined by a string. Declare names in `shared/` — the only tree both sides may import. The same literal on both sides without that declaration is `event-undeclared`. A name used on one side only is not that failure. `on("*")` is not an event name. A host notice is not an event name on this path; bridge it with `onHostEvents` and `ctx.push` when the view must hear it.
 
 Worked example: `templates/radar/shared/events.ts`. The UI loads one snapshot on mount and then applies events. It does not poll. A reconnect whose last id is older than the buffer delivers `app:gap`; `onAny` surfaces `{ name: "*", data: { gap: true } }`. Refetch the snapshot. Do not invent the missing events.
 

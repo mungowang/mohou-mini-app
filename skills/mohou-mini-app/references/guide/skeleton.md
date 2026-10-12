@@ -45,3 +45,5 @@ export default defineApp({
   },
 })
 ```
+
+`onHostEvents(ctx, event)` is an optional sibling of `api`, on any app. It is not a method the UI `call`s. Use it when this loaded instance must react to a host notice (library change, reload, market install, and the rest). Push a name this app owns; the view listens with `useApp().on`. Details: [ctx.md](ctx.md#host-notices). Worked example: `templates/workbench/`.

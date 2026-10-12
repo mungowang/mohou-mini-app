@@ -102,19 +102,36 @@ describe('UpdateDialog', () => {
     localStorage.setItem('mini-app.panel.skill-agents', JSON.stringify(['claude']))
     localStorage.setItem('mini-app.panel.skill-dirs', JSON.stringify(['~/extra/skills']))
     const installed: Array<{ ids: readonly string[]; dirs: readonly string[] }> = []
+    const after = {
+      ...status,
+      agents: status.agents.map(agent => agent.id === 'claude'
+        ? { ...agent, updateAvailable: false, version: '1.0.17' }
+        : agent),
+    }
     const skill = {
       readSkill: async () => status,
       installSkill: async (ids: readonly string[], dirs: readonly string[]) => {
         installed.push({ ids, dirs })
-        return status
+        return after
       },
     }
     const { host, root } = await render({ kind: 'done', version: '1.0.17' }, { skill })
     expect(host.textContent).toContain('Choose assistants')
     expect(host.querySelector('details')?.open).toBe(false)
+    // Open the list first so a stale read is on screen, then the one-click install must replace it.
+    await act(async () => {
+      const summary = host.querySelector('details summary')
+      summary?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(host.textContent).toContain('Update available')
+    expect(host.textContent).toContain('1.0.16')
     await click(host, 'Update writing skill')
     expect(installed).toEqual([{ ids: ['claude'], dirs: ['~/extra/skills'] }])
     expect(host.textContent).toContain('Installed')
+    expect(host.textContent).toContain('1.0.17')
+    expect(host.textContent).not.toContain('Update available')
+    expect(host.textContent).not.toContain('1.0.16')
     await unmount(root, host)
   })
 

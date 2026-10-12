@@ -131,6 +131,8 @@ export function GalleryBody(props: {
   const [refreshing, setRefreshing] = useState(false)
   /** Bumped to make an open market tab read the catalog again. */
   const [marketTick, setMarketTick] = useState(0)
+  /** Resolves the chrome spin started by a market refresh click. */
+  const marketRefreshSettle = useRef<(() => void) | undefined>(undefined)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const mac = isMacPlatform(navigator.platform, navigator.userAgent)
   useEffect(() => bindPaletteChord(document, () => { setPaletteOpen(open => !open) }), [])
@@ -235,11 +237,18 @@ export function GalleryBody(props: {
           <Tooltip text={appTab ? label('reload') : label('refresh')}>
             <button
               type="button"
-              className="inline-flex size-8 items-center justify-center rounded-lg transition-colors duration-150 hover:bg-muted"
+              className="inline-flex size-8 items-center justify-center rounded-lg transition-colors duration-150 hover:bg-muted disabled:opacity-60"
               aria-label={appTab ? label('reload') : label('refresh')}
+              disabled={refreshing}
               onClick={() => {
-                // The market tab owns its own data: a refresh reads the catalog again.
-                if (marketTab) { setMarketTick(value => value + 1); return }
+                // Library, app, and market all spin this control while the work runs.
+                if (marketTab) {
+                  void withRefreshSpin(() => new Promise<void>((resolve) => {
+                    marketRefreshSettle.current = resolve
+                    setMarketTick(value => value + 1)
+                  }), setRefreshing)
+                  return
+                }
                 void refreshList(props.client, appTab && active?.kind === 'app' ? active.appId : undefined, !appTab ? desk?.id : undefined, dispatch, setRefreshing)
               }}
             >
@@ -312,6 +321,11 @@ export function GalleryBody(props: {
                 list={props.client.listMarket}
                 install={props.client.installMarket}
                 refreshTick={marketTick}
+                onCatalogSettled={() => {
+                  const settle = marketRefreshSettle.current
+                  marketRefreshSettle.current = undefined
+                  settle?.()
+                }}
                 onInstalled={() => { void refreshList(props.client, undefined, undefined, dispatch, setRefreshing) }}
               />
             </div>
@@ -533,6 +547,24 @@ async function removeApp(client: PanelClient, appId: string | undefined, dispatc
   dispatch({ type: 'deleted', appId })
 }
 
+/** Shortest chrome spin so a fast list still shows one turn. */
+const refreshSpinMs = 400
+
+async function withRefreshSpin(
+  work: () => Promise<void>,
+  setRefreshing: (value: boolean) => void,
+): Promise<void> {
+  setRefreshing(true)
+  const started = Date.now()
+  try {
+    await work()
+  } finally {
+    const wait = refreshSpinMs - (Date.now() - started)
+    if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
+    setRefreshing(false)
+  }
+}
+
 async function refreshList(
   client: PanelClient,
   appId: string | undefined,
@@ -540,19 +572,13 @@ async function refreshList(
   dispatch: (action: GalleryAction) => void,
   setRefreshing: (value: boolean) => void,
 ): Promise<void> {
-  setRefreshing(true)
-  const started = Date.now()
-  try {
+  await withRefreshSpin(async () => {
     if (appId !== undefined && client.reload !== undefined) await reloadApp(client, appId, dispatch)
     else {
       await loadGallery(client, dispatch)
       if (workbenchId !== undefined) await reloadApp(client, workbenchId, dispatch)
     }
-  } finally {
-    const wait = 400 - (Date.now() - started)
-    if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
-    setRefreshing(false)
-  }
+  }, setRefreshing)
 }
 
 function statusDot(kind: GalleryKind): 'ready' | 'failed' | 'down' {

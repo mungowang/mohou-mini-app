@@ -43,7 +43,9 @@ The host injects `defineApp`. Allowlist: `@mohou/contract`, `lodash` / `lodash-e
 
 A real Node library: `mini_app_install({ appId, packages: [{ name: "exceljs" }] })`, then `import ExcelJS from "exceljs"`. Do not hand-write `package.json`. `sheets` teaches install and ships without `package.json`.
 
-`export default defineApp({ name, description, api })`.
+`export default defineApp({ name, description, api, onHostEvents? })`.
+
+`onHostEvents(ctx, event)` is optional. It is not an `api` method. Any loaded app may define it. The host calls it when a host notice is published. `useApp().on` does not receive that notice. The hook may `ctx.push` a name this app owns. Notices and payload: [ctx.md](ctx.md#host-notices).
 
 ## Frontend
 
@@ -73,7 +75,7 @@ Match `code`. The message is for a person.
 | `manifest-invalid` | `id` `name` `description` `version` `entry`, or a bad `acronym` or `tags` |
 | `import-forbidden` | drop the specifier, or `mini_app_install` if the message names that tool |
 | `import-escape` | keep the import inside the app dir |
-| `define-app-invalid` | fix `name`, `description`, or `api` |
+| `define-app-invalid` | fix `name`, `description`, `api`, or a non-function `onHostEvents` |
 | `backend-invalid` | backend syntax or an undefined name |
 | `ui-invalid` | UI bundle or an undefined name |
 | `shared-invalid` | JSX or a forbidden name in `shared/` |

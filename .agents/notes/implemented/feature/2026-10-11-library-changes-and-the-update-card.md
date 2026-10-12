@@ -26,7 +26,7 @@ The card that says the new version is running stopped there. The writing skill s
 
 Publish sites: register `created`; file write, edit, or delete `updated`; the reload that publishes `app:reload` also `updated`; a history reset that changed the tree `updated`; rename `renamed` with `from`; trash `deleted`; restore `restored`; a market app install `created`, or `updated` when it replaces, beside `market:install`; each sample the settings button copies `created`. A failed write publishes nothing. npm package install and the sample copy at host boot publish nothing.
 
-**The done card names where the skill is, and can update it.** The sentence points at Settings → Agent, and at this card. The button installs into the assistants this browser already chose, or into every assistant whose home exists when nothing was saved. The settings skill list is the same `SkillInstall`, folded in the card.
+**The done card names where the skill is, and can update it.** The sentence points at Settings → Agent, and at this card. The button installs into the assistants this browser already chose, or into every assistant whose home exists when nothing was saved. The settings skill list is the same `SkillInstall`, folded in the card. The one-step install returns `PanelSkillStatus` and passes it into that list, so a successful click replaces "update available" with the version just written. An in-flight `readSkill` from the list's own mount does not overwrite that result.
 
 ## Alternatives considered
 
@@ -41,4 +41,4 @@ An empty credential keeps the server from starting until the secret is filled an
 
 A market app install refetches the gallery twice, once for `market:install` and once for `app:changed`. Theme installs stay on `market:install` only.
 
-The workbench template and the skill copy both define the hook and listen for the name they push. `check:skill` fails if those two trees drift. The skill version is still the shell version and is not bumped here.
+The workbench template and the skill copy both define the hook and listen for the name they push. `check:skill` fails if those two trees drift. The skill states the hook on any loaded app — Files, `loader.md`, `skeleton.md`, and a Host notices section in `ctx.md` — not only under workbench. The skill version is still the shell version and is not bumped here.

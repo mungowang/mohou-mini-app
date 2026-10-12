@@ -1,5 +1,5 @@
 import { Download, Hash, Loader2, Package, PackageSearch, Store, Tag, User } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { MarketRow } from '../gallery/client.ts'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
@@ -16,6 +16,8 @@ export function MarketView(props: {
   readonly mode: PanelLabelMode
   /** Bumped when chrome asks for a refresh, so the catalog is read again. */
   readonly refreshTick?: number
+  /** Fires when a catalog read settles, including the chrome-driven refresh. */
+  readonly onCatalogSettled?: () => void
   readonly onInstalled: () => void
 }): ReactNode {
   const label = (key: string) => panelText(props.locale, key, props.mode)
@@ -28,21 +30,35 @@ export function MarketView(props: {
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState<string>()
   const [busy, setBusy] = useState<string>()
+  // Optimistic mark until a catalog read lands. A later read clears it so a new catalog version can show Update.
   const [done, setDone] = useState<string>()
   const [loading, setLoading] = useState(false)
+  const loadGeneration = useRef(0)
 
   function load(): void {
     if (props.list === undefined) {
       setError(label('market-unavailable'))
+      props.onCatalogSettled?.()
       return
     }
+    const generation = loadGeneration.current + 1
+    loadGeneration.current = generation
     setLoading(true)
     void props.list().then((next) => {
+      if (generation !== loadGeneration.current) return
       setRows(next)
+      // Host answer owns the install button. Keep `done` only while this read is still in flight.
+      setDone(undefined)
       setError(undefined)
       if (!next.some(row => row.kind === 'app') && next.some(row => row.kind === 'theme')) setKind('theme')
-    }).catch(failure => setError(failure instanceof Error ? failure.message : label('market-failed')))
-      .finally(() => setLoading(false))
+    }).catch((failure) => {
+      if (generation !== loadGeneration.current) return
+      setError(failure instanceof Error ? failure.message : label('market-failed'))
+    }).finally(() => {
+      if (generation !== loadGeneration.current) return
+      setLoading(false)
+      props.onCatalogSettled?.()
+    })
   }
 
   useEffect(() => { load() }, [props.list, props.refreshTick])

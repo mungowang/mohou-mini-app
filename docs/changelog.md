@@ -7,6 +7,10 @@ updated: 2026-10-12
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.59
+
+The list-home refresh test mounts its own gallery and waits for the list load, so Refresh is enabled and the slot workbench reload is visible.
+
 ## 1.0.58
 
 The header refresh control spins on the library, an app tab, and the market tab while the work runs.

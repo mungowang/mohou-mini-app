@@ -95,9 +95,11 @@ describe('gallery card styles and toolbar', () => {
       reload: async (id) => { reloadedIds.push(id) },
     }
     state = reduceGallery(galleryState('standalone'), { type: 'listed', apps: [todo, desk] })
+    // The reload above still holds this mount's spin, which disables the control. The list home is a new mount.
     await act(async () => {
       root.render(
         <GalleryBody
+          key="home"
           state={state}
           dispatch={dispatch}
           client={home}
@@ -108,8 +110,10 @@ describe('gallery card styles and toolbar', () => {
       )
     })
     await act(async () => {
-      host.querySelector('button[aria-label="Refresh"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
+      const refresh = host.querySelector('button[aria-label="Refresh"]')
+      if (refresh instanceof HTMLButtonElement) refresh.click()
+      // The list load settles, then the slot workbench reloads.
+      for (let round = 0; round < 8; round += 1) await Promise.resolve()
     })
     expect(reloadedIds).toEqual([desk.id])
     const listed = client

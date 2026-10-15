@@ -9,7 +9,7 @@ This page owns released version notes. The product version is the `version` fiel
 
 ## 1.0.65
 
-The panel window disables Tauri's native file-drop handler so HTML5 / `FileDropzone` receives OS file drops (same as the browser).
+The panel window disables Tauri's native file-drop handler so HTML5 / `FileDropzone` receives OS file drops (same as the browser). The shipped prefix keeps `node_modules/.bin` links relative to that prefix, so they resolve after the bundle leaves the build machine.
 
 ## 1.0.64
 

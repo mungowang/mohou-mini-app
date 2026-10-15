@@ -24,6 +24,8 @@ describe('prefix dependencies', () => {
     const plist = readFileSync(join(root, 'scripts/build/macos-Info.plist'), 'utf8')
     const run = readFileSync(join(root, 'scripts/build/run-launcher.sh'), 'utf8')
     const win = readFileSync(join(root, 'scripts/build/sidecar.cmd'), 'utf8')
+    expect(app).toContain('copyInstallPrefix')
+    expect(app).not.toContain('cpSync(prefix')
     expect(app).toContain("'MacOS'")
     expect(app).toContain('chmodSync(executable, 0o755)')
     expect(app).toContain('macos-Info.plist')

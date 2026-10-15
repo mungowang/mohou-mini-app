@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { fileDependencies } from '../pack/prefix-deps.mjs'
+import { copyInstallPrefix } from './copy-prefix.mjs'
 import { runCommand } from './run-command.mjs'
 import { syncSkillIntoShell } from '../sync/skill-into-shell.mjs'
 
@@ -369,7 +370,7 @@ if (process.platform === 'win32') {
 function writeMacBundle({ version, label, prefix, built }) {
   mkdirSync(macos, { recursive: true })
   mkdirSync(resources, { recursive: true })
-  cpSync(prefix, join(resources, 'prefix'), { recursive: true })
+  copyInstallPrefix(prefix, join(resources, 'prefix'))
   const executable = join(macos, 'Mohou')
   cpSync(built, executable)
   chmodSync(executable, 0o755)
@@ -403,7 +404,7 @@ function writeWindowsBundle({ version, label, prefix, built }) {
   const folder = join(outDir, folderName)
   mkdirSync(folder, { recursive: true })
   cpSync(built, join(folder, 'Mohou.exe'))
-  cpSync(prefix, join(folder, 'Resources/prefix'), { recursive: true })
+  copyInstallPrefix(prefix, join(folder, 'Resources/prefix'))
   cpSync(join(root, 'scripts/build/sidecar.cmd'), join(folder, 'run.cmd'))
   writeFileSync(join(folder, 'VERSION'), `${version}\n`)
   writeFileSync(join(folder, 'README.md'), windowsReadme(version, label))

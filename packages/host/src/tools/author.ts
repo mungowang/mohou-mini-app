@@ -43,6 +43,7 @@ export const authorToolNames = [
   'mini_app_list',
   'mini_app_market_list',
   'mini_app_market_install',
+  'mini_app_market_uninstall',
   'mini_app_get',
   'mini_app_list_files',
   'mini_app_read',
@@ -154,6 +155,7 @@ export function createAuthorTools(options: {
   readonly market?: {
     list: () => Promise<MarketListRow[]>
     install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+    uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
   }
 }) {
   const live = new Map<string, LiveApp>()
@@ -261,6 +263,7 @@ async function invoke(
     market?: {
       list: () => Promise<MarketListRow[]>
       install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+      uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
     }
   },
   live: Map<string, LiveApp>,
@@ -322,6 +325,8 @@ async function invoke(
       return marketList(options, input)
     case 'mini_app_market_install':
       return marketInstall(options, input)
+    case 'mini_app_market_uninstall':
+      return marketUninstall(options, input)
     case 'mini_app_rename':
       return renameRegistered(options, live, requiredString(input, 'appId'), requiredString(input, 'newAppId'))
     case 'mini_app_reload':
@@ -945,6 +950,7 @@ async function marketInstall(
     readonly market?: {
       list: () => Promise<MarketListRow[]>
       install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+      uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
     }
     readonly hostEvents?: { publish: (event: HostEvent) => void }
   },
@@ -969,6 +975,36 @@ async function marketInstall(
       change: input.overwrite === true ? 'updated' : 'created',
     })
   }
+  return { id, kind }
+}
+
+async function marketUninstall(
+  options: {
+    readonly market?: {
+      list: () => Promise<MarketListRow[]>
+      install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+      uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
+    }
+    readonly hostEvents?: { publish: (event: HostEvent) => void }
+  },
+  input: Record<string, unknown>,
+): Promise<{ id: string; kind: MarketKind }> {
+  if (options.market === undefined) throw new MarketError('market-catalog', 'market is not available')
+  const id = requiredString(input, 'appId')
+  const kind = requiredString(input, 'kind')
+  if (kind !== 'app' && kind !== 'theme') {
+    throw new AuthorError('tool-args', 'market kind must be app or theme')
+  }
+  const rows = await options.market.list()
+  const row = rows.find(item => item.id === id)
+  // Catalog may have dropped the row; uninstall still clears a local market install.
+  if (row !== undefined && row.kind !== kind) {
+    throw new AuthorError('tool-args', 'market kind does not match the catalog row')
+  }
+  await options.market.uninstall(id, kind, input.confirm === true)
+  // Same signal the panel uses after install: refresh library or palette rows.
+  // App trash already publishes app:changed deleted.
+  options.hostEvents?.publish({ type: 'market:install', kind, id })
   return { id, kind }
 }
 

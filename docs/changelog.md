@@ -1,15 +1,43 @@
 ---
 status: locked
-updated: 2026-10-12
+updated: 2026-10-15
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.65
+
+The panel window disables Tauri's native file-drop handler so HTML5 / `FileDropzone` receives OS file drops (same as the browser).
+
+## 1.0.64
+
+`FileDropzone` accepts `className` on the outer shell.
+
+## 1.0.63
+
+`FileDropzone` exposes `accept`, `multiple`, `maxSize`, `maxFiles`, `disabled`, and `onReject`. Custom suffixes such as `.caskpack` are listed under a MIME key's extension array.
+
+## 1.0.62
+
+
+Author tool `mini_app_market_uninstall` removes a market app (to trash) or theme (css and lock). Local edits need `confirm: true`.
+
+## 1.0.61
+
+
+`CodeEditor` accepts `lineWrapping` for CodeMirror soft wrap. Switching the active app tab updates surface focus so History and Storage follow the tab in front.
+
+## 1.0.60
+
+
+Switching the active app tab updates surface focus, so History and Storage follow the tab in front instead of a stale host focus. The panel host event stream reconnects after a drop and keeps `app:open` until the surface is ready.
+
 ## 1.0.59
 
-The list-home refresh test mounts its own gallery and waits for the list load, so Refresh is enabled and the slot workbench reload is visible.
+
+The panel host event stream reconnects after a drop and keeps `app:open` until the surface is ready. Gallery refetch on `app:changed` is debounced. A workbench `onHostEvents` sample only forwards library-shaped notices, so a write/reload storm does not thrash the rail. The list-home refresh test mounts its own gallery and waits for the list load, so Refresh is enabled and the slot workbench reload is visible.
 
 ## 1.0.58
 

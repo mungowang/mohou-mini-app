@@ -324,7 +324,7 @@
       "componentType": "product",
       "family": "Discovery & inspect",
       "primitive": false,
-      "when": "Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json.",
+      "when": "Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json. Soft wrap uses CodeMirror `EditorView.lineWrapping` when `lineWrapping` is true.",
       "contract": "references/contracts/code-editor.md"
     },
     "Collapsible": {

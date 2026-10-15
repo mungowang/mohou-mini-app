@@ -9,4 +9,10 @@ describe('CodeEditor', () => {
     render(<CodeEditor value={'const n = 1'} language="ts" />)
     expect(screen.getByTestId('code-editor')).toBeInTheDocument()
   })
+
+  it('soft-wraps the CDN fallback textarea when lineWrapping is on', () => {
+    render(<CodeEditor value={'const n = 1'} language="ts" lineWrapping />)
+    const field = screen.getByTestId('code-editor')
+    expect(field.className).toContain('whitespace-pre-wrap')
+  })
 })

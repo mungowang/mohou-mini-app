@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-09-23
+updated: 2026-10-14
 ---
 
 # Git UI
@@ -17,4 +17,4 @@ Layer: [Panel](README.md). Index: [features.md](../features.md).
 ## Implementation
 
 
-Role: consumer. `PanelHistory` calls an injected client and `useReducer`. The surface passes the focused app id, or the injected id when nothing is open, and remounts the list when that id changes. The list shows each commit's id, message, and time. A close control on the pane hides it; the toolbar control still toggles it. No history client hides the control. Reset stays an authoring tool. This package does not name a host route. Plan: [implementation.md](../implementation.md).
+Role: consumer. `PanelHistory` calls an injected client and `useReducer`. The surface passes `focus` (or the injected id when nothing is focused) and remounts when that id changes. Gallery tab switches update focus via `select-app`. The list shows each commit's id, message, and time. A close control on the pane hides it; the toolbar control still toggles it. No history client hides the control. Reset stays an authoring tool. This package does not name a host route. Plan: [implementation.md](../implementation.md).

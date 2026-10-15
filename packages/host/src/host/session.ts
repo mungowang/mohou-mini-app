@@ -15,7 +15,7 @@ import { ensureVendorFiles, vendorOutputDir } from '../compile/build-vendor.ts'
 import { renderRunnerDocument } from '../compile/runner.ts'
 import { bindLoopback } from '../http/bind.ts'
 import { tarballChannel } from '../http/updates.ts'
-import { installMarket, listMarket } from '../market/service.ts'
+import { installMarket, listMarket, uninstallMarket } from '../market/service.ts'
 import { appResource, httpLayout } from '../http/layout.ts'
 import { createOwnerReads, reloadView } from '../owner/read.ts'
 import { resolveFirstPaint } from '../theme/paint.ts'
@@ -157,6 +157,15 @@ export async function createHost(options: {
           confirm: overwrite,
           localDist: tarballChannel(options.env ?? process.env),
           ...options.env === undefined ? {} : { env: options.env },
+        })
+      },
+      uninstall: async (id, kind, confirm) => {
+        await uninstallMarket({
+          runtimeRoot: registry.runtimeRoot,
+          id,
+          kind,
+          confirm,
+          trashApp: appId => author.deleteApp(appId),
         })
       },
     },

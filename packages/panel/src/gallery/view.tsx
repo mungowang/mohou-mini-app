@@ -59,6 +59,8 @@ export function PanelGallery(props: {
   readonly overlay?: (chrome: GalleryChrome) => ReactNode
   readonly defaultWorkbenchId?: string
   readonly onSetDefaultWorkbench?: (id: string) => void
+  /** Active app tab changed. Surface updates focus so history / storage keep using focus. */
+  readonly onActiveApp?: (appId: string | undefined, title?: string) => void
 }): ReactNode {
   const [state, dispatch] = useReducer(reduceGallery, props.shell, (shell: PanelShell) => ({
     ...galleryState(shell),
@@ -92,6 +94,7 @@ export function PanelGallery(props: {
       {...props.onToggleSettings === undefined ? {} : { onToggleSettings: props.onToggleSettings }}
       {...props.defaultWorkbenchId === undefined ? {} : { defaultWorkbenchId: props.defaultWorkbenchId }}
       {...props.onSetDefaultWorkbench === undefined ? {} : { onSetDefaultWorkbench: props.onSetDefaultWorkbench }}
+      {...props.onActiveApp === undefined ? {} : { onActiveApp: props.onActiveApp }}
       {...props.overlay === undefined ? {} : { overlay: props.overlay({ cardStyle: state.cardStyle, setCard: (style) => { writeCardStyle(style); dispatch({ type: 'card', cardStyle: style }) } }) }}
     />
   )
@@ -114,6 +117,7 @@ export function GalleryBody(props: {
   readonly overlay?: ReactNode
   readonly defaultWorkbenchId?: string
   readonly onSetDefaultWorkbench?: (id: string) => void
+  readonly onActiveApp?: (appId: string | undefined, title?: string) => void
 }): ReactNode {
   const { state, dispatch } = props
   const label = (key: string) => panelText(props.locale, key, props.mode)
@@ -128,6 +132,12 @@ export function GalleryBody(props: {
   const desk = state.apps.find(app => app.id === props.defaultWorkbenchId && app.kind === 'workbench')
   const desks = workbenchEntries(state.apps, props.defaultWorkbenchId, label('workbench-builtin'))
   const deskId = desks.find(entry => entry.default)?.id ?? 'default'
+  const activeAppId = appTab ? active.appId : undefined
+  const activeTitle = appTab ? active.title : undefined
+  useEffect(() => {
+    if (activeAppId === undefined) props.onActiveApp?.(undefined)
+    else props.onActiveApp?.(activeAppId, activeTitle)
+  }, [props.onActiveApp, activeAppId, activeTitle])
   const [refreshing, setRefreshing] = useState(false)
   /** Bumped to make an open market tab read the catalog again. */
   const [marketTick, setMarketTick] = useState(0)

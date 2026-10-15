@@ -9,7 +9,10 @@ export default defineApp({
   name: '工作台',
   description: '第一屏是今天要处理的事，应用列表在旁边',
   onHostEvents(ctx, event) {
-    ctx.push(deskEvent, event)
+    // Library-shaped notices only. A write/reload storm must not thrash the rail.
+    if (event.type === 'app:changed' || event.type === 'app:rename' || event.type === 'market:install') {
+      ctx.push(deskEvent, event)
+    }
   },
   api: {
     // ⭐ key: the homepage shows what this person wants first.

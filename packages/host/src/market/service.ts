@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { homedir } from 'node:os'
 
@@ -99,6 +99,36 @@ export async function installMarket(input: {
     confirm: input.confirm,
   })
   return { id: row.id, kind: 'app' }
+}
+
+/**
+ * Remove one market-tracked install. Apps go to trash. Themes delete the css and lock.
+ * Untracked local trees need confirm. Missing installs are catalog failures.
+ */
+export async function uninstallMarket(input: {
+  readonly runtimeRoot: string
+  readonly id: string
+  readonly kind: 'app' | 'theme'
+  readonly confirm: boolean
+  readonly home?: string
+  /** Trash one app directory. Apps only. */
+  readonly trashApp: (appId: string) => Promise<void>
+}): Promise<{ id: string; kind: 'app' | 'theme' }> {
+  if (input.kind === 'theme') {
+    uninstallTheme({
+      themesDir: homeThemesDir(input.home ?? homedir()),
+      id: input.id,
+      confirm: input.confirm,
+    })
+    return { id: input.id, kind: 'theme' }
+  }
+  await uninstallApp({
+    runtimeRoot: input.runtimeRoot,
+    id: input.id,
+    confirm: input.confirm,
+    trashApp: input.trashApp,
+  })
+  return { id: input.id, kind: 'app' }
 }
 
 /** A registry install cannot install a tarball row. */
@@ -230,4 +260,60 @@ function readPackageSum(packageRoot: string): string {
   const sum = meta.mohou?.sum
   if (sum === undefined) throw new MarketError('market-sum', 'package sum is missing')
   return sum
+}
+
+async function uninstallApp(input: {
+  readonly runtimeRoot: string
+  readonly id: string
+  readonly confirm: boolean
+  readonly trashApp: (appId: string) => Promise<void>
+}): Promise<void> {
+  const dest = path.join(input.runtimeRoot, 'apps', input.id)
+  if (!existsSync(dest)) throw new MarketError('market-catalog', 'market app is not installed')
+  const lock = readLock(dest)
+  if (lock === undefined && !input.confirm) {
+    throw new MarketError(
+      'market-confirm',
+      'app was not installed from the market. Confirm to move it to trash. Records stay in trash.',
+    )
+  }
+  const modified = lock !== undefined && sourceSum(dest) !== lock.sum
+  if (modified && !input.confirm) {
+    throw new MarketError(
+      'market-confirm',
+      'local source has changes. Confirm to uninstall. Records stay in trash.',
+    )
+  }
+  await input.trashApp(input.id)
+}
+
+function uninstallTheme(input: {
+  readonly themesDir: string
+  readonly id: string
+  readonly confirm: boolean
+}): void {
+  if (!/^[a-z0-9-]+$/.test(input.id)) throw new MarketError('market-id', 'theme id is invalid')
+  const dest = path.join(input.themesDir, `theme-${input.id}.css`)
+  const lockPath = themeLockPath(input.themesDir, input.id)
+  const hasFile = existsSync(dest)
+  const hasLock = existsSync(lockPath)
+  if (!hasFile && !hasLock) throw new MarketError('market-catalog', 'market theme is not installed')
+  if (hasFile && !hasLock && !input.confirm) {
+    throw new MarketError(
+      'market-confirm',
+      'theme file was not installed from the market. Confirm to delete that file.',
+    )
+  }
+  if (hasFile && hasLock) {
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as { sum?: string }
+    const sum = createHash('sha256').update(readFileSync(dest)).digest('hex')
+    if (sum !== lock.sum && !input.confirm) {
+      throw new MarketError(
+        'market-confirm',
+        'theme file has local changes. Confirm to delete it.',
+      )
+    }
+  }
+  rmSync(dest, { force: true })
+  rmSync(lockPath, { force: true })
 }

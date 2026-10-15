@@ -85,15 +85,13 @@ export function StepperItem({
           />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-1 pb-6 pt-1 group-last/step:pb-0">
-          <div className="flex flex-col gap-0.5">
-            <h3 className="text-sm font-semibold leading-tight text-foreground">
-              {title}
-            </h3>
-            {description ? (
-              <p className="text-sm text-muted-foreground">{description}</p>
-            ) : null}
-          </div>
+        <div className="flex min-w-0 flex-col pb-6 group-last/step:pb-0">
+          <h3 className="flex min-h-8 items-center text-sm font-semibold leading-none text-foreground">
+            {title}
+          </h3>
+          {description ? (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          ) : null}
           {children ? <div className="mt-2">{children}</div> : null}
         </div>
       </div>

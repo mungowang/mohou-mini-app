@@ -15,7 +15,7 @@ import { resolveCatalog, versionCompared } from '../src/market/catalog.ts'
 import { MarketError } from '../src/market/error.ts'
 import { installAppTree, installThemeFile, themeColors, themesPackageSum } from '../src/market/install.ts'
 import { extractTarball, fetchCatalog, fetchPackage, readLocalCatalog } from '../src/market/fetch.ts'
-import { assertLocalSource, installMarket, listMarket } from '../src/market/service.ts'
+import { assertLocalSource, installMarket, listMarket, uninstallMarket } from '../src/market/service.ts'
 import { themePreview, readThemeCss } from '../src/market/install.ts'
 import { sourceSum } from '../src/market/sum.ts'
 import { searchMarket } from '../src/market/search.ts'
@@ -137,6 +137,22 @@ describe('local tarball source', () => {
       env: { MINI_APP_MARKET_DIR: root },
     })
     expect(readFileSync(path.join(runtime, 'apps', row.id, 'ui.tsx'), 'utf8')).toBe('local')
+    const trashed: string[] = []
+    await uninstallMarket({
+      runtimeRoot: runtime,
+      id: row.id,
+      kind: 'app',
+      confirm: false,
+      trashApp: async (appId) => { trashed.push(appId) },
+    })
+    expect(trashed).toEqual([row.id])
+    await expect(uninstallMarket({
+      runtimeRoot: runtime,
+      id: 'missing.app',
+      kind: 'app',
+      confirm: true,
+      trashApp: async () => undefined,
+    })).rejects.toMatchObject({ code: 'market-catalog' })
     expect(() => {
       assertLocalSource('local', false)
     }).toThrow(MarketError)
@@ -296,6 +312,7 @@ describe('author market tools', () => {
   it('lists with search and refuses a kind mismatch', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'mohou-author-market-'))
     const installs: { id: string; kind: string; overwrite: boolean }[] = []
+    const uninstalls: { id: string; kind: string; confirm: boolean }[] = []
     const author = createAuthorTools({
       registry: createAppRegistry(root),
       mcp: new McpClient({}),
@@ -315,6 +332,7 @@ describe('author market tools', () => {
       market: {
         list: async () => [{ ...row, kind: 'app' as const }],
         install: async (id, kind, overwrite) => { installs.push({ id, kind, overwrite }) },
+        uninstall: async (id, kind, confirm) => { uninstalls.push({ id, kind, confirm }) },
       },
     })
     const listed = await author.invoke('mini_app_market_list', { search: 'desk' }) as { apps: { id: string }[] }
@@ -327,6 +345,10 @@ describe('author market tools', () => {
     await expect(author.invoke('mini_app_market_install', { appId: row.id, kind: 'nope' })).rejects.toMatchObject({ code: 'tool-args' })
     await author.invoke('mini_app_market_install', { appId: row.id, kind: 'app', overwrite: true })
     expect(installs).toEqual([{ id: row.id, kind: 'app', overwrite: true }])
+    await expect(author.invoke('mini_app_market_uninstall', { appId: row.id, kind: 'theme' })).rejects.toMatchObject({ code: 'tool-args' })
+    await expect(author.invoke('mini_app_market_uninstall', { appId: row.id, kind: 'nope' })).rejects.toMatchObject({ code: 'tool-args' })
+    await author.invoke('mini_app_market_uninstall', { appId: row.id, kind: 'app', confirm: true })
+    expect(uninstalls).toEqual([{ id: row.id, kind: 'app', confirm: true }])
     const bare = createAuthorTools({
       registry: createAppRegistry(root),
       mcp: new McpClient({}),
@@ -712,6 +734,23 @@ describe('themes package', () => {
       home,
     })
     expect(edited.find(row => row.id === 'ink')).toMatchObject({ tracked: true, modified: true })
+    await expect(uninstallMarket({
+      runtimeRoot: path.join(root, 'runtime'),
+      id: 'ink',
+      kind: 'theme',
+      confirm: false,
+      home,
+      trashApp: async () => undefined,
+    })).rejects.toMatchObject({ code: 'market-confirm' })
+    await uninstallMarket({
+      runtimeRoot: path.join(root, 'runtime'),
+      id: 'ink',
+      kind: 'theme',
+      confirm: true,
+      home,
+      trashApp: async () => undefined,
+    })
+    expect(existsSync(path.join(home, '.mini-app/themes/theme-ink.css'))).toBe(false)
   })
 
   it('lists a theme with no file on disk as not installed', async () => {

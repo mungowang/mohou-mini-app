@@ -132,6 +132,78 @@ describe('PanelSurface', () => {
     host.remove()
   })
 
+  it('reads storage for the active tab, not a stale host focus', async () => {
+    const seen: string[] = []
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    let controls: PanelControls | undefined
+    await act(async () => {
+      root.render(<PanelSurface
+        client={{
+          list: () => Promise.resolve([
+            { id: 'com.example.fuze', name: 'Fuze', description: 'secrets', version: '1', acronym: 'FZ' },
+            { id: 'com.example.cask', name: 'Cask', description: 'data', version: '1', acronym: 'CK' },
+          ]),
+          open: () => Promise.resolve(),
+          deleteApp: () => Promise.resolve(),
+        }}
+        storage={{
+          readStorage: (appId) => {
+            seen.push(appId)
+            return Promise.resolve({ bytes: 1, tables: ['kv'] })
+          },
+          readTable: () => Promise.resolve({ columns: ['k'], rows: [] }),
+          restoreStorage: () => Promise.resolve(),
+        }}
+        locale="en"
+        mode="production"
+        shell="standalone"
+        onControls={(value) => { controls = value }}
+      />)
+    })
+    await act(async () => {
+      controls?.showApp('com.example.fuze', 'Fuze')
+      await Promise.resolve()
+    })
+    await act(async () => {
+      controls?.showApp('com.example.cask', 'Cask')
+      await Promise.resolve()
+    })
+    // Switch back to Fuze tab without a new host focus event — storage must follow the tab.
+    const fuzeTab = [...host.querySelectorAll('button')].find(item => item.textContent?.includes('Fuze') && item.closest('[class*="mma"]') !== null)
+      ?? [...host.querySelectorAll('button')].find(item => (item.textContent ?? '').includes('Fuze'))
+    await act(async () => {
+      fuzeTab?.click()
+      await Promise.resolve()
+    })
+    const storage = [...host.querySelectorAll('button')].find(item => item.getAttribute('aria-label') === 'Storage' || item.textContent === 'Storage')
+    await act(async () => {
+      storage?.click()
+      await Promise.resolve()
+    })
+    expect(seen.at(-1)).toBe('com.example.fuze')
+    const caskTab = [...host.querySelectorAll('button')].find(item => (item.textContent ?? '').includes('Cask'))
+    await act(async () => {
+      caskTab?.click()
+      await Promise.resolve()
+    })
+    await act(async () => {
+      storage?.click()
+      await Promise.resolve()
+    })
+    // Storage may already be open; remount follows active tab on the next open or key change.
+    await act(async () => {
+      const again = [...host.querySelectorAll('button')].find(item => item.getAttribute('aria-label') === 'Storage' || item.textContent === 'Storage')
+      again?.click()
+      await Promise.resolve()
+    })
+    expect(seen).toContain('com.example.cask')
+    expect(seen.at(-1)).toBe('com.example.cask')
+    root.unmount()
+    host.remove()
+  })
+
   it('shows the default workbench in the slot and clears it from the host event', async () => {
     const host = document.createElement('div')
     document.body.append(host)

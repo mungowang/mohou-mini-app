@@ -10,5 +10,15 @@ import { FileDropzone } from "@mohou/ui";
 export default function FileDropzone01Example() {
   const [files, setFiles] = React.useState<File[]>([]);
 
-  return <FileDropzone files={files} onFiles={setFiles} />;
+  return (
+    <FileDropzone
+      files={files}
+      onFiles={setFiles}
+      // Custom suffixes need an extensions list; MIME alone is often empty for unknown types.
+      accept={{
+        "application/json": [".json"],
+        "application/octet-stream": [".caskpack"],
+      }}
+    />
+  );
 }

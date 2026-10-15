@@ -17,6 +17,8 @@ export type SurfaceAction =
   | { readonly type: 'toggle-theme' }
   | { readonly type: 'close-theme' }
   | { readonly type: 'show-app'; readonly appId: string; readonly title?: string }
+  /** Gallery tab switch. Updates focus only — does not force the gallery section or close storage. */
+  | { readonly type: 'select-app'; readonly appId?: string; readonly title?: string }
   | { readonly type: 'show-notice'; readonly appId: string; readonly table: string }
   | { readonly type: 'unavailable'; readonly appId: string }
   | { readonly type: 'rename-app'; readonly from: string; readonly to: string }
@@ -50,6 +52,20 @@ export function reduceSurface(state: SurfaceState, action: SurfaceAction): Surfa
         ...withoutUnavailable(state),
         section: 'gallery',
         themeOpen: false,
+        focus: action.title === undefined ? { appId: action.appId } : { appId: action.appId, title: action.title },
+      }
+    case 'select-app':
+      if (action.appId === undefined) {
+        const { focus: gone, ...rest } = state
+        void gone
+        return rest
+      }
+      if (state.focus?.appId === action.appId
+        && (action.title === undefined ? state.focus.title === undefined : state.focus.title === action.title)) {
+        return state
+      }
+      return {
+        ...state,
         focus: action.title === undefined ? { appId: action.appId } : { appId: action.appId, title: action.title },
       }
     case 'show-notice':

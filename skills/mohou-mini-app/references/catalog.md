@@ -219,7 +219,7 @@ Inspect, compare and browse artefacts: diff, JSON, code, requests, attachments.
 | component | type | parts | when | contract |
 |---|---|---|---|---|
 | `CodeBlock` | product | — | Showing a snippet/command. Editable → `CodeEditor`. | [docs](contracts/code-block.md) |
-| `CodeEditor` | product | — | Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json. | [docs](contracts/code-editor.md) |
+| `CodeEditor` | product | — | Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json. Soft wrap uses CodeMirror `EditorView.lineWrapping` when `lineWrapping` is true. | [docs](contracts/code-editor.md) |
 | `DiffViewer` | product | — | Comparing two versions of text. Pass `original` + `modified` strings. | [docs](contracts/diff-viewer.md) |
 | `JsonViewer` | product | — | API responses/config. Plain text with wrapping → `CodeBlock`. | [docs](contracts/json-viewer.md) |
 | `AttachmentGallery` | block | — | A record has N files/images and you show them as tiles, not a table. | [docs](contracts/attachment-gallery.md) |

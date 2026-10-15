@@ -41,6 +41,18 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
       required: ['appId', 'kind'],
     },
   },
+  mini_app_market_uninstall: {
+    description: 'Uninstall one market row from this machine. kind is app or theme. Apps move to trash (storage stays there). Themes delete the css and market lock. confirm defaults to false. Local edits or an untracked tree return market-confirm and write nothing until confirm is true.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        appId,
+        kind: { type: 'string', enum: ['app', 'theme'] },
+        confirm: { type: 'boolean' },
+      },
+      required: ['appId', 'kind'],
+    },
+  },
   mini_app_get: {
     description: 'Read one mini-app name, version, and directory.',
     inputSchema: { type: 'object', properties: { appId }, required: ['appId'] },

@@ -1,10 +1,11 @@
 import { diagnosticUrl } from '@mohou/host/diagnostics'
 import { httpLayout, runnerPath } from '@mohou/host/http'
-import { PanelSurface, isPanelLocale, type PanelControls } from '@mohou/panel'
+import { PanelSurface, isPanelLocale } from '@mohou/panel'
 import { createRoot } from 'react-dom/client'
 
 import { createFrameBus } from './frame-bus.ts'
 import { appFrameSandbox } from './frame.ts'
+import { openHostEventsStream } from './host-events-stream.ts'
 import { httpPanelClients } from './http-client.ts'
 
 function record(value: unknown): Record<string, unknown> {
@@ -15,7 +16,25 @@ const clients = httpPanelClients('')
 const policy = await clients.readPolicy()
 const about = record(await fetch(httpLayout.about).then(response => response.json()))
 const root = document.getElementById('root')
-let controls: PanelControls | undefined
+const frames = createFrameBus(postToAppFrame)
+
+const stream = openHostEventsStream(httpLayout.events, {
+  onAppEvent: (event) => {
+    frames.push(event)
+  },
+  onAppGap: (appId, since) => {
+    frames.gap(appId, since)
+  },
+  onAppReload: (appId) => {
+    postToAppFrame(appId, { type: 'app:reload', appId })
+  },
+  onAppEval: (event) => {
+    const appId = event.appId
+    if (typeof appId !== 'string') return
+    if (!postToAppFrame(appId, event)) reportAbsent(appId)
+  },
+})
+
 if (root) {
   createRoot(root).render(
     <PanelSurface
@@ -32,68 +51,10 @@ if (root) {
       )}
       versions={[about.name, about.current].filter((part): part is string => typeof part === 'string' && part.length > 0).join(' ')}
       onControls={(next) => {
-        controls = next
+        stream.setControls(next)
       }}
     />,
   )
-}
-
-const frames = createFrameBus(postToAppFrame)
-
-const events = new EventSource(httpLayout.events)
-events.onmessage = (event) => {
-  const data = JSON.parse(event.data) as {
-    type?: string
-    appId?: string
-    title?: string
-    table?: string
-    name?: string
-    data?: unknown
-    seq?: number
-    since?: number
-    from?: string
-    to?: string
-    kind?: string
-    id?: string
-    change?: string
-  }
-  if (data.type === 'app:event' && typeof data.appId === 'string' && typeof data.name === 'string' && typeof data.seq === 'number') {
-    frames.push({ appId: data.appId, name: data.name, data: data.data, seq: data.seq })
-    return
-  }
-  if (data.type === 'app:gap' && typeof data.appId === 'string' && typeof data.since === 'number') {
-    frames.gap(data.appId, data.since)
-    return
-  }
-  if (data.type === 'app:open' && typeof data.appId === 'string') {
-    controls?.showApp(data.appId, data.title)
-  }
-  if (data.type === 'workbench:default' && typeof data.appId === 'string') {
-    controls?.setWorkbench(data.appId)
-  }
-  if (data.type === 'app:rename' && typeof data.from === 'string' && typeof data.to === 'string') {
-    controls?.renameApp(data.from, data.to)
-  }
-  if (data.type === 'storage-size' && typeof data.appId === 'string' && typeof data.table === 'string') {
-    controls?.showNotice(data.appId, data.table)
-  }
-  if (data.type === 'market:install' && (data.kind === 'app' || data.kind === 'theme') && typeof data.id === 'string') {
-    controls?.marketInstalled(data.kind, data.id)
-  }
-  if (data.type === 'app:changed' && typeof data.appId === 'string' && isAppChange(data.change)) {
-    controls?.appChanged({
-      appId: data.appId,
-      change: data.change,
-      ...typeof data.from === 'string' ? { from: data.from } : {},
-    })
-  }
-  if ((data.type === 'app:reload' || data.type === 'app:eval') && typeof data.appId === 'string') {
-    if (!postToAppFrame(data.appId, data) && data.type === 'app:eval') reportAbsent(data.appId)
-  }
-}
-
-function isAppChange(value: unknown): value is 'created' | 'updated' | 'deleted' | 'restored' | 'renamed' {
-  return value === 'created' || value === 'updated' || value === 'deleted' || value === 'restored' || value === 'renamed'
 }
 
 /** The panel document holds one iframe per open app, titled with the app id. A missing frame is the panel's to report. */

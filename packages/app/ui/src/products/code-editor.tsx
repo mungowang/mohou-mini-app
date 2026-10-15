@@ -24,8 +24,9 @@ function bare<T extends object>(m: T & { default?: T }): T {
  * Find uses `@codemirror/search` (Mod-f / Ctrl-f, next/prev, match case, regexp).
  * If the CDN fails the host stays empty (no editor), rather than requiring a peer install.
  * @when Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json.
+ * Soft wrap uses CodeMirror `EditorView.lineWrapping` when `lineWrapping` is true.
  * @example
- * <CodeEditor value={src} language="ts" onChange={(v) => set(v)} />
+ * <CodeEditor value={src} language="ts" lineWrapping onChange={(v) => set(v)} />
  * @family Discovery & inspect
  */
 export function CodeEditor({
@@ -33,12 +34,15 @@ export function CodeEditor({
   onChange,
   language = 'ts',
   height = '220px',
+  lineWrapping = false,
   className,
 }: {
   value: string
   onChange?: ((value: string) => void) | undefined
   language?: LangS
   height?: string
+  /** Soft-wrap long lines (`EditorView.lineWrapping`). Default off (horizontal scroll). */
+  lineWrapping?: boolean
   className?: string
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -99,6 +103,7 @@ export function CodeEditor({
         )
         const EditorView = viewNs.EditorView as {
           new (o: object): EditorViewT
+          lineWrapping: unknown
           updateListener: { of: (fn: (u: { docChanged: boolean }) => void) => unknown }
           theme: (spec: Record<string, Record<string, string>>) => unknown
           darkTheme: { of: (v: boolean) => unknown }
@@ -183,6 +188,7 @@ export function CodeEditor({
           doc: valueRef.current,
           extensions: [
             viewNs.lineNumbers(),
+            ...lineWrapping ? [EditorView.lineWrapping] : [],
             cmdNs.history(),
             searchNs.search({ top: true }),
             searchNs.highlightSelectionMatches(),
@@ -234,7 +240,7 @@ export function CodeEditor({
       viewRef.current?.destroy()
       viewRef.current = null
     }
-  }, [language, dark, t])
+  }, [language, dark, t, lineWrapping])
 
   useEffect(() => {
     const view = viewRef.current
@@ -252,7 +258,10 @@ export function CodeEditor({
           value={value}
           onChange={e => onChange?.(e.target.value)}
           spellCheck={false}
-          className="w-full resize-y overflow-auto bg-transparent px-3 py-2 font-mono text-xs leading-6 outline-none"
+          className={cn(
+            'w-full resize-y overflow-auto bg-transparent px-3 py-2 font-mono text-xs leading-6 outline-none',
+            lineWrapping ? 'whitespace-pre-wrap break-words' : 'whitespace-pre',
+          )}
           style={{ height }}
         />
       )}

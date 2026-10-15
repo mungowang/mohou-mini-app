@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-11
+updated: 2026-10-14
 ---
 
 # Author surface
@@ -31,6 +31,7 @@ Codes are in [implementation.md](implementation.md).
 | `mini_app_rename` | `appId`, `newAppId` | the list summary for the new id, including `directory` | `app-id-invalid`, `app-not-registered`, `app-duplicate`. An unchanged id is `app-id-invalid`. |
 | `mini_app_market_list` | optional `search`, optional `kind` | `{ apps }`. Each row includes `kind`. Omitted `kind` returns apps and themes. | `market-catalog` |
 | `mini_app_market_install` | `appId`, `kind`, optional `overwrite` | `{ id, kind }` | `market-confirm`, `market-catalog`, `tool-args`. `overwrite` defaults to false. A kind that does not match the row is `tool-args` and writes nothing. |
+| `mini_app_market_uninstall` | `appId`, `kind`, optional `confirm` | `{ id, kind }` | `market-confirm`, `market-catalog`, `tool-args`. `confirm` defaults to false. Apps move to trash. Themes delete the css and lock. A kind that does not match a present catalog row is `tool-args`. A missing install is `market-catalog`. Local edits or an untracked tree need `confirm: true`. |
 | `mini_app_reload` | `appId`, optional `cleanCaches` | compile result | codes on [compile.md](host/compile.md) |
 | `mini_app_install` | `appId`, optional packages to add or remove, optional `commit` | `{ ok, packages, lockfile }` or `{ ok: false, code }` | `install-denied`, `install-failed` |
 | `mini_app_call` | `appId` plus one `method`/`args`, or `calls` | one result, or one result per entry | `unknown-method`; one entry's failure does not drop the others |

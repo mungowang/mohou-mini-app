@@ -99,10 +99,13 @@ fn open_window(
     on_navigation: impl Fn(&Url) -> bool + Send + 'static,
     on_popup: impl Fn(Url) + Send + 'static,
 ) -> Result<tauri::WebviewWindow, Box<dyn std::error::Error>> {
+    // Native file-drop is on by default and steals OS drops from HTML5 / react-dropzone
+    // (required off for HTML5 DnD on Windows; macOS wry handler has the same effect).
     let window = tauri::WebviewWindowBuilder::new(app, "main", url)
         .title("Mohou")
         .inner_size(1200.0, 800.0)
         .min_inner_size(800.0, 600.0)
+        .disable_drag_drop_handler()
         .on_document_title_changed(|window, title| {
             if title.is_empty() {
                 return;

@@ -4,7 +4,7 @@
 
 Vanilla CodeMirror 6 loaded on demand from `esm.sh` (not npm, not a React wrapper). Do not import `@codemirror/*` or `@uiw/react-codemirror` — the latter pulls a second React. Highlighting needs `@codemirror/language` + a theme; lang packages only provide the parser. Find uses `@codemirror/search` (Mod-f / Ctrl-f, next/prev, match case, regexp). If the CDN fails the host stays empty (no editor), rather than requiring a peer install.
 
-**when** Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json.
+**when** Editing config/scripts in-app. Do not `import @codemirror/*` or add it to package.json. Soft wrap uses CodeMirror `EditorView.lineWrapping` when `lineWrapping` is true.
 
 `import { CodeEditor, LangS } from "@mohou/ui"`
 
@@ -17,6 +17,7 @@ Vanilla CodeMirror 6 loaded on demand from `esm.sh` (not npm, not a React wrappe
 | `className` | `string` |  |  |
 | `height` | `string` |  |  |
 | `language` | `LangS` |  |  |
+| `lineWrapping` | `boolean` |  | Soft-wrap long lines (`EditorView.lineWrapping`). Default off (horizontal scroll). |
 | `onChange` | `((value: string) => void) \| undefined` |  |  |
 | `value` | `string` | ✓ |  |
 
@@ -31,7 +32,7 @@ Vanilla CodeMirror 6 loaded on demand from `esm.sh` (not npm, not a React wrappe
 ## Example
 
 ```tsx
-<CodeEditor value={src} language="ts" onChange={(v) => set(v)} />
+<CodeEditor value={src} language="ts" lineWrapping onChange={(v) => set(v)} />
 ```
 
 ## Examples

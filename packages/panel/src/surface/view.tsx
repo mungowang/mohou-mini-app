@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { Clock, Database } from 'lucide-react'
 
 import type { PanelClient } from '../gallery/client.ts'
@@ -55,6 +55,18 @@ export function PanelSurface(props: {
   const [updateCard, setUpdateCard] = useState<UpdateCard | undefined>(undefined)
   const [libraryTick, setLibraryTick] = useState(0)
   const [paletteTick, setPaletteTick] = useState(0)
+  // A write/reload storm must not thrash the gallery on every app:changed.
+  const libraryBump = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const bumpLibrary = () => {
+    if (libraryBump.current !== undefined) clearTimeout(libraryBump.current)
+    libraryBump.current = setTimeout(() => {
+      libraryBump.current = undefined
+      setLibraryTick(value => value + 1)
+    }, 200)
+  }
+  useEffect(() => () => {
+    if (libraryBump.current !== undefined) clearTimeout(libraryBump.current)
+  }, [])
   useEffect(() => {
     const check = props.settings?.checkUpdate
     if (check === undefined) return
@@ -77,10 +89,10 @@ export function PanelSurface(props: {
         setDesk(current => current === from ? to : current)
       },
       marketInstalled: (kind) => {
-        if (kind === 'app') setLibraryTick(value => value + 1)
+        if (kind === 'app') bumpLibrary()
         if (kind === 'theme') setPaletteTick(value => value + 1)
       },
-      appChanged: () => setLibraryTick(value => value + 1),
+      appChanged: () => bumpLibrary(),
     })
   }, [props.onControls])
   useEffect(() => {
@@ -101,7 +113,13 @@ export function PanelSurface(props: {
   useEffect(() => {
     document.title = panelText(chromeLocale, 'product-name', props.mode)
   }, [chromeLocale, props.mode])
+  // Gallery tab switches call select-app so focus stays the chrome target (history / storage).
   const appId = state.focus?.appId ?? props.appId
+  const onActiveApp = useCallback((id: string | undefined, title?: string) => {
+    dispatch(id === undefined
+      ? { type: 'select-app' }
+      : { type: 'select-app', appId: id, ...title === undefined ? {} : { title } })
+  }, [])
   const toggle = (section: PanelSection) => dispatch({ type: 'section', section: state.section === section ? 'gallery' : section })
   const tool = (section: PanelSection, title: string, icon: ReactNode) => (
     <Tooltip key={section} text={title}>
@@ -118,6 +136,7 @@ export function PanelSurface(props: {
       mode={props.mode}
       shell={props.shell}
       libraryTick={libraryTick}
+      onActiveApp={onActiveApp}
       {...desk === undefined ? {} : { defaultWorkbenchId: desk }}
       {...props.settings === undefined ? {} : { onSetDefaultWorkbench: (id: string) => { void writeDefault(props.settings, id, setDesk) } }}
       {...props.theme === undefined ? {} : {

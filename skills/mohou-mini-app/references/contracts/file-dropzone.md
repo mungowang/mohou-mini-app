@@ -2,7 +2,7 @@
 
 # FileDropzone
 
-Drag-drop + click file picker.
+Drag-drop + click file picker (`react-dropzone`). The list only updates when the parent stores `onFiles` into `files`. Custom extensions (e.g. `.caskpack`) go under a MIME key whose value lists the extension — browsers often send an empty type for unknown suffixes.
 
 **when** Getting a local File into the app (then upload via `ctx.http` in the api layer).
 
@@ -14,13 +14,24 @@ Drag-drop + click file picker.
 
 | field | type | required | note |
 |---|---|:---:|---|
+| `accept` | `Accept` |  | MIME → extensions map for `react-dropzone`. Example: `{ 'application/json': ['.json'], 'application/octet-stream': ['.caskpack'] }`. Omitted = every file type. |
+| `className` | `string` |  | Outer shell (list + drop target). |
+| `disabled` | `boolean` |  |  |
 | `files` | `File[]` |  |  |
+| `maxFiles` | `number` |  |  |
+| `maxSize` | `number` |  | Bytes. Rejected files go to `onReject`. |
+| `multiple` | `boolean` |  | Default true. |
 | `onFiles` | `(files: File[]) => void` |  |  |
+| `onReject` | `(rejections: FileRejection[]) => void` |  |  |
 
 ## Example
 
 ```tsx
-<FileDropzone onFiles={(fs) => set(fs)} />
+<FileDropzone
+  files={files}
+  accept={{ 'application/json': ['.json'], 'application/octet-stream': ['.caskpack'] }}
+  onFiles={setFiles}
+/>
 ```
 
 ## Examples

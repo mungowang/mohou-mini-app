@@ -2,7 +2,7 @@
 
 # DiffViewer
 
-Unified or split diff view.
+Unified or split diff view. The header names how many change sites there are and steps between them. A ruler on the right marks each site. A click scrolls to it.
 
 **when** Comparing two versions of text. Pass `original` + `modified` strings.
 

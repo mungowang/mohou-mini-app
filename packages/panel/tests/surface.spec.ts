@@ -23,4 +23,16 @@ describe('panel surface', () => {
     expect(missing.unavailable).toBe('com.example.app')
     expect(reduceSurface(missing, { type: 'show-app', appId: 'com.example.app' }).unavailable).toBeUndefined()
   })
+
+  it('select-app moves focus without closing storage', () => {
+    const open = reduceSurface(surfaceState(), { type: 'show-app', appId: 'com.example.fuze', title: 'Fuze' })
+    const storage = reduceSurface(open, { type: 'show-notice', appId: 'com.example.fuze', table: 'kv' })
+    expect(storage.section).toBe('storage')
+    const switched = reduceSurface(storage, { type: 'select-app', appId: 'com.example.cask', title: 'Cask' })
+    expect(switched.section).toBe('storage')
+    expect(switched.focus).toEqual({ appId: 'com.example.cask', title: 'Cask' })
+    const home = reduceSurface(switched, { type: 'select-app' })
+    expect(home.focus).toBeUndefined()
+    expect(home.section).toBe('storage')
+  })
 })

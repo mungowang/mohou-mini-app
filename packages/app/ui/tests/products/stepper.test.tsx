@@ -56,4 +56,15 @@ describe('Stepper', () => {
     expect(root).toHaveTextContent('1');
     expect(root).toHaveTextContent('2');
   })
+
+  it('gives the vertical title the same row height as the mark', () => {
+    render(
+      <Stepper>
+        <StepperItem title="File" status="active" />
+      </Stepper>,
+    );
+    const title = screen.getByRole('heading', { name: 'File' });
+    expect(title).toHaveClass('min-h-8', 'items-center', 'leading-none');
+    expect(title).not.toHaveClass('pt-1', 'leading-tight');
+  })
 });

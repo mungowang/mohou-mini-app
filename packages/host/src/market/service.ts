@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 
 import { homeThemesDir } from '../host/layout.ts'
 import { aboutInfo } from '../http/ports.ts'
-import type { Catalog, CatalogRow } from './catalog.ts'
+import type { Catalog, CatalogRow, ThemePack } from './catalog.ts'
 import { versionCompared } from './catalog.ts'
 import { extractTarball, fetchCatalog, fetchPackage, marketDir, readLocalCatalog } from './fetch.ts'
 import { MarketError } from './error.ts'
@@ -20,10 +20,8 @@ import {
   type ThemePreview,
 } from './install.ts'
 import { sourceSum } from './sum.ts'
-import { toneOf, type ThemeTone } from './tone.ts'
 
 export interface MarketListRow extends CatalogRow {
-  readonly tone?: ThemeTone
   readonly installedVersion?: string
   /** Manifest version when the app dir exists without a market lock. */
   readonly localVersion?: string
@@ -33,8 +31,15 @@ export interface MarketListRow extends CatalogRow {
   readonly preview?: ThemePreview
 }
 
+/** One market read: rows with local state, plus the bundles that still have a row. */
+export interface MarketList {
+  readonly rows: readonly MarketListRow[]
+  readonly packs: readonly ThemePack[]
+}
+
 /**
  * Catalog plus local lock state. A missing registry is an empty error for the panel.
+ * A theme pack with no visible row is dropped, so the panel never offers an empty bundle.
  * @param input - registry and runtime root
  */
 export async function listMarket(input: {
@@ -43,14 +48,18 @@ export async function listMarket(input: {
   readonly localDist: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly home?: string
-}): Promise<MarketListRow[]> {
+}): Promise<MarketList> {
   const local = input.localDist ? readLocalCatalog(marketDir(input.env)) : undefined
   const catalog = local ?? await fetchCatalog(input.registry)
-  const rows = catalog.apps.filter(row => input.localDist || row.source !== 'local')
+  const visible = catalog.apps.filter(row => input.localDist || row.source !== 'local')
   const product = aboutInfo().current
   const themesDir = homeThemesDir(input.home ?? homedir())
-  const previews = await themePreviews(rows, input)
-  return rows.map(row => withLocal(row, input.runtimeRoot, themesDir, product, previews.get(row.id)))
+  const previews = await themePreviews(visible, input)
+  const rows = visible.map(row => withLocal(row, input.runtimeRoot, themesDir, product, previews.get(row.id)))
+  return {
+    rows,
+    packs: catalog.themePacks.filter(pack => rows.some(row => row.themePackId === pack.id)),
+  }
 }
 
 /**
@@ -150,21 +159,17 @@ function withLocal(
     ...preview === undefined ? {} : { preview },
   }
   if (row.kind === 'theme') {
-    const tone = row.colors?.[0] === undefined ? undefined : toneOf(row.colors[0])
     const dest = path.join(themesDir, `theme-${row.id}.css`)
     const lockPath = themeLockPath(themesDir, row.id)
-    if (!existsSync(dest)) return { ...base, ...tone === undefined ? {} : { tone } }
+    if (!existsSync(dest)) return base
     const lock = existsSync(lockPath) ? JSON.parse(readFileSync(lockPath, 'utf8')) as { version?: string; sum?: string } : undefined
-    if (lock === undefined) {
-      return { ...base, tracked: false, ...tone === undefined ? {} : { tone } }
-    }
+    if (lock === undefined) return { ...base, tracked: false }
     const sum = createHash('sha256').update(readFileSync(dest)).digest('hex')
     return {
       ...base,
       ...typeof lock.version === 'string' ? { installedVersion: lock.version } : {},
       tracked: true,
       modified: sum !== lock.sum,
-      ...tone === undefined ? {} : { tone },
     }
   }
   const dir = path.join(runtimeRoot, 'apps', row.id)

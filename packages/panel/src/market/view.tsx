@@ -1,16 +1,16 @@
 import { Download, Hash, Loader2, Package, PackageSearch, Store, Tag, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import type { MarketRow } from '../gallery/client.ts'
+import type { MarketList, MarketPack, MarketRow } from '../gallery/client.ts'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
-import { ThemeDualPreview, type ThemeDualTokens } from '../theme/preview.tsx'
+import { ThemeColorStrip, ThemeDualPreview, type ThemeDualTokens } from '../theme/preview.tsx'
 
 /**
  * Market tab. Apps and themes are separate grids. The card click confirms before a replace.
  * @param props - catalog client and chrome locale
  */
 export function MarketView(props: {
-  readonly list?: (() => Promise<readonly MarketRow[]>) | undefined
+  readonly list?: (() => Promise<MarketList>) | undefined
   readonly install?: ((id: string, confirm: boolean) => Promise<void>) | undefined
   readonly locale: PanelLocale
   readonly mode: PanelLabelMode
@@ -22,6 +22,7 @@ export function MarketView(props: {
 }): ReactNode {
   const label = (key: string) => panelText(props.locale, key, props.mode)
   const [rows, setRows] = useState<readonly MarketRow[]>([])
+  const [packs, setPacks] = useState<readonly MarketPack[]>([])
   const [error, setError] = useState<string>()
   const [kind, setKind] = useState<'app' | 'theme'>('app')
   const [filter, setFilter] = useState('all')
@@ -46,11 +47,12 @@ export function MarketView(props: {
     setLoading(true)
     void props.list().then((next) => {
       if (generation !== loadGeneration.current) return
-      setRows(next)
+      setRows(next.rows)
+      setPacks(next.packs)
       // Host answer owns the install button. Keep `done` only while this read is still in flight.
       setDone(undefined)
       setError(undefined)
-      if (!next.some(row => row.kind === 'app') && next.some(row => row.kind === 'theme')) setKind('theme')
+      if (!next.rows.some(row => row.kind === 'app') && next.rows.some(row => row.kind === 'theme')) setKind('theme')
     }).catch((failure) => {
       if (generation !== loadGeneration.current) return
       setError(failure instanceof Error ? failure.message : label('market-failed'))
@@ -68,10 +70,7 @@ export function MarketView(props: {
     return [...set]
   }, [rows])
 
-  const tones = useMemo(() => {
-    const set = new Set(rows.filter(row => row.kind === 'theme' && row.tone !== undefined).map(row => row.tone as string))
-    return [...set]
-  }, [rows])
+  // Bundles come from Host and already hold only packs with a visible row. No hue bucket remains.
 
   const byKind = useMemo(() => rows.filter(row => row.kind === kind), [rows, kind])
   const byStatus = useMemo(() => byKind.filter(row => matchesStatus(row, status)), [byKind, status])
@@ -110,18 +109,20 @@ export function MarketView(props: {
   }, [byKind])
 
   const typeCount = useMemo(() => {
-    const byTone = new Map<string, number>()
+    const byPack = new Map<string, number>()
+    let none = 0
     let mini = 0
     let workbench = 0
     for (const row of byStatus) {
       if (row.kind === 'theme') {
-        if (row.tone !== undefined) byTone.set(row.tone, (byTone.get(row.tone) ?? 0) + 1)
+        if (row.themePackId === undefined) none += 1
+        else byPack.set(row.themePackId, (byPack.get(row.themePackId) ?? 0) + 1)
         continue
       }
       if (row.appKind === 'workbench') workbench += 1
       else mini += 1
     }
-    return { all: byStatus.length, mini, workbench, byTone }
+    return { all: byStatus.length, mini, workbench, byPack, none }
   }, [byStatus])
 
   const tagCount = useMemo(() => {
@@ -197,16 +198,24 @@ export function MarketView(props: {
           <Seg active={status === 'update'} level="secondary" count={statusCount.update} onClick={() => setStatus('update')}>{label('market-status-update')}</Seg>
           <Seg active={status === 'installed'} level="secondary" count={statusCount.installed} onClick={() => setStatus('installed')}>{label('market-status-installed')}</Seg>
         </FilterRow>
-        <FilterRow caption={kind === 'theme' ? label('market-filter-tone') : label('market-filter-type')} level="secondary">
+        <FilterRow caption={kind === 'theme' ? label('market-filter-pack') : label('market-filter-type')} level="secondary">
           <Seg active={filter === 'all'} level="secondary" count={typeCount.all} onClick={() => setFilter('all')}>{label('market-all')}</Seg>
           {kind === 'app' ? (
             <>
               <Seg active={filter === 'app'} level="secondary" count={typeCount.mini} onClick={() => setFilter('app')}>{label('market-mini')}</Seg>
               <Seg active={filter === 'workbench'} level="secondary" count={typeCount.workbench} onClick={() => setFilter('workbench')}>{label('market-workbench')}</Seg>
             </>
-          ) : tones.map(tone => (
-            <Seg key={tone} active={filter === tone} level="secondary" count={typeCount.byTone.get(tone) ?? 0} onClick={() => setFilter(tone)}>{label(`market-tone-${tone}`)}</Seg>
-          ))}
+          ) : (
+            <>
+              {packs.map(pack => (
+                <Seg key={pack.id} active={filter === pack.id} level="secondary" count={typeCount.byPack.get(pack.id) ?? 0} onClick={() => setFilter(pack.id)}>{packLabel(props.locale, pack)}</Seg>
+              ))}
+              {/* An empty group is not offered, the same rule a bundle follows. */}
+              {typeCount.none > 0 ? (
+                <Seg active={filter === UNGROUPED} level="secondary" count={typeCount.none} onClick={() => setFilter(UNGROUPED)}>{label('market-pack-none')}</Seg>
+              ) : null}
+            </>
+          )}
         </FilterRow>
         {kind === 'app' && tags.length > 0 ? (
           <FilterRow caption={label('market-filter-tags')} level="tertiary">
@@ -234,6 +243,7 @@ export function MarketView(props: {
             <Card
               key={row.id}
               row={row}
+              locale={props.locale}
               pending={pending === row.id}
               busy={busy === row.id}
               done={done === row.id}
@@ -282,6 +292,7 @@ function EmptyState(props: {
 
 function Card(props: {
   readonly row: MarketRow
+  readonly locale: PanelLocale
   readonly pending: boolean
   readonly busy: boolean
   readonly done: boolean
@@ -299,13 +310,72 @@ function Card(props: {
   const noticeExtra = row.tracked === false && row.localVersion !== undefined
     ? props.label('market-local-version').replace('{v}', row.localVersion)
     : undefined
+  // Theme cards: preview owns the height. Title + description + install on top, strip + workbench,
+  // then a one-line footer. App cards keep the older prose-first layout.
+  if (row.kind === 'theme') {
+    const tokens = marketPreviewTokens(row)
+    return (
+      <article key={row.id} className="flex flex-col overflow-hidden rounded-2xl border bg-card" data-market-card={row.id}>
+        <div className="flex items-start gap-3 px-4 pt-3.5 pb-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="m-0 truncate text-[15px] font-semibold tracking-tight">{rowLabel(props.locale, row, 'name')}</h2>
+              <SourceIcon source={row.source} label={props.label} />
+            </div>
+            <p className="mt-0.5 truncate text-[12px] leading-5 text-muted-foreground">{rowLabel(props.locale, row, 'description')}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {notice === undefined ? null : (
+              <span className="max-w-24 truncate text-right text-[11px] leading-snug text-muted-foreground" title={[notice, noticeExtra].filter(Boolean).join(' · ')} data-market-notice="">
+                {row.tracked === false ? props.label('market-untracked-short') : props.label('market-overwrite-short')}
+              </span>
+            )}
+            <Action {...props} />
+          </div>
+        </div>
+        <div className="px-4">
+          <ThemeColorStrip
+            {...(tokens?.light === undefined ? {} : { tokens: tokens.light })}
+            {...(row.colors === undefined ? {} : { colors: row.colors })}
+          />
+        </div>
+        <div className="mt-2.5 px-4">
+          {tokens === undefined ? null : (
+            <ThemeDualPreview
+              size="workbench"
+              tokens={tokens}
+              lightLabel={props.label('market-light')}
+              darkLabel={props.label('market-dark')}
+              primaryLabel={props.label('market-preview-primary')}
+              secondaryLabel={props.label('market-preview-secondary')}
+            />
+          )}
+        </div>
+        <div className="mt-auto flex items-center gap-2.5 px-4 pt-2.5 pb-3 text-[11px] text-muted-foreground" data-market-meta="">
+          <span className="tabular-nums">{`v${row.version}`}</span>
+          {row.official === true ? <OfficialMark label={props.label('market-official')} /> : null}
+          <span className="inline-flex min-w-0 items-center gap-1" data-market-id={row.id}>
+            <Hash size={11} strokeWidth={2} className="shrink-0 opacity-70" aria-label={props.label('market-id')} />
+            <span className="truncate font-mono text-[10.5px]">{row.id}</span>
+          </span>
+          {noticeExtra === undefined ? null : <span className="truncate text-[10.5px]">{noticeExtra}</span>}
+          {row.downloads === undefined ? null : (
+            <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
+              <Download size={11} strokeWidth={2} />
+              {row.downloads}
+            </span>
+          )}
+        </div>
+      </article>
+    )
+  }
+
   return (
-    <article key={row.id} className={`flex flex-col rounded-2xl border bg-card px-5 pt-4 ${row.kind === 'theme' ? 'min-h-0' : 'min-h-44'}`} data-market-card={row.id}>
-      {row.kind === 'theme' ? <ThemePreview row={row} label={props.label} /> : null}
+    <article key={row.id} className="flex min-h-44 flex-col rounded-2xl border bg-card px-5 pt-4" data-market-card={row.id}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="m-0 truncate text-lg font-semibold tracking-tight">{row.name}</h2>
+            <h2 className="m-0 truncate text-lg font-semibold tracking-tight">{rowLabel(props.locale, row, 'name')}</h2>
             <SourceIcon source={row.source} label={props.label} />
           </div>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted-foreground">
@@ -337,7 +407,7 @@ function Card(props: {
           <Action {...props} />
         </div>
       </div>
-      <p className="mt-2.5 text-sm leading-6 text-foreground/90">{row.description}</p>
+      <p className="mt-2.5 text-sm leading-6 text-foreground/90">{rowLabel(props.locale, row, 'description')}</p>
       {row.tags === undefined || row.tags.length === 0 ? null : (
         <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-5 text-muted-foreground">
           <Tag size={13} strokeWidth={2} className="shrink-0 opacity-70" aria-label={props.label('market-topics')} />
@@ -413,21 +483,6 @@ function Action(props: {
   )
 }
 
-function ThemePreview(props: { readonly row: MarketRow; readonly label: (key: string) => string }): ReactNode {
-  const tokens = marketPreviewTokens(props.row)
-  if (tokens === undefined) return null
-  return (
-    <ThemeDualPreview
-      size="card"
-      tokens={tokens}
-      lightLabel={props.label('market-light')}
-      darkLabel={props.label('market-dark')}
-      primaryLabel={props.label('market-preview-primary')}
-      secondaryLabel={props.label('market-preview-secondary')}
-    />
-  )
-}
-
 function marketPreviewTokens(row: MarketRow): ThemeDualTokens | undefined {
   if (row.preview !== undefined) return row.preview
   if (row.colors === undefined || row.colors.length < 4) return undefined
@@ -482,7 +537,7 @@ function OfficialMark(props: { readonly label: string }): ReactNode {
 function matchesQuery(row: MarketRow, query: string): boolean {
   const needle = query.trim().toLowerCase()
   if (needle.length === 0) return true
-  const hay = [row.name, row.description, row.id, ...(row.tags ?? [])].join(' ').toLowerCase()
+  const hay = [row.name, row.nameZh, row.description, row.descriptionZh, row.id, ...(row.tags ?? [])].filter(Boolean).join(' ').toLowerCase()
   return hay.includes(needle)
 }
 
@@ -492,11 +547,30 @@ function matchesStatus(row: MarketRow, status: 'all' | 'missing' | 'update' | 'i
   return installState(row) === status
 }
 
+/** Filter value for theme rows that no pack claims. Never a pack id: those match `^[a-z0-9-]+$`. */
+const UNGROUPED = '__ungrouped__'
+
 function matchesType(row: MarketRow, kind: 'app' | 'theme', filter: string): boolean {
   if (filter === 'all') return true
   if (kind === 'app' && filter === 'workbench') return row.appKind === 'workbench'
   if (kind === 'app' && filter === 'app') return row.appKind !== 'workbench'
-  return row.tone === filter
+  if (filter === UNGROUPED) return row.themePackId === undefined
+  return row.themePackId === filter
+}
+
+/** Theme/app row labels: zh fields win under zh-CN when present. */
+function rowLabel(locale: PanelLocale, row: MarketRow, field: 'name' | 'description'): string {
+  if (locale === 'zh-CN') {
+    if (field === 'name' && row.nameZh !== undefined && row.nameZh.length > 0) return row.nameZh
+    if (field === 'description' && row.descriptionZh !== undefined && row.descriptionZh.length > 0) return row.descriptionZh
+  }
+  return field === 'name' ? row.name : row.description
+}
+
+/** Pack names are catalog data, so they keep the palette-label rule: zh first when present. */
+function packLabel(locale: PanelLocale, pack: MarketPack): string {
+  if (locale === 'zh-CN' && pack.nameZh !== undefined && pack.nameZh.length > 0) return pack.nameZh
+  return pack.name
 }
 
 function installState(row: MarketRow): 'missing' | 'update' | 'installed' {

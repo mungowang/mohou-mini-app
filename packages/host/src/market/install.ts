@@ -155,6 +155,11 @@ export interface ThemeModePreview {
   readonly 'secondary-foreground'?: string
   readonly primary?: string
   readonly 'primary-foreground'?: string
+  readonly accent?: string
+  readonly 'accent-foreground'?: string
+  readonly destructive?: string
+  readonly 'destructive-foreground'?: string
+  readonly input?: string
 }
 
 /** Market lock for one installed theme. Hidden so the palette scanner ignores it. */
@@ -287,5 +292,10 @@ function modeTokens(css: string, mode: string): ThemeModePreview | undefined {
     ...pick('secondary-foreground'),
     ...pick('primary'),
     ...pick('primary-foreground'),
+    ...pick('accent'),
+    ...pick('accent-foreground'),
+    ...pick('destructive'),
+    ...pick('destructive-foreground'),
+    ...pick('input'),
   }
 }

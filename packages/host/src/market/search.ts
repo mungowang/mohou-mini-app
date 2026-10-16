@@ -31,11 +31,11 @@ function rankRow(row: MarketListRow, needle: string): { tier: number; quality: n
   })
   const versionQuery = /\d+\.\d+/.test(needle)
   const tiers = [
-    { tier: 1, texts: [row.name, spelling?.name?.full ?? '', spelling?.name?.initials ?? ''] },
+    { tier: 1, texts: [row.name, row.nameZh ?? '', spelling?.name?.full ?? '', spelling?.name?.initials ?? ''] },
     { tier: 2, texts: [row.id.split('.').at(-1) ?? row.id] },
     { tier: 3, texts: [row.id] },
     { tier: 4, texts: [row.tags?.join(' ') ?? '', spelling?.tags?.full ?? '', spelling?.tags?.initials ?? ''] },
-    { tier: 5, texts: [row.description, spelling?.description?.full ?? '', spelling?.description?.initials ?? ''] },
+    { tier: 5, texts: [row.description, row.descriptionZh ?? '', spelling?.description?.full ?? '', spelling?.description?.initials ?? ''] },
     ...versionQuery ? [{ tier: 6, texts: [row.version] }] : [],
   ]
   let chosen: { tier: number; quality: number } | undefined

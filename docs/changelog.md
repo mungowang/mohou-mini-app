@@ -1,11 +1,15 @@
 ---
 status: locked
-updated: 2026-10-16
+updated: 2026-10-17
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.69
+
+SIGINT and SIGTERM stay bound until the shell process exits. A second signal while Host is disposing no longer kills the process first, and a signal during the window spawn still closes the window and exits.
 
 ## 1.0.68
 

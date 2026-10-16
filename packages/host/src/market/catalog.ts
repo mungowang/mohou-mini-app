@@ -11,6 +11,10 @@ export interface CatalogRow {
   readonly id: string
   readonly name: string
   readonly description: string
+  /** Optional Chinese display name (themes). Absent → use `name`. */
+  readonly nameZh?: string
+  /** Optional Chinese description (themes). Absent → use `description`. */
+  readonly descriptionZh?: string
   readonly package: string
   readonly version: string
   readonly kind: MarketKind
@@ -156,6 +160,8 @@ function resolveRow(raw: unknown): CatalogRow {
     if (kind !== 'theme') throw new MarketError('market-catalog', `catalog themePackId is only valid on a theme row: ${id}`)
     if (!PACK_ID.test(themePackId)) throw new MarketError('market-catalog', `catalog themePackId is invalid: ${themePackId}`)
   }
+  const nameZh = optionalText(row.nameZh, 'nameZh')
+  const descriptionZh = optionalText(row.descriptionZh, 'descriptionZh')
   return {
     id,
     name,
@@ -164,6 +170,8 @@ function resolveRow(raw: unknown): CatalogRow {
     version,
     kind,
     source,
+    ...nameZh === undefined ? {} : { nameZh },
+    ...descriptionZh === undefined ? {} : { descriptionZh },
     ...row.appKind === 'workbench' ? { appKind: 'workbench' as const } : {},
     ...stringList(row.tags),
     ...typeof row.requires === 'string' ? { requires: row.requires } : {},

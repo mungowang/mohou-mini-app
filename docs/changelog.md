@@ -7,6 +7,16 @@ updated: 2026-10-16
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.68
+
+Theme workbench dummy copy is everyday life (groceries, reply a friend, weekend film), not logistics jargon.
+
+## 1.0.67
+
+Theme catalog rows carry optional `nameZh` and `descriptionZh` from the theme CSS headers (`name-zh-CN`, `description-zh-CN`). The market card and search use the Chinese fields under zh-CN. English `name` / `description` stay required.
+
+Theme market cards put the preview first: a color strip and a light|dark workbench dummy (list, hover, input, primary/danger), with title, description, and install on a compact header. App cards keep the prose-first layout.
+
 ## 1.0.66
 
 The market groups themes by bundle (灵感 / Inspiration) instead of a computed hue bucket. A bundle is a catalog heading with no version and nothing to install: its themes still install one at a time, still land flat in `themes/`, and keep their own versions. A theme no bundle claims shows under 未分类.

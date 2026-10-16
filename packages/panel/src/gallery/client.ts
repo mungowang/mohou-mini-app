@@ -34,6 +34,10 @@ export interface MarketRow {
   readonly id: string
   readonly name: string
   readonly description: string
+  /** Optional Chinese display name (themes). */
+  readonly nameZh?: string
+  /** Optional Chinese description (themes). */
+  readonly descriptionZh?: string
   readonly package: string
   readonly version: string
   readonly kind: 'app' | 'theme'
@@ -69,6 +73,11 @@ export interface ThemeModePreview {
   readonly 'secondary-foreground'?: string
   readonly primary?: string
   readonly 'primary-foreground'?: string
+  readonly accent?: string
+  readonly 'accent-foreground'?: string
+  readonly destructive?: string
+  readonly 'destructive-foreground'?: string
+  readonly input?: string
 }
 
 /** A client failure the view can tell from an empty list. */

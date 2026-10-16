@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { MarketList, MarketPack, MarketRow } from '../gallery/client.ts'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
-import { ThemeDualPreview, type ThemeDualTokens } from '../theme/preview.tsx'
+import { ThemeColorStrip, ThemeDualPreview, type ThemeDualTokens } from '../theme/preview.tsx'
 
 /**
  * Market tab. Apps and themes are separate grids. The card click confirms before a replace.
@@ -243,6 +243,7 @@ export function MarketView(props: {
             <Card
               key={row.id}
               row={row}
+              locale={props.locale}
               pending={pending === row.id}
               busy={busy === row.id}
               done={done === row.id}
@@ -291,6 +292,7 @@ function EmptyState(props: {
 
 function Card(props: {
   readonly row: MarketRow
+  readonly locale: PanelLocale
   readonly pending: boolean
   readonly busy: boolean
   readonly done: boolean
@@ -308,13 +310,72 @@ function Card(props: {
   const noticeExtra = row.tracked === false && row.localVersion !== undefined
     ? props.label('market-local-version').replace('{v}', row.localVersion)
     : undefined
+  // Theme cards: preview owns the height. Title + description + install on top, strip + workbench,
+  // then a one-line footer. App cards keep the older prose-first layout.
+  if (row.kind === 'theme') {
+    const tokens = marketPreviewTokens(row)
+    return (
+      <article key={row.id} className="flex flex-col overflow-hidden rounded-2xl border bg-card" data-market-card={row.id}>
+        <div className="flex items-start gap-3 px-4 pt-3.5 pb-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <h2 className="m-0 truncate text-[15px] font-semibold tracking-tight">{rowLabel(props.locale, row, 'name')}</h2>
+              <SourceIcon source={row.source} label={props.label} />
+            </div>
+            <p className="mt-0.5 truncate text-[12px] leading-5 text-muted-foreground">{rowLabel(props.locale, row, 'description')}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {notice === undefined ? null : (
+              <span className="max-w-24 truncate text-right text-[11px] leading-snug text-muted-foreground" title={[notice, noticeExtra].filter(Boolean).join(' · ')} data-market-notice="">
+                {row.tracked === false ? props.label('market-untracked-short') : props.label('market-overwrite-short')}
+              </span>
+            )}
+            <Action {...props} />
+          </div>
+        </div>
+        <div className="px-4">
+          <ThemeColorStrip
+            {...(tokens?.light === undefined ? {} : { tokens: tokens.light })}
+            {...(row.colors === undefined ? {} : { colors: row.colors })}
+          />
+        </div>
+        <div className="mt-2.5 px-4">
+          {tokens === undefined ? null : (
+            <ThemeDualPreview
+              size="workbench"
+              tokens={tokens}
+              lightLabel={props.label('market-light')}
+              darkLabel={props.label('market-dark')}
+              primaryLabel={props.label('market-preview-primary')}
+              secondaryLabel={props.label('market-preview-secondary')}
+            />
+          )}
+        </div>
+        <div className="mt-auto flex items-center gap-2.5 px-4 pt-2.5 pb-3 text-[11px] text-muted-foreground" data-market-meta="">
+          <span className="tabular-nums">{`v${row.version}`}</span>
+          {row.official === true ? <OfficialMark label={props.label('market-official')} /> : null}
+          <span className="inline-flex min-w-0 items-center gap-1" data-market-id={row.id}>
+            <Hash size={11} strokeWidth={2} className="shrink-0 opacity-70" aria-label={props.label('market-id')} />
+            <span className="truncate font-mono text-[10.5px]">{row.id}</span>
+          </span>
+          {noticeExtra === undefined ? null : <span className="truncate text-[10.5px]">{noticeExtra}</span>}
+          {row.downloads === undefined ? null : (
+            <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
+              <Download size={11} strokeWidth={2} />
+              {row.downloads}
+            </span>
+          )}
+        </div>
+      </article>
+    )
+  }
+
   return (
-    <article key={row.id} className={`flex flex-col rounded-2xl border bg-card px-5 pt-4 ${row.kind === 'theme' ? 'min-h-0' : 'min-h-44'}`} data-market-card={row.id}>
-      {row.kind === 'theme' ? <ThemePreview row={row} label={props.label} /> : null}
+    <article key={row.id} className="flex min-h-44 flex-col rounded-2xl border bg-card px-5 pt-4" data-market-card={row.id}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="m-0 truncate text-lg font-semibold tracking-tight">{row.name}</h2>
+            <h2 className="m-0 truncate text-lg font-semibold tracking-tight">{rowLabel(props.locale, row, 'name')}</h2>
             <SourceIcon source={row.source} label={props.label} />
           </div>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted-foreground">
@@ -346,7 +407,7 @@ function Card(props: {
           <Action {...props} />
         </div>
       </div>
-      <p className="mt-2.5 text-sm leading-6 text-foreground/90">{row.description}</p>
+      <p className="mt-2.5 text-sm leading-6 text-foreground/90">{rowLabel(props.locale, row, 'description')}</p>
       {row.tags === undefined || row.tags.length === 0 ? null : (
         <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] leading-5 text-muted-foreground">
           <Tag size={13} strokeWidth={2} className="shrink-0 opacity-70" aria-label={props.label('market-topics')} />
@@ -422,21 +483,6 @@ function Action(props: {
   )
 }
 
-function ThemePreview(props: { readonly row: MarketRow; readonly label: (key: string) => string }): ReactNode {
-  const tokens = marketPreviewTokens(props.row)
-  if (tokens === undefined) return null
-  return (
-    <ThemeDualPreview
-      size="card"
-      tokens={tokens}
-      lightLabel={props.label('market-light')}
-      darkLabel={props.label('market-dark')}
-      primaryLabel={props.label('market-preview-primary')}
-      secondaryLabel={props.label('market-preview-secondary')}
-    />
-  )
-}
-
 function marketPreviewTokens(row: MarketRow): ThemeDualTokens | undefined {
   if (row.preview !== undefined) return row.preview
   if (row.colors === undefined || row.colors.length < 4) return undefined
@@ -491,7 +537,7 @@ function OfficialMark(props: { readonly label: string }): ReactNode {
 function matchesQuery(row: MarketRow, query: string): boolean {
   const needle = query.trim().toLowerCase()
   if (needle.length === 0) return true
-  const hay = [row.name, row.description, row.id, ...(row.tags ?? [])].join(' ').toLowerCase()
+  const hay = [row.name, row.nameZh, row.description, row.descriptionZh, row.id, ...(row.tags ?? [])].filter(Boolean).join(' ').toLowerCase()
   return hay.includes(needle)
 }
 
@@ -510,6 +556,15 @@ function matchesType(row: MarketRow, kind: 'app' | 'theme', filter: string): boo
   if (kind === 'app' && filter === 'app') return row.appKind !== 'workbench'
   if (filter === UNGROUPED) return row.themePackId === undefined
   return row.themePackId === filter
+}
+
+/** Theme/app row labels: zh fields win under zh-CN when present. */
+function rowLabel(locale: PanelLocale, row: MarketRow, field: 'name' | 'description'): string {
+  if (locale === 'zh-CN') {
+    if (field === 'name' && row.nameZh !== undefined && row.nameZh.length > 0) return row.nameZh
+    if (field === 'description' && row.descriptionZh !== undefined && row.descriptionZh.length > 0) return row.descriptionZh
+  }
+  return field === 'name' ? row.name : row.description
 }
 
 /** Pack names are catalog data, so they keep the palette-label rule: zh first when present. */

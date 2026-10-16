@@ -8,8 +8,25 @@ export interface PanelClient {
   reload?(appId: string): Promise<void>
   listTrash?(): Promise<readonly GalleryApp[]>
   undeleteApp?(appId: string): Promise<void>
-  listMarket?(): Promise<readonly MarketRow[]>
+  listMarket?(): Promise<MarketList>
   installMarket?(id: string, confirm: boolean): Promise<void>
+}
+
+/** One market read: rows with local state, plus the bundles that still have a row. */
+export interface MarketList {
+  readonly rows: readonly MarketRow[]
+  readonly packs: readonly MarketPack[]
+}
+
+/** A market bundle. Presentation only: it installs nothing and has no version. */
+export interface MarketPack {
+  readonly id: string
+  readonly name: string
+  readonly nameZh?: string
+  readonly description?: string
+  readonly descriptionZh?: string
+  readonly author?: string
+  readonly official?: boolean
 }
 
 /** One catalog row plus local lock state. */
@@ -28,7 +45,8 @@ export interface MarketRow {
   readonly official?: boolean
   readonly source: 'npm' | 'local'
   readonly colors?: readonly string[]
-  readonly tone?: string
+  /** The `MarketPack` this theme belongs to. Absent means ungrouped. */
+  readonly themePackId?: string
   readonly installedVersion?: string
   readonly localVersion?: string
   readonly modified?: boolean

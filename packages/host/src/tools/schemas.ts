@@ -20,7 +20,7 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
     inputSchema: { type: 'object', properties: {} },
   },
   mini_app_market_list: {
-    description: 'List market apps and themes. Optional search matches name, pinyin, id, tags, and description. Optional kind limits the list.',
+    description: 'List market apps and themes. Optional search matches name, pinyin, id, tags, and description. Optional kind limits the list. Answers apps and themePacks; a theme row names its bundle in themePackId, and a bundle installs nothing on its own.',
     inputSchema: {
       type: 'object',
       properties: {

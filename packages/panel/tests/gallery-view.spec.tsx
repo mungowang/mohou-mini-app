@@ -11,7 +11,7 @@ const client: PanelClient = {
   list: () => Promise.resolve([todo]),
   open: () => Promise.resolve(),
   deleteApp: () => Promise.resolve(),
-  listMarket: async () => [],
+  listMarket: async () => ({ rows: [], packs: [] }),
   installMarket: async () => undefined,
 }
 

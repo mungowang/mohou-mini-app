@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
 
-import type { MarketRow } from '../src/gallery/client.ts'
+import type { MarketList, MarketPack, MarketRow } from '../src/gallery/client.ts'
 import { MarketView } from '../src/market/view.tsx'
 
 const appRow: MarketRow = {
@@ -35,7 +35,6 @@ const themeRow: MarketRow = {
   version: '1.0.0',
   kind: 'theme',
   source: 'local',
-  tone: 'green',
   colors: ['#060', '#fff', '#0a0', '#000'],
   official: true,
   preview: {
@@ -62,7 +61,13 @@ const themeRow: MarketRow = {
   },
 }
 
-function mount(rows: readonly MarketRow[], install?: (id: string, confirm: boolean) => Promise<void>) {
+const spring: MarketPack = { id: 'spring', name: 'Spring', nameZh: '春' }
+
+function mount(
+  rows: readonly MarketRow[],
+  install?: (id: string, confirm: boolean) => Promise<void>,
+  packs: readonly MarketPack[] = [],
+) {
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
@@ -72,7 +77,7 @@ function mount(rows: readonly MarketRow[], install?: (id: string, confirm: boole
       <MarketView
         locale="zh-CN"
         mode="production"
-        list={async () => rows}
+        list={async (): Promise<MarketList> => ({ rows, packs })}
         {...install === undefined ? {} : { install }}
         onInstalled={() => { installed.push('ok') }}
       />,
@@ -126,8 +131,34 @@ describe('market view', () => {
     expect(host.querySelector('[data-market-card="com.example.desk"]')).not.toBeNull()
     clickText(host, '主题')
     expect(host.querySelector('[data-market-card="forest"]')).not.toBeNull()
-    clickText(host, '绿色')
+    // No bundle declared: the ungrouped bucket is the only group, and it holds the row.
+    clickText(host, '未分类')
     expect(host.querySelector('[data-market-card="forest"]')).not.toBeNull()
+  })
+
+  it('filters themes by pack and keeps ungrouped beside the bundles', async () => {
+    const { host } = mount(
+      [
+        themeRow,
+        { ...themeRow, id: 'plum', name: 'Plum', themePackId: 'spring' },
+        { ...themeRow, id: 'reed', name: 'Reed', themePackId: 'autumn' },
+      ],
+      undefined,
+      [spring, { id: 'autumn', name: 'Autumn', nameZh: '秋天' }],
+    )
+    await act(async () => { await Promise.resolve() })
+    clickText(host, '主题')
+    expect(host.textContent).toContain('灵感')
+    clickText(host, '春')
+    expect(host.querySelector('[data-market-card="plum"]')).not.toBeNull()
+    expect(host.querySelector('[data-market-card="forest"]')).toBeNull()
+    expect(host.querySelector('[data-market-card="reed"]')).toBeNull()
+    clickText(host, '秋天')
+    expect(host.querySelector('[data-market-card="reed"]')).not.toBeNull()
+    expect(host.querySelector('[data-market-card="plum"]')).toBeNull()
+    clickText(host, '未分类')
+    expect(host.querySelector('[data-market-card="forest"]')).not.toBeNull()
+    expect(host.querySelector('[data-market-card="plum"]')).toBeNull()
   })
 
   it('disables install when the product is too old', async () => {
@@ -245,7 +276,7 @@ describe('market refresh', () => {
           locale="en"
           mode="production"
           refreshTick={tick}
-          list={async () => [appRow]}
+          list={async () => ({ rows: [appRow], packs: [] })}
           onCatalogSettled={() => { settled += 1 }}
           onInstalled={() => undefined}
         />,
@@ -279,7 +310,7 @@ describe('market refresh', () => {
           list={async () => {
             calls += 1
             // The third read is the one after the install lands.
-            return calls < 3 ? [untracked] : [installed]
+            return { rows: calls < 3 ? [untracked] : [installed], packs: [] }
           }}
           install={async () => undefined}
           onInstalled={() => undefined}
@@ -320,9 +351,9 @@ describe('market refresh', () => {
           mode="production"
           refreshTick={tick}
           list={async () => {
-            if (phase === 'before') return [{ ...appRow, tracked: false }]
-            if (phase === 'installed') return [{ ...appRow, tracked: true, installedVersion: appRow.version }]
-            return [{ ...appRow, version: '2.0.0', tracked: true, installedVersion: appRow.version }]
+            if (phase === 'before') return { rows: [{ ...appRow, tracked: false }], packs: [] }
+            if (phase === 'installed') return { rows: [{ ...appRow, tracked: true, installedVersion: appRow.version }], packs: [] }
+            return { rows: [{ ...appRow, version: '2.0.0', tracked: true, installedVersion: appRow.version }], packs: [] }
           }}
           install={async () => { phase = 'installed' }}
           onInstalled={() => undefined}

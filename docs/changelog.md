@@ -1,11 +1,15 @@
 ---
 status: locked
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.66
+
+The market groups themes by bundle (灵感 / Inspiration) instead of a computed hue bucket. A bundle is a catalog heading with no version and nothing to install: its themes still install one at a time, still land flat in `themes/`, and keep their own versions. A theme no bundle claims shows under 未分类.
 
 ## 1.0.65
 

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-14
+updated: 2026-10-16
 ---
 
 # Author surface
@@ -29,7 +29,7 @@ Codes are in [implementation.md](implementation.md).
 | `mini_app_delete` | `appId`, `path`, optional `commit` | file removed | `manifest-protected`, `file-missing`. Required entries cannot be deleted. Another owner may mark more paths protected. |
 | `mini_app_register` | `appId`, `name`, `description`, `version`, optional `acronym`, `tags`, `kind` | `{ directory, needed }` plus the list summary. `needed` is the absolute paths of `ui.tsx` and `main.api.ts`. A `files` field is rejected. | `app-id-invalid`, `manifest-invalid`, `app-duplicate` |
 | `mini_app_rename` | `appId`, `newAppId` | the list summary for the new id, including `directory` | `app-id-invalid`, `app-not-registered`, `app-duplicate`. An unchanged id is `app-id-invalid`. |
-| `mini_app_market_list` | optional `search`, optional `kind` | `{ apps }`. Each row includes `kind`. Omitted `kind` returns apps and themes. | `market-catalog` |
+| `mini_app_market_list` | optional `search`, optional `kind` | `{ apps, themePacks }`. Each row includes `kind`, and a theme row may include `themePackId`. Omitted `kind` returns apps and themes. `themePacks` is the bundle list that has rows before `search` is applied. | `market-catalog` |
 | `mini_app_market_install` | `appId`, `kind`, optional `overwrite` | `{ id, kind }` | `market-confirm`, `market-catalog`, `tool-args`. `overwrite` defaults to false. A kind that does not match the row is `tool-args` and writes nothing. |
 | `mini_app_market_uninstall` | `appId`, `kind`, optional `confirm` | `{ id, kind }` | `market-confirm`, `market-catalog`, `tool-args`. `confirm` defaults to false. Apps move to trash. Themes delete the css and lock. A kind that does not match a present catalog row is `tool-args`. A missing install is `market-catalog`. Local edits or an untracked tree need `confirm: true`. |
 | `mini_app_reload` | `appId`, optional `cleanCaches` | compile result | codes on [compile.md](host/compile.md) |

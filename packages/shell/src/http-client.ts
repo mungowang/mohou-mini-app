@@ -4,6 +4,7 @@ import {
   PanelClientError,
   type GalleryApp,
   type MarketRow,
+  type MarketPack,
   type HistoryClient,
   type HistoryCommit,
   type HistoryDetail,
@@ -40,9 +41,15 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
     undeleteApp: appId => postOk(origin, `${httpLayout.trash}/${encodeURIComponent(appId)}/${httpLayout.restore}`),
     reload: appId => postOk(origin, appsResource(appId, httpLayout.reload)),
     listMarket: async () => {
-      const result = (await getJson(origin, httpLayout.market)).result
-      if (!Array.isArray(result)) throw new PanelClientError('failed', 'market list is invalid')
-      return result as MarketRow[]
+      const body = (await getJson(origin, httpLayout.market)).result
+      // A Host from before the bundle list answered a bare row array. Read it as no bundles.
+      if (Array.isArray(body)) return { rows: body as MarketRow[], packs: [] }
+      const result = record(body)
+      if (!Array.isArray(result.rows)) throw new PanelClientError('failed', 'market list is invalid')
+      return {
+        rows: result.rows as MarketRow[],
+        packs: Array.isArray(result.packs) ? result.packs as MarketPack[] : [],
+      }
     },
     installMarket: (id, confirm) => postOk(origin, httpLayout.marketInstall, { id, confirm }),
     readPolicy: async () => publicPolicy((await getJson(origin, httpLayout.hostConfig)).policy),

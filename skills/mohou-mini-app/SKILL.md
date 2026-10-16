@@ -1,7 +1,7 @@
 ---
 name: mohou-mini-app
 description: Create or edit local mini-apps (ui.tsx + main.api.ts) that run in the mini-app panel. Confirm the core choices before mini_app_register when the ask is vague. Then write source with your file tools, compile with mini_app_reload, smoke-test with mini_app_call, and reveal with mini_app_open. Triggers include 做个小程序 / 小工具 / 面板 / 仪表盘 / dashboard / 看板 / 工作台 / mini-app. Not for editing Host, Panel, or Shell source.
-version: 1.0.65
+version: 1.0.66
 ---
 
 # Mini-app authoring
@@ -68,7 +68,7 @@ mini_app_register({
 | Read one file | `mini_app_read({ appId, path })` |
 | Create an app | `mini_app_register({ appId, name, description, version })` — optional `tags`, `acronym`, `kind`. Writes `manifest.json`, returns `directory` and `needed` |
 | Rename an app | `mini_app_rename({ appId, newAppId })` — moves the directory, manifest id, usage, homepage pin, and trash copies, then commits that tree. Does not rewrite source text. |
-| List the market | `mini_app_market_list({ search?, kind? })` — `kind` is `app` or `theme`. Omitted `kind` returns both. Search matches name, pinyin, id, tags, and description. |
+| List the market | `mini_app_market_list({ search?, kind? })` — `kind` is `app` or `theme`. Omitted `kind` returns both. Search matches name, pinyin, id, tags, and description. Answers `{ apps, themePacks }`; a theme row's `themePackId` names one bundle. |
 | Install from the market | `mini_app_market_install({ appId, kind, overwrite? })` — `kind` must match the row. `overwrite` defaults to false. `market-confirm` writes nothing. Records stay. To keep edits, back up that app history first and replay them after the update, or rename the local app, install the official id, and merge one into the other. |
 | Uninstall a market row | `mini_app_market_uninstall({ appId, kind, confirm? })` — apps go to trash; themes delete css + lock. `confirm` defaults to false. Local edits or an untracked tree return `market-confirm` until `confirm: true`. |
 | Write / edit / delete source | your file tools on `directory` / `needed`. Not MCP. |

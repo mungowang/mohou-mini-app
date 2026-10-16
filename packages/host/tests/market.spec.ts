@@ -19,7 +19,6 @@ import { assertLocalSource, installMarket, listMarket, uninstallMarket } from '.
 import { themePreview, readThemeCss } from '../src/market/install.ts'
 import { sourceSum } from '../src/market/sum.ts'
 import { searchMarket } from '../src/market/search.ts'
-import { toneOf } from '../src/market/tone.ts'
 
 const row = {
   id: 'com.example.desk',
@@ -48,6 +47,88 @@ describe('market catalog', () => {
   })
 })
 
+describe('market theme packs', () => {
+  /** A theme row is the base; `themePackId` points at a `themePacks` entry. */
+  const theme = (extra: Record<string, unknown> = {}) => ({
+    id: 'sakura', name: 'Sakura', description: 'd', package: '@mohou-apps/themes',
+    version: '1.0.0', kind: 'theme', ...extra,
+  })
+  const pack = { id: 'spring', name: 'Spring', nameZh: '春', description: 'Soft light', author: 'Mohou', official: true }
+
+  it('admits a bundle and the row that names it', () => {
+    const catalog = resolveCatalog({
+      version: '1.0.0',
+      mohou: { themePacks: [pack], apps: [theme({ themePackId: 'spring' })] },
+    })
+    expect(catalog.themePacks[0]).toMatchObject({ id: 'spring', nameZh: '春', official: true })
+    expect(catalog.apps[0]).toMatchObject({ themePackId: 'spring' })
+  })
+
+  it('reads a catalog with no bundle list as no bundles', () => {
+    expect(resolveCatalog({ version: '1.0.0', mohou: { apps: [theme()] } }).themePacks).toEqual([])
+  })
+
+  it('ignores a key it does not declare, which is what keeps an older Host listing every row', () => {
+    const catalog = resolveCatalog({
+      version: '1.0.0',
+      mohou: {
+        // A sibling the current resolver knows nothing about, and a row field it does not read.
+        futureThings: [{ id: 'x' }],
+        apps: [theme({ futureField: 'ignored', themePackId: undefined })],
+      },
+    })
+    expect(catalog.apps).toHaveLength(1)
+    expect(catalog.apps[0]).not.toHaveProperty('futureField')
+    expect(catalog.apps[0]).not.toHaveProperty('themePackId')
+  })
+
+  it('refuses a bundle that names nothing, a bundle id reused, a row id reused, and a bundle on an app row', () => {
+    const bad = [
+      // Missing referent is a catalog error, not an ungrouped row.
+      { version: '1.0.0', mohou: { apps: [theme({ themePackId: 'ghost' })] } },
+      { version: '1.0.0', mohou: { themePacks: 'no', apps: [] } },
+      { version: '1.0.0', mohou: { themePacks: [pack, { ...pack, name: 'Second' }], apps: [] } },
+      { version: '1.0.0', mohou: { themePacks: [{ name: 'No id' }], apps: [] } },
+      { version: '1.0.0', mohou: { themePacks: [{ id: 'Spring!', name: 'X' }], apps: [] } },
+      // Two rows, one id: one flat file and one lock cannot carry both.
+      { version: '1.0.0', mohou: { apps: [theme(), theme()] } },
+      { version: '1.0.0', mohou: { themePacks: [pack], apps: [{ ...row, themePackId: 'spring' }] } },
+      { version: '1.0.0', mohou: { themePacks: [pack], apps: [theme({ themePackId: 'Spring' })] } },
+    ]
+    for (const entry of bad) {
+      expect(() => resolveCatalog(entry)).toThrow(MarketError)
+    }
+  })
+
+  it('drops a bundle whose rows are all filtered out of this channel', async () => {
+    const original = globalThis.fetch
+    // 春 ships only a `local` row, which a registry channel hides. 秋 keeps an npm row.
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      version: '1.0.0',
+      mohou: {
+        themePacks: [pack, { id: 'autumn', name: 'Autumn' }],
+        apps: [
+          theme({ themePackId: 'spring', source: 'local', file: 'themes.tgz' }),
+          theme({ id: 'reed', name: 'Reed', themePackId: 'autumn' }),
+        ],
+      },
+    }), { status: 200 }))
+    try {
+      const root = mkdtempSync(path.join(tmpdir(), 'mohou-pack-'))
+      const listed = await listMarket({
+        registry: 'https://registry.example',
+        runtimeRoot: path.join(root, 'runtime'),
+        localDist: false,
+        home: path.join(root, 'home'),
+      })
+      expect(listed.rows.map(item => item.id)).toEqual(['reed'])
+      expect(listed.packs.map(item => item.id)).toEqual(['autumn'])
+    } finally {
+      globalThis.fetch = original
+    }
+  })
+})
+
 describe('market search', () => {
   it('matches a name before a description and keeps kind on the row', () => {
     const apps = [
@@ -59,23 +140,6 @@ describe('market search', () => {
     expect(searchMarket(apps, 'com.example.desk')[0]?.id).toBe('com.example.desk')
     expect(searchMarket(apps, 'dsk').map(item => item.id)).toContain('com.example.desk')
     expect(searchMarket(apps, 'today')[0]?.id).toBe('com.example.desk')
-  })
-})
-
-describe('market tone', () => {
-  it('groups from the primary color', () => {
-    expect(toneOf('#111111')).toBe('dark')
-    expect(toneOf('#c45c5c')).toBe('red')
-    expect(toneOf('#ff0000')).toBe('red')
-    expect(toneOf('#e0a040')).toBe('warm')
-    expect(toneOf('#ff8800')).toBe('warm')
-    expect(toneOf('#2e7de9')).toBe('blue')
-    expect(toneOf('#0000ff')).toBe('blue')
-    expect(toneOf('#00aa55')).toBe('green')
-    expect(toneOf('#808080')).toBe('neutral')
-    expect(toneOf('#abcdef')).toBe('blue')
-    expect(toneOf('not-a-color')).toBe('neutral')
-    expect(toneOf('#fff')).toBe('neutral')
   })
 })
 
@@ -330,7 +394,7 @@ describe('author market tools', () => {
         provider: createEchoProvider(),
       },
       market: {
-        list: async () => [{ ...row, kind: 'app' as const }],
+        list: async () => ({ rows: [{ ...row, kind: 'app' as const }], packs: [] }),
         install: async (id, kind, overwrite) => { installs.push({ id, kind, overwrite }) },
         uninstall: async (id, kind, confirm) => { uninstalls.push({ id, kind, confirm }) },
       },
@@ -419,11 +483,10 @@ describe('list and local theme install', () => {
       localDist: true,
       env: { MINI_APP_MARKET_DIR: root },
     })
-    const app = listed.find(item => item.id === row.id)
-    const theme = listed.find(item => item.id === 'forest')
+    const app = listed.rows.find(item => item.id === row.id)
+    const theme = listed.rows.find(item => item.id === 'forest')
     expect(app).toMatchObject({ tracked: true, modified: true, installedVersion: '1.0.0' })
     expect(theme).toMatchObject({ kind: 'theme', installable: false })
-    expect(theme?.tone === 'green' || theme?.tone === 'dark').toBe(true)
     expect(theme?.preview?.light.primary).toBe('#060')
     await installMarket({
       registry: 'https://invalid.example',
@@ -562,7 +625,7 @@ describe('list and local theme install', () => {
         runtimeRoot: path.join(packed, 'runtime'),
         localDist: false,
       })
-      expect(listed[0]?.id).toBe(row.id)
+      expect(listed.rows[0]?.id).toBe(row.id)
       await installMarket({
         registry: 'https://registry.example',
         runtimeRoot: path.join(packed, 'runtime'),
@@ -704,7 +767,7 @@ describe('themes package', () => {
       home,
     })
     // Both rows get a preview from the one extracted package.
-    expect(listed.map(row => row.preview?.light.primary)).toEqual(['#2563eb', '#2563eb'])
+    expect(listed.rows.map(row => row.preview?.light.primary)).toEqual(['#2563eb', '#2563eb'])
     const ink = await installMarket({
       registry: 'https://invalid.example',
       runtimeRoot: path.join(root, 'runtime'),
@@ -723,7 +786,7 @@ describe('themes package', () => {
       env,
       home,
     })
-    expect(after.find(row => row.id === 'ink')).toMatchObject({ tracked: true, installedVersion: '1.0.0', modified: false })
+    expect(after.rows.find(row => row.id === 'ink')).toMatchObject({ tracked: true, installedVersion: '1.0.0', modified: false })
     // A hand edit to the installed file is the modified state.
     writeFileSync(path.join(home, '.mini-app/themes/theme-ink.css'), 'edited')
     const edited = await listMarket({
@@ -733,7 +796,7 @@ describe('themes package', () => {
       env,
       home,
     })
-    expect(edited.find(row => row.id === 'ink')).toMatchObject({ tracked: true, modified: true })
+    expect(edited.rows.find(row => row.id === 'ink')).toMatchObject({ tracked: true, modified: true })
     await expect(uninstallMarket({
       runtimeRoot: path.join(root, 'runtime'),
       id: 'ink',
@@ -767,8 +830,8 @@ describe('themes package', () => {
       env: { MINI_APP_MARKET_DIR: root },
       home: path.join(root, 'home'),
     })
-    expect(listed[0]).toMatchObject({ id: 'ink' })
-    expect(listed[0]?.tracked).toBeUndefined()
+    expect(listed.rows[0]).toMatchObject({ id: 'ink' })
+    expect(listed.rows[0]?.tracked).toBeUndefined()
   })
 
   it('refuses a themes tarball with no sum, and a tarball that is missing', async () => {

@@ -19,10 +19,10 @@ import { createFileTools, type FileCommit } from '../files/tools.ts'
 import { commitApp, listHistory, resetApp } from '../history/store.ts'
 import { DEFAULT_STORAGE_NOTICE_BYTES } from '../storage/open.ts'
 import { type HostEvent } from '../events/host-events.ts'
-import type { MarketKind } from '../market/catalog.ts'
+import type { MarketKind, ThemePack } from '../market/catalog.ts'
 import { MarketError } from '../market/error.ts'
 import { searchMarket } from '../market/search.ts'
-import type { MarketListRow } from '../market/service.ts'
+import type { MarketList, MarketListRow } from '../market/service.ts'
 import { restoreStorageBackup } from '../storage/schema.ts'
 import type { CredentialProvider } from '../credentials/provider.ts'
 import { hostAuthoringToken } from '../host/layout.ts'
@@ -153,7 +153,7 @@ export function createAuthorTools(options: {
   /** The live homepage pin, when the renamed id was that pin. */
   readonly onWorkbenchRenamed?: (from: string, to: string) => void
   readonly market?: {
-    list: () => Promise<MarketListRow[]>
+    list: () => Promise<MarketList>
     install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
     uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
   }
@@ -261,7 +261,7 @@ async function invoke(
     installTimeoutMs?: number
     storageNoticeBytes?: number
     market?: {
-      list: () => Promise<MarketListRow[]>
+      list: () => Promise<MarketList>
       install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
       uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
     }
@@ -931,24 +931,25 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 async function marketList(
-  options: { readonly market?: { list: () => Promise<MarketListRow[]> } },
+  options: { readonly market?: { list: () => Promise<MarketList> } },
   input: Record<string, unknown>,
-): Promise<{ apps: MarketListRow[] }> {
+): Promise<{ apps: MarketListRow[]; themePacks: readonly ThemePack[] }> {
   if (options.market === undefined) throw new MarketError('market-catalog', 'market is not available')
   const kind = input.kind
   if (kind !== undefined && kind !== 'app' && kind !== 'theme') {
     throw new AuthorError('tool-args', 'market kind must be app or theme')
   }
-  const rows = await options.market.list()
-  const filtered = kind === undefined ? rows : rows.filter(row => row.kind === kind)
+  const listed = await options.market.list()
+  const filtered = kind === undefined ? listed.rows : listed.rows.filter(row => row.kind === kind)
   const query = typeof input.search === 'string' ? input.search : undefined
-  return { apps: searchMarket(filtered, query) }
+  // Search may empty a bundle, so the list stays the bundle set that has a row before the search.
+  return { apps: searchMarket(filtered, query), themePacks: listed.packs }
 }
 
 async function marketInstall(
   options: {
     readonly market?: {
-      list: () => Promise<MarketListRow[]>
+      list: () => Promise<MarketList>
       install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
       uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
     }
@@ -962,7 +963,7 @@ async function marketInstall(
   if (kind !== 'app' && kind !== 'theme') {
     throw new AuthorError('tool-args', 'market kind must be app or theme')
   }
-  const rows = await options.market.list()
+  const { rows } = await options.market.list()
   const row = rows.find(item => item.id === id)
   if (row === undefined) throw new MarketError('market-catalog', 'catalog row is missing')
   if (row.kind !== kind) throw new AuthorError('tool-args', 'market kind does not match the catalog row')
@@ -981,7 +982,7 @@ async function marketInstall(
 async function marketUninstall(
   options: {
     readonly market?: {
-      list: () => Promise<MarketListRow[]>
+      list: () => Promise<MarketList>
       install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
       uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
     }
@@ -995,7 +996,7 @@ async function marketUninstall(
   if (kind !== 'app' && kind !== 'theme') {
     throw new AuthorError('tool-args', 'market kind must be app or theme')
   }
-  const rows = await options.market.list()
+  const { rows } = await options.market.list()
   const row = rows.find(item => item.id === id)
   // Catalog may have dropped the row; uninstall still clears a local market install.
   if (row !== undefined && row.kind !== kind) {

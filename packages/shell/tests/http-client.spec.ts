@@ -131,6 +131,20 @@ describe('httpPanelClients', () => {
     expect((await client.readAuthorMcp?.())?.agents).toHaveLength(1)
     expect((await client.listRuntimes?.())?.[0]?.models).toEqual([])
     expect((await client.listMcp?.())?.servers[0]?.enabled).toBe(false)
+    expect(await client.listMarket?.()).toEqual({ rows: [{ id: 'ink', kind: 'theme' }], packs: [] })
+  })
+
+  it('reads a bundle list from the market body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        result: { rows: [{ id: 'ink', kind: 'theme', themePackId: 'spring' }], packs: [{ id: 'spring', name: 'Spring' }] },
+      }),
+    })))
+    const listed = await httpPanelClients('http://127.0.0.1').listMarket?.()
+    expect(listed?.rows[0]).toMatchObject({ themePackId: 'spring' })
+    expect(listed?.packs).toEqual([{ id: 'spring', name: 'Spring' }])
   })
 
   it('reads the remaining wire shapes', async () => {
@@ -366,6 +380,8 @@ function wire(url: string): unknown {
   if (url.includes('/storage')) return { ok: true, result: { bytes: 3, tables: ['kv'] } }
   if (url.includes('/theme')) return { ok: true, result: { pin: { kind: 'palette', id: 'slate' }, appFile: false } }
   if (url.endsWith('/api/palettes')) return { palettes: [{ id: 'slate', name: 'Slate' }], ignored: [{ file: 'nope.css', reason: 'name' }] }
+  // The pre-bundle Host shape: a bare row array. Kept here so the client's read of it stays tested.
+  if (url.endsWith('/api/market')) return { ok: true, result: [{ id: 'ink', kind: 'theme' }] }
   if (url.endsWith('/api/host-config')) {
     return {
       ok: true,

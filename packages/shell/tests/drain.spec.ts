@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 
 import { describe, expect, it } from 'vitest'
 
-import { bindHostDrain, childExited } from '../src/drain.ts'
+import { armHostDrain, bindHostDrain, childExited } from '../src/drain.ts'
 
 describe('bindHostDrain', () => {
   it('disposes once when the window exits', async () => {
@@ -59,11 +59,70 @@ describe('bindHostDrain', () => {
     await settled()
     expect(code).toBe(130)
     expect(await childExited({ exitCode: 3 } as never)).toBe(3)
-    const pending = new EventEmitter() as EventEmitter & { exitCode: number | null }
+    const pending = new EventEmitter() as EventEmitter & { exitCode: number | null; signalCode: NodeJS.Signals | null }
     pending.exitCode = null
+    pending.signalCode = null
     const waiting = childExited(pending as never)
     pending.emit('exit', 4)
     expect(await waiting).toBe(4)
+    expect(await childExited({ exitCode: null, signalCode: 'SIGTERM' } as never)).toBeNull()
+  })
+
+  it('disposes once when a second SIGTERM arrives while dispose is running', async () => {
+    const signals = new EventEmitter()
+    let calls = 0
+    let code = -1
+    let release: (() => void) | undefined
+    const child = fakeChild()
+    bindHostDrain({
+      dispose: () => {
+        calls += 1
+        return new Promise((resolve) => { release = resolve })
+      },
+      child,
+      exit: (next) => { code = next },
+    }, signals)
+    signals.emit('SIGTERM')
+    signals.emit('SIGTERM')
+    expect(calls).toBe(1)
+    expect(code).toBe(-1)
+    release?.()
+    await settled()
+    expect(code).toBe(143)
+  })
+
+  it('kills a window that appears after SIGTERM and disposes one that already died', async () => {
+    const signals = new EventEmitter()
+    let code = -1
+    const armed = armHostDrain({
+      dispose: async () => undefined,
+      exit: (next) => { code = next },
+    }, signals)
+    signals.emit('SIGTERM')
+    const child = fakeChild()
+    let killed = false
+    child.kill = () => {
+      killed = true
+      child.exitCode = null
+      child.signalCode = 'SIGTERM'
+      return true
+    }
+    expect(armed.attach(child)).toBe(true)
+    await settled()
+    expect(killed).toBe(true)
+    expect(code).toBe(143)
+
+    const later = new EventEmitter()
+    let again = -1
+    const dead = fakeChild()
+    dead.exitCode = null
+    dead.signalCode = 'SIGKILL'
+    armHostDrain({
+      dispose: async () => undefined,
+      exit: (next) => { again = next },
+    }, later).attach(dead)
+    await settled()
+    expect(again).toBe(0)
   })
 })
 

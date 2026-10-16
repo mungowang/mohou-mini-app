@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { childExited } from '../src/drain.ts'
 import { windowBinaryPath } from '../src/window.ts'
 import { existsSync } from 'node:fs'
 
@@ -28,9 +29,10 @@ describe('process entry', () => {
       const response = await fetch(origin)
       expect(response.status).toBe(200)
       expect(await response.text()).toContain('<title>Mohou</title>')
+      const finished = childExited(child)
       child.kill('SIGTERM')
-      const code = await exited(child)
-      expect(code).not.toBeNull()
+      const code = await finished
+      expect(code, `signal=${child.signalCode ?? 'none'}`).not.toBeNull()
       await expect(fetch(origin, { signal: AbortSignal.timeout(1000) })).rejects.toThrow()
       expect(existsSync(join(runtime, 'panel-window.pid'))).toBe(false)
       expect(windowPids()).toEqual(before)
@@ -54,7 +56,7 @@ describe('process entry', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     try {
-      const code = await exited(child)
+      const code = await childExited(child)
       expect(code).toBe(0)
       await expect(fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) })).rejects.toThrow()
     } finally {
@@ -80,9 +82,10 @@ describe('process entry', () => {
       const origin = await readOrigin(child)
       expect((await fetch(origin)).status).toBe(200)
       expect(child.exitCode).toBeNull()
+      const finished = childExited(child)
       child.kill('SIGTERM')
-      const code = await exited(child)
-      expect(code).not.toBeNull()
+      const code = await finished
+      expect(code, `signal=${child.signalCode ?? 'none'}`).not.toBeNull()
       await expect(fetch(origin, { signal: AbortSignal.timeout(1000) })).rejects.toThrow()
     } finally {
       if (child.exitCode === null) child.kill('SIGKILL')
@@ -103,8 +106,9 @@ describe('process entry', () => {
     try {
       await new Promise((resolve) => { setTimeout(resolve, 1500) })
       expect(child.exitCode).toBeNull()
+      const finished = childExited(child)
       child.kill('SIGTERM')
-      await exited(child)
+      await finished
       expect(child.exitCode !== null || child.signalCode !== null).toBe(true)
     } finally {
       if (child.exitCode === null) child.kill('SIGKILL')
@@ -130,13 +134,6 @@ function readOrigin(child: ChildProcess): Promise<string> {
       clearTimeout(timer)
       reject(new Error(`entry exited ${code} before printing an origin\n${text}`))
     })
-  })
-}
-
-function exited(child: ChildProcess): Promise<number | null> {
-  if (child.exitCode !== null) return Promise.resolve(child.exitCode)
-  return new Promise((resolve) => {
-    child.once('exit', code => resolve(code))
   })
 }
 

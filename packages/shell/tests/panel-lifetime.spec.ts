@@ -253,20 +253,58 @@ describe('bindPanelLifetime', () => {
     expect(code).toBe(143)
   })
 
+  it('disposes when SIGTERM arrives before the window spawn returns', async () => {
+    const root = scratch()
+    const signals = new EventEmitter()
+    const child = fakeChild(77)
+    let disposed = 0
+    let code = -1
+    let killed = 0
+    child.kill = () => {
+      killed += 1
+      child.exitCode = null
+      child.signalCode = 'SIGTERM'
+      child.emit('exit', null)
+      return true
+    }
+    await bindPanelLifetime({
+      runtimeRoot: root,
+      env: {},
+      skipWindow: false,
+      open: () => {
+        signals.emit('SIGTERM')
+        return child
+      },
+      dispose: async () => { disposed += 1 },
+      exit: (next) => { code = next },
+      signals,
+    })
+    await settled()
+    expect(disposed).toBe(1)
+    expect(code).toBe(143)
+    expect(killed).toBe(1)
+    expect(existsSync(join(root, windowPidFileName))).toBe(false)
+  })
+
   it('disposes and rethrows when the window fails to open', async () => {
     const root = scratch()
+    const signals = new EventEmitter()
     let disposed = 0
+    let code = -1
     await expect(bindPanelLifetime({
       runtimeRoot: root,
       env: {},
       skipWindow: false,
       open: () => { throw new Error('panel window is not built') },
       dispose: async () => { disposed += 1 },
-      exit: () => undefined,
-      signals: new EventEmitter(),
+      exit: (next) => { code = next },
+      signals,
       probe: () => false,
     })).rejects.toThrow('panel window is not built')
+    signals.emit('SIGTERM')
+    await settled()
     expect(disposed).toBe(1)
+    expect(code).toBe(-1)
   })
 })
 

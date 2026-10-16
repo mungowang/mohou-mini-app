@@ -1,7 +1,7 @@
 import { chmodSync, lstatSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { bindHostDrain, type DrainChild } from './drain.ts'
+import { armHostDrain, type DrainChild } from './drain.ts'
 
 /** Pid file under the runtime root. Shell owns it; it is not a host config field. */
 export const windowPidFileName = 'panel-window.pid'
@@ -139,22 +139,24 @@ export async function bindPanelLifetime(input: {
     adoptWindow({ file, probe, schedule, dispose: input.dispose, exit: input.exit, signals })
     return
   }
-  let child: PanelChild
-  try {
-    child = input.open()
-  } catch (error) {
-    await input.dispose()
-    throw error
-  }
-  if (typeof child.pid === 'number') rememberWindowPid(file, child.pid)
-  bindHostDrain({
+  // Spawn blocks, and the origin line is already out. Bind first so a signal during that spawn exits 143.
+  const armed = armHostDrain({
     dispose: async () => {
       forgetWindowPid(file)
       await input.dispose()
     },
-    child,
     exit: input.exit,
   }, signals)
+  let child: PanelChild
+  try {
+    child = input.open()
+  } catch (error) {
+    armed.cancel()
+    await input.dispose()
+    throw error
+  }
+  const started = armed.attach(child)
+  if (!started && typeof child.pid === 'number') rememberWindowPid(file, child.pid)
 }
 
 function adoptWindow(input: {
@@ -180,8 +182,8 @@ function adoptWindow(input: {
     return
   }
   cancel = watchLiveWindow(pid, () => stop(0), input.probe, input.schedule)
-  input.signals.once('SIGINT', () => stop(130))
-  input.signals.once('SIGTERM', () => stop(143))
+  input.signals.on('SIGINT', () => stop(130))
+  input.signals.on('SIGTERM', () => stop(143))
 }
 
 /** The packaged app sets this. The Tauri executable owns the window and spawns this process. */
@@ -205,8 +207,8 @@ export function bindSupervisedLifetime(input: {
     void input.dispose().then(() => input.exit(code), () => input.exit(code))
   }
   const signals = input.signals ?? process
-  signals.once('SIGINT', () => stop(130))
-  signals.once('SIGTERM', () => stop(143))
+  signals.on('SIGINT', () => stop(130))
+  signals.on('SIGTERM', () => stop(143))
 }
 
 function isEnoent(error: unknown): boolean {

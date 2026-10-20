@@ -1,6 +1,6 @@
 /** Codes the backend loader emits. Import checks still use the definition codes. */
 
-export const compileCodes = ['backend-invalid', 'ui-invalid', 'shared-invalid', 'event-undeclared'] as const
+export const compileCodes = ['backend-invalid', 'ui-invalid', 'shared-invalid', 'event-undeclared', 'ui-placement'] as const
 
 /** A backend load failure. Callers match `code`. */
 export type CompileCode = (typeof compileCodes)[number]

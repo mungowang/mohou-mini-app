@@ -117,6 +117,33 @@ describe('ThemeMenu', () => {
     sheet.remove()
   })
 
+  it('refetches the palette list when paletteTick bumps', async () => {
+    let lists = 0
+    const client = theme({
+      listPalettes: () => {
+        lists += 1
+        return Promise.resolve({
+          palettes: lists === 1
+            ? [{ id: 'ink', name: 'Ink', origin: 'builtin' as const }, { id: 'plum', name: 'Plum', origin: 'custom' as const }]
+            : [{ id: 'ink', name: 'Ink', origin: 'builtin' as const }],
+          ignored: [],
+        })
+      },
+    })
+    const { host, root } = await render(<ThemeMenu locale="en" mode="production" theme={client} paletteTick={0} />)
+    expect(host.textContent).toContain('Plum')
+    await act(async () => {
+      root.render(<ThemeMenu locale="en" mode="production" theme={client} paletteTick={1} />)
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(host.textContent).not.toContain('Plum')
+    expect(host.textContent).toContain('Ink')
+    root.unmount()
+    host.remove()
+  })
+
   it('shows save failures and ignores a missing client', async () => {
     const { host, root } = await render(<ThemeMenu locale="en" mode="production" />)
     await act(async () => {

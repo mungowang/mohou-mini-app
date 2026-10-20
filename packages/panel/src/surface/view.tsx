@@ -172,7 +172,11 @@ export function PanelSurface(props: {
                 mode={props.mode}
                 palettes={palettes}
                 {...props.theme === undefined ? {} : { theme: props.theme }}
-                onPalettesChange={setPalettes}
+                onPalettesChange={(next) => {
+                  setPalettes(next)
+                  // ThemeMenu keeps its own list; the same tick market install uses.
+                  setPaletteTick(value => value + 1)
+                }}
                 cardStyle={chrome.cardStyle}
                 onCardStyle={chrome.setCard}
                 client={props.settings}

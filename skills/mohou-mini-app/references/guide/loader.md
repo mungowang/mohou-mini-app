@@ -18,6 +18,8 @@ ui.css                optional author CSS, appended unchanged
 theme.json            panel pin — not an author source file
 ```
 
+UI modules are `ui.tsx` and files under `ui/` only. A component at the app root or under another folder (for example `components/`) is still classified as backend. Reload fails that as `ui-placement`; move the file under `ui/`.
+
 A trivial app needs none of the folders. `schema/` files are `NNN_name.sql`, ids from 1 with no gaps. Host applies pending files when storage opens. One file may create or alter tables and may seed or rewrite rows. Runtime `query` / `run` cannot create tables and must not replace a one-shot data migration. `theme.css` only when the look depends on a hue. Do not write `theme.json`.
 
 Enforced:
@@ -27,6 +29,7 @@ Enforced:
 - either side importing `./assets/**` → `import-forbidden`. Use `resolveAssetUrl`
 - either side importing outside the app dir → `import-escape`
 - `shared/` with JSX, or using `ctx` / React / DOM / Node names → `shared-invalid`
+- React or JSX outside `ui.tsx` / `ui/` → `ui-placement`
 - the same event string on `ctx.push` and `useApp().on` without a declaration in `shared/` → `event-undeclared`
 
 `shared/` is pure: no React, no DOM, no `ctx`, no Node. Event names both sides use are declared once there and imported. A name used on one side only is not that failure. `on("*")` is not an event name.
@@ -79,6 +82,7 @@ Match `code`. The message is for a person.
 | `backend-invalid` | backend syntax or an undefined name |
 | `ui-invalid` | UI bundle or an undefined name |
 | `shared-invalid` | JSX or a forbidden name in `shared/` |
+| `ui-placement` | move the React/JSX file under `ui/` |
 | `event-undeclared` | declare the name once in `shared/` and import it on both sides |
 | `commit-failed` | compile succeeded; `mini_app_history_commit` |
 

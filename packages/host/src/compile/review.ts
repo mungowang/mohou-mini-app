@@ -42,22 +42,22 @@ interface ReviewOptions {
 }
 
 /**
- * Keyframe collisions are notices. An unbound component, or a one-edit typo of a
- * declared name, fails that side. Other free names are not a list this module owns.
- * A missing parser is a notice and does not fail reload.
+ * Keyframe collisions are notices. UI outside `ui.tsx` / `ui/**`, an unbound component,
+ * or a one-edit typo of a declared name fails that side. Other free names are not a list
+ * this module owns. A missing parser is a notice and does not fail reload.
  * @param appDir - absolute app directory
  */
 export async function reviewApp(appDir: string, options: ReviewOptions = {}): Promise<AppReview> {
   const notices = keyframeNotices(appDir, new Set(options.reservedKeyframes ?? []))
   const parser = await loadParser(options.loadParser)
+  const errors: ReviewError[] = uiPlacementErrors(appDir, parser)
   if (parser === undefined) {
     notices.push({
       code: 'identifier-skipped',
       message: 'identifier pass skipped: parser did not load',
     })
-    return { errors: [], notices }
+    return { errors, notices }
   }
-  const errors: ReviewError[] = []
   const events = { push: new Map<string, string>(), on: new Map<string, string>() }
   for (const file of sourceFiles(appDir)) {
     const rel = relative(appDir, file)
@@ -297,6 +297,71 @@ function keyframeNotices(appDir: string, reserved: Set<string>): ReviewNotice[] 
     }
   }
   return notices
+}
+
+/**
+ * UI modules are `ui.tsx` and `ui/**` only. A React/JSX file elsewhere is still
+ * classified as backend (or shared); fail before the author chases a side allowlist error.
+ */
+function uiPlacementErrors(appDir: string, parser: Ts | undefined): ReviewError[] {
+  const errors: ReviewError[] = []
+  for (const file of textFiles(appDir)) {
+    if (!/\.(ts|tsx|js|jsx)$/.test(file)) continue
+    const rel = relative(appDir, file)
+    if (isUiPath(rel)) continue
+    if (rel.startsWith(`${appTrees.shared}/`)) continue
+    if (rel.startsWith(`${appTrees.schema}/`) || rel.startsWith(`${appTrees.assets}/`)) continue
+    const text = readFileSync(file, 'utf8')
+    if (!looksLikeUiSource(parser, rel, text)) continue
+    errors.push({
+      code: 'ui-placement',
+      message: `${rel} looks like UI; keep UI modules in ${appEntries.ui} or under ${appTrees.ui}/`,
+    })
+  }
+  return errors
+}
+
+function isUiPath(rel: string): boolean {
+  return rel === appEntries.ui || rel.startsWith(`${appTrees.ui}/`)
+}
+
+function looksLikeUiSource(parser: Ts | undefined, rel: string, text: string): boolean {
+  if (importsUiModule(text)) return true
+  if (parser === undefined) return false
+  try {
+    const source = parser.createSourceFile(rel, text, parser.ScriptTarget.Latest, true, scriptKind(parser, rel))
+    let found = false
+    const visit = (node: ts.Node): void => {
+      if (found || isJsx(parser, node)) {
+        found = true
+        return
+      }
+      parser.forEachChild(node, visit)
+    }
+    visit(source)
+    return found
+  } catch {
+    return false
+  }
+}
+
+function importsUiModule(text: string): boolean {
+  for (const match of text.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+    if (isUiModuleSpecifier(match[1] ?? '')) return true
+  }
+  for (const match of text.matchAll(/import\s+['"]([^'"]+)['"]/g)) {
+    if (isUiModuleSpecifier(match[1] ?? '')) return true
+  }
+  return false
+}
+
+function isUiModuleSpecifier(specifier: string): boolean {
+  return specifier === 'react'
+    || specifier.startsWith('react/')
+    || specifier === '@mohou/ui'
+    || specifier.startsWith('@mohou/ui/')
+    || specifier === 'motion'
+    || specifier.startsWith('motion/')
 }
 
 function codeFor(rel: string): CompileCode {

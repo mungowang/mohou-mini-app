@@ -396,42 +396,40 @@ export function PanelSettings(props: {
         </div>
       </div>
       {section === 'mcp' || section === 'about' ? null : <footer className="flex items-center justify-end gap-2 border-t bg-card px-4 py-3">
-        <div className="flex items-center gap-2">
-          {state.dirty ? (
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-              data-dirty="1"
-              onClick={() => dispatch({ type: 'restore' })}
-            >
-              <Undo2 size={14} strokeWidth={2} aria-hidden />
-              {label('discard')}
-            </button>
-          ) : null}
-          <span
-            className={[
-              'inline-flex min-w-[4.5rem] items-center justify-end gap-1.5 text-xs font-medium transition-all duration-300 ease-out',
-              saveFeedback === 'idle' ? 'pointer-events-none translate-x-1 opacity-0' : 'translate-x-0 opacity-100',
-              saveFeedback === 'saving' ? 'text-muted-foreground' : '',
-              saveFeedback === 'saved' ? 'text-emerald-600 dark:text-emerald-400' : '',
-            ].filter(Boolean).join(' ')}
-            aria-live="polite"
-          >
-            {saveFeedback === 'saving' ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden /> : null}
-            {saveFeedback === 'saved' ? <Check size={14} className="shrink-0 animate-in zoom-in-95 fade-in-0 duration-300" aria-hidden /> : null}
-            {saveFeedback === 'saving' ? label('saving') : null}
-            {saveFeedback === 'saved' ? label('saved') : null}
-          </span>
+        <span
+          className={[
+            'inline-flex items-center gap-1.5 text-xs font-medium transition-all duration-300 ease-out',
+            saveFeedback === 'idle' ? 'pointer-events-none w-0 overflow-hidden opacity-0' : 'min-w-[4.5rem] opacity-100',
+            saveFeedback === 'saving' ? 'text-muted-foreground' : '',
+            saveFeedback === 'saved' ? 'text-emerald-600 dark:text-emerald-400' : '',
+          ].filter(Boolean).join(' ')}
+          aria-live="polite"
+        >
+          {saveFeedback === 'saving' ? <Loader2 size={14} className="shrink-0 animate-spin" aria-hidden /> : null}
+          {saveFeedback === 'saved' ? <Check size={14} className="shrink-0 animate-in zoom-in-95 fade-in-0 duration-300" aria-hidden /> : null}
+          {saveFeedback === 'saving' ? label('saving') : null}
+          {saveFeedback === 'saved' ? label('saved') : null}
+        </span>
+        {state.dirty ? (
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-            disabled={saveFeedback === 'saving'}
-            onClick={() => { void onSave() }}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            data-dirty="1"
+            onClick={() => dispatch({ type: 'restore' })}
           >
-            {saveFeedback === 'saving' ? <Loader2 size={14} className="animate-spin" aria-hidden /> : null}
-            {saveFeedback === 'saving' ? label('saving') : label('save')}
+            <Undo2 size={14} strokeWidth={2} aria-hidden />
+            {label('discard')}
           </button>
-        </div>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          disabled={saveFeedback === 'saving'}
+          onClick={() => { void onSave() }}
+        >
+          {saveFeedback === 'saving' ? <Loader2 size={14} className="animate-spin" aria-hidden /> : null}
+          {saveFeedback === 'saving' ? label('saving') : label('save')}
+        </button>
       </footer>}
     </form>
   )

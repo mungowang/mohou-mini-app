@@ -1,7 +1,7 @@
 ---
 name: mohou-mini-app
 description: Create or edit local mini-apps (ui.tsx + main.api.ts) that run in the mini-app panel. Confirm the core choices before mini_app_register when the ask is vague. Then write source with your file tools, compile with mini_app_reload, smoke-test with mini_app_call, and reveal with mini_app_open. Triggers include 做个小程序 / 小工具 / 面板 / 仪表盘 / dashboard / 看板 / 工作台 / mini-app. Not for editing Host, Panel, or Shell source.
-version: 1.0.69
+version: 1.0.72
 ---
 
 # Mini-app authoring
@@ -44,7 +44,7 @@ The UI kit is not the design. It is a shortcut for SaaS-shaped screens. A beauti
 ## Write loop
 
 1. `mini_app_register({ appId, name, description, version })` → `directory` and `needed`. Optional: `tags`, `acronym`, `kind`.
-2. Write the files in `needed` (`ui.tsx`, `main.api.ts`) with your file tools. Add `ui/`, `api/`, `shared/`, `assets/` the same way.
+2. Write the files in `needed` (`ui.tsx`, `main.api.ts`) with your file tools. Add `ui/`, `api/`, `shared/`, `assets/` the same way. UI components go in `ui.tsx` or under `ui/` — not the app root or a `components/` folder.
 3. `mini_app_reload({ appId })`. Success commits a dirty tree. Failure does not.
 4. `mini_app_call` → `mini_app_open` → `mini_app_errors` → `mini_app_view_eval`.
 

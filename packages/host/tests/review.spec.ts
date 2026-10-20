@@ -133,6 +133,22 @@ describe('reviewApp', () => {
     expect(review.errors).toEqual([])
     expect(review.notices[0]?.code).toBe('identifier-skipped')
   })
+
+  it('fails UI-looking source outside ui.tsx and ui/', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'mma-review-place-'))
+    await mkdir(join(dir, 'components'), { recursive: true })
+    await writeFile(join(dir, 'ui.tsx'), 'export {}\n')
+    await writeFile(join(dir, 'main.api.ts'), 'export {}\n')
+    await writeFile(join(dir, 'view-row-actions.tsx'), "import { Button } from '@mohou/ui'\nexport const Row = () => <Button />\n")
+    await writeFile(join(dir, 'components', 'chip.tsx'), 'export const Chip = () => <span />\n')
+    await writeFile(join(dir, 'plain.ts'), 'export const n = 1\n')
+    const review = await reviewApp(dir)
+    expect(review.errors.filter(item => item.code === 'ui-placement').map(item => item.message).sort()).toEqual([
+      'components/chip.tsx looks like UI; keep UI modules in ui.tsx or under ui/',
+      'view-row-actions.tsx looks like UI; keep UI modules in ui.tsx or under ui/',
+    ])
+    expect(review.notices).toEqual([])
+  })
 })
 
 function emptyPorts(): AuthorCallPorts {

@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-03
+updated: 2026-10-19
 ---
 
 # Compile and reload
@@ -25,6 +25,7 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 | `backend-invalid` | fix backend syntax or an undefined name |
 | `ui-invalid` | fix the UI bundle or an undefined name |
 | `shared-invalid` | fix an undefined name in `shared/**` |
+| `ui-placement` | move the React/JSX file under `ui/` |
 | `event-undeclared` | declare the shared event name once in `shared/` and import it on both sides |
 | `commit-failed` | compile succeeded; fix the history commit |
 
@@ -32,7 +33,7 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 - `notices` carry lower-confidence findings, including keyframe collisions and a skipped identifier pass when the parser cannot load. A notice does not fail reload. A missing parser does not brick reload.
 - The UI bundle keeps component names. Relative imports are checked against the real directory path so a symlink prefix is not mistaken for an escape. The runner document does not wait for that bundle. The iframe loads it from `GET /api/app/:appId/ui/entry.js`.
 - Failure of compile leaves the previous good bundle in place for an already-open view until a later success emits reload. The tool result is `ok: false` with `errors`.
-- Reload opens storage, then loads the backend, then runs the identifier pass, then bundles `ui.tsx` in memory. Platform modules stay external. Component names are kept. A relative import whose real path leaves the app is `import-escape`. A storage, load, review, or bundle failure returns `ok: false` and leaves the previous backend and bundle in place. A missing parser is a notice and does not fail reload. A duplicate or reserved `@keyframes` name is a notice and does not fail reload. The bundle is written to `.autogen/entry.js` inside the app. A later read whose source stamp still matches returns that file and does not keep the text. `cleanCaches` defaults to true. A non-boolean is `tool-args`. The flag is recorded on the result. `cleanCaches` deletes `.autogen` before the new bundle is written.
+- Reload opens storage, then loads the backend, then runs the identifier pass, then bundles `ui.tsx` in memory. Platform modules stay external. Component names are kept. A relative import whose real path leaves the app is `import-escape`. A storage, load, review, or bundle failure returns `ok: false` and leaves the previous backend and bundle in place. A missing parser is a notice and does not fail reload. A duplicate or reserved `@keyframes` name is a notice and does not fail reload. React or JSX outside `ui.tsx` / `ui/**` fails reload with `ui-placement`. The bundle is written to `.autogen/entry.js` inside the app. A later read whose source stamp still matches returns that file and does not keep the text. `cleanCaches` defaults to true. A non-boolean is `tool-args`. The flag is recorded on the result. `cleanCaches` deletes `.autogen` before the new bundle is written.
 - Non-goals: type-checking the whole app as a gate; compiling inside the iframe; a second copy of a platform module inside the app bundle.
 
 Tailwind compiles the app sheet to `.autogen/ui.css`. Host does not parse `className`. A missing app directory is `ui-invalid`. The author's `ui.css`, when present, is appended unchanged. The stylesheet uses the same source stamp as the bundle. `cleanCaches` deletes `.autogen`, so the next request compiles again.

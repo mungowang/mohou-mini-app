@@ -94,6 +94,7 @@ Match `code`. The message is for a person. Full table: [loader.md](loader.md).
 | `backend-invalid` | backend syntax or an undefined name |
 | `ui-invalid` | UI bundle, missing import, or missing `ui.tsx` |
 | `shared-invalid` | no JSX / `ctx` / React / DOM / Node in `shared/` |
+| `ui-placement` | React/JSX only in `ui.tsx` or under `ui/` |
 | `event-undeclared` | declare the push/`on` name once in `shared/` |
 | `commit-failed` | compile succeeded; `mini_app_history_commit` |
 
@@ -121,6 +122,7 @@ Match `code`. The message is for a person. Full table: [loader.md](loader.md).
 | `Cannot find package '<x>'`-style npm failure from `mini_app_install` | Typo, no network, or the name is not on the registry | Fix the name/version; report the npm stderr to the user rather than inventing a substitute |
 | `backend cannot import '<spec>': ui/** is UI-only` | Backend reached into the UI tree | Move the shared logic to `shared/**` |
 | `backend import escapes app dir: <spec>` | Backend imported `../` past the app root | Keep every import inside the app dir |
+| `… looks like UI; keep UI modules in ui.tsx or under ui/` | A React/JSX file sits outside `ui.tsx` / `ui/` (`ui-placement`) | Move it under `ui/`. The app root and `components/` are not UI trees |
 | `unsafe relative path: <rel>` | Path contained `..` or was absolute | `mini_app_*` `path` values are app-relative |
 | `register requires manifest.json` | `files` had no manifest | Add it |
 | `cancelled` | The user pressed stop and `ctx.signal` fired | Expected behaviour; long jobs must wire it (see ctx.md) |

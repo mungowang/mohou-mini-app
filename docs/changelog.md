@@ -1,11 +1,23 @@
 ---
 status: locked
-updated: 2026-10-17
+updated: 2026-10-19
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.72
+
+Reload fails with `ui-placement` when React or JSX sits outside `ui.tsx` / `ui/`. The skill states the same path rule. Misplaced UI is no longer a soft notice or a confusing backend import denial first.
+
+## 1.0.71
+
+Settings footer keeps Discard next to Save. The saving/saved chip no longer reserves width between them when idle.
+
+## 1.0.70
+
+Deleting a custom palette in Settings also refreshes the toolbar theme menu. The menu stays mounted while closed, so it previously kept a stale list until the panel reloaded.
 
 ## 1.0.69
 

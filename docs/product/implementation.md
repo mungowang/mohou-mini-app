@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-11
+updated: 2026-10-19
 ---
 
 # Implementation plan
@@ -56,6 +56,7 @@ The code is a stable literal. The page that emits it names it. Wrapping passes t
 | `backend-invalid` | backend syntax or an undefined name in `main.api.ts` or `api/**` |
 | `ui-invalid` | UI bundle failure or an undefined name in `ui.tsx` or `ui/**` |
 | `shared-invalid` | an undefined name in `shared/**` |
+| `ui-placement` | React or JSX outside `ui.tsx` / `ui/**` |
 | `event-undeclared` | the same event name is a string literal on both the UI `on` and the backend `push`; declare it once in `shared/` |
 | `unknown-method` | `call` names a key that is not in `api` |
 | `call-outside-wrapper` | `useApp().call` ran outside the host wrapper |

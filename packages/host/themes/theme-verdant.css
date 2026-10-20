@@ -1,4 +1,4 @@
-/* name: Three Swords */
-/* name-zh-CN: 三刀流 */
+/* name: Verdant */
+/* name-zh-CN: 青锋 */
 :root[data-mode="light"] { --background: #f2f6f0; --foreground: #24302a; --card: #ffffff; --card-foreground: #24302a; --border: #d8e4d6; --muted: #e9efe6; --muted-foreground: #7d907e; --primary: #15803d; --primary-foreground: #ffffff; --secondary: #e3ecdf; --secondary-foreground: #24302a; --accent: #dcf2e2; --accent-foreground: #166534; --destructive: #dc2626; --destructive-foreground: #ffffff; --ring: #15803d; --input: #f4f8f2; --radius: 12px; --shadow: rgba(30, 80, 50, 0.1); }
 :root[data-mode="dark"] { --background: #101512; --foreground: #d8e0d4; --card: #18211b; --card-foreground: #d8e0d4; --border: #2c3a30; --muted: #1d2720; --muted-foreground: #93a393; --primary: #4ade80; --primary-foreground: #101512; --secondary: #1d2720; --secondary-foreground: #d8e0d4; --accent: #14532d; --accent-foreground: #bbf7d0; --destructive: #f87171; --destructive-foreground: #101512; --ring: #4ade80; --input: #141b16; --radius: 12px; --shadow: rgba(0, 0, 0, 0.5); }

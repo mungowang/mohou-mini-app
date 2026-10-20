@@ -39,17 +39,17 @@ describe('first paint', () => {
     expect(host.light['--background']).toBe('#ececee')
     const named = await resolveFirstPaint({
       appDir: dir,
-      pin: { kind: 'palette', id: 'tokyo' },
+      pin: { kind: 'palette', id: 'matcha' },
       hostPalette: 'slate',
       themesDir: themes,
     })
-    expect(named).toMatchObject({ source: 'builtin', paletteId: 'tokyo' })
-    expect(named.light['--background']).toBe('#d5d6db')
+    expect(named).toMatchObject({ source: 'builtin', paletteId: 'matcha' })
+    expect(named.light['--background']).toBe('#faf5f3')
     await mkdir(themes)
-    await writeFile(join(themes, 'theme-tokyo.css'), css)
+    await writeFile(join(themes, 'theme-matcha.css'), css)
     const overridden = await resolveFirstPaint({
       appDir: dir,
-      pin: { kind: 'palette', id: 'tokyo' },
+      pin: { kind: 'palette', id: 'matcha' },
       hostPalette: 'slate',
       themesDir: themes,
     })

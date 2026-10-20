@@ -1,11 +1,12 @@
-import { Check, ExternalLink, Loader2, Pencil, RefreshCw, Undo2 } from 'lucide-react'
+import { Check, ExternalLink, Hash, Loader2, Pencil, RefreshCw, Undo2 } from 'lucide-react'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 
 import { galleryCardStyles, type GalleryCardStyle } from '../gallery/list.ts'
 import { isPanelLocale, panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
 import { Dialog } from '../ui/dialog.tsx'
 import type { PaletteChip, ThemeClient } from '../theme/client.ts'
-import { ThemeDualPreview, tokensFromThemeCss } from '../theme/preview.tsx'
+import { ThemePreviewCard } from '../theme/card.tsx'
+import { tokensFromThemeCss } from '../theme/preview.tsx'
 import { applyDocumentMode, paintHostStyle } from '../theme/menu.tsx'
 import { AuthorMcpInstall } from './author-mcp-view.tsx'
 import type { PanelAbout, PanelAuthorMcpStatus, PanelPolicy, PanelRuntime, PanelSettingsClient, PanelSkillStatus, PanelUpdateCheck, PanelUpdateSource } from './client.ts'
@@ -168,7 +169,7 @@ export function PanelSettings(props: {
               <div className="mb-4 flex flex-col gap-2">
                 <span className="text-sm text-muted-foreground">{label('palette')}</span>
                 <input className="sr-only" value={state.palette} onChange={event => dispatch({ type: 'edit-palette', palette: event.target.value })} />
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="mt-2 grid grid-cols-1 gap-5 sm:grid-cols-2">
                   {(props.palettes ?? []).map((palette) => {
                     const dual = tokensFromThemeCss(palette.style ?? '')
                     const chip = dual === undefined ? palettePreview(palette) : undefined
@@ -176,69 +177,52 @@ export function PanelSettings(props: {
                     const canDelete = custom && props.theme?.deletePalette !== undefined
                     const asking = pendingDelete === palette.id
                     return (
-                      <div key={palette.id} className="relative" data-palette={palette.id}>
-                        <button
-                          type="button"
-                          className={`${choiceCardClass} w-full`}
-                          data-on={state.palette === palette.id ? '1' : '0'}
-                          disabled={asking}
-                          onClick={() => dispatch({ type: 'edit-palette', palette: palette.id })}
-                        >
-                          {dual !== undefined ? (
-                            <ThemeDualPreview
-                              size="chip"
-                              tokens={dual}
-                              lightLabel={label('market-light')}
-                              darkLabel={label('market-dark')}
-                              primaryLabel={label('market-preview-primary')}
-                              secondaryLabel={label('market-preview-secondary')}
-                            />
-                          ) : (
-                            <span className="flex h-10 items-end gap-1 rounded-lg border border-border/60 px-2 pb-2" style={{ background: chip!.surface }}>
-                              <span className="h-5 flex-1 rounded-sm" style={{ background: chip!.primary }} />
-                              <span className="h-3 flex-1 rounded-sm" style={{ background: chip!.muted }} />
-                              <span className="h-4 w-3 rounded-sm border border-border/50" style={{ background: chip!.card }} />
-                            </span>
-                          )}
-                          <span className={`flex items-center gap-1 text-xs ${canDelete && !asking ? 'pr-6' : ''}`}>
-                            <span className="min-w-0 truncate">{paletteLabel(labelLocale, palette)}</span>
-                            {custom ? <span className="shrink-0 text-[10px] text-muted-foreground">{label('chip-custom')}</span> : null}
+                      <ThemePreviewCard
+                        key={palette.id}
+                        data-palette={palette.id}
+                        title={paletteLabel(labelLocale, palette)}
+                        badge={(
+                          <span className="inline-flex items-center gap-0.5 rounded-md border border-border/80 px-1 py-0.5 text-[10px] leading-none font-medium text-muted-foreground">
+                            {label(custom ? 'chip-custom' : 'chip-system')}
                           </span>
-                        </button>
-                        {canDelete && asking ? (
-                          <div className="absolute inset-x-1 bottom-1 flex items-center gap-1 rounded-md bg-card/95 px-1.5 py-1 text-[11px] shadow-sm ring-1 ring-border backdrop-blur-sm" data-palette-confirm="">
-                            <span className="min-w-0 flex-1 truncate text-muted-foreground">{label('palette-confirm')}</span>
-                            <button type="button" className="shrink-0 rounded px-1 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => setPendingDelete(undefined)}>
-                              {label('cancel')}
-                            </button>
-                            <button
-                              type="button"
-                              className="shrink-0 rounded px-1 py-0.5 font-medium text-destructive hover:bg-destructive/10"
-                              onClick={() => {
-                                setPendingDelete(undefined)
-                                void removeCustomPalette(props, palette.id, state.palette, dispatch, label)
-                              }}
-                            >
-                              {label('palette-delete-confirm')}
-                            </button>
-                          </div>
-                        ) : null}
-                        {canDelete && !asking ? (
-                          <button
-                            type="button"
-                            className="absolute right-1.5 bottom-1.5 inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={label('palette-delete')}
-                            title={label('palette-delete')}
-                            data-palette-delete={palette.id}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setPendingDelete(palette.id)
-                            }}
-                          >
-                            <span className="text-sm leading-none">×</span>
-                          </button>
-                        ) : null}
-                      </div>
+                        )}
+                        {...(dual === undefined ? {} : { tokens: dual })}
+                        {...(chip === undefined ? {} : {
+                          fallback: (
+                            <span className="flex h-[4.5rem] items-end gap-1 rounded-xl border border-border/60 px-2 pb-2" style={{ background: chip.surface }}>
+                              <span className="h-6 flex-1 rounded-sm" style={{ background: chip.primary }} />
+                              <span className="h-4 flex-1 rounded-sm" style={{ background: chip.muted }} />
+                              <span className="h-5 w-4 rounded-sm border border-border/50" style={{ background: chip.card }} />
+                            </span>
+                          ),
+                        })}
+                        lightLabel={label('market-light')}
+                        darkLabel={label('market-dark')}
+                        primaryLabel={label('market-preview-primary')}
+                        secondaryLabel={label('market-preview-secondary')}
+                        selected={state.palette === palette.id}
+                        selectedLabel={label('palette-current')}
+                        disabled={asking}
+                        onSelect={() => dispatch({ type: 'edit-palette', palette: palette.id })}
+                        headerEnd={paletteDeleteEnd({
+                          canDelete,
+                          asking,
+                          id: palette.id,
+                          label,
+                          onAsk: setPendingDelete,
+                          onCancel: () => setPendingDelete(undefined),
+                          onConfirm: () => {
+                            setPendingDelete(undefined)
+                            void removeCustomPalette(props, palette.id, state.palette, dispatch, label)
+                          },
+                        })}
+                        footer={(
+                          <span className="inline-flex min-w-0 items-center gap-1" data-palette-id={palette.id}>
+                            <Hash size={11} strokeWidth={2} className="shrink-0 opacity-70" aria-hidden />
+                            <span className="truncate font-mono text-[10.5px]">{palette.id}</span>
+                          </span>
+                        )}
+                      />
                     )
                   })}
                 </div>
@@ -835,6 +819,54 @@ async function probeSettings(
 function probeText(probe: string, label: (key: string) => string): string {
   if (probe === 'update-failed' || probe === 'probe-ok' || probe === 'probe-failed') return label(probe)
   return probe
+}
+
+/** Market-style pill in the theme card header; confirm sits to the left of the action. */
+function paletteDeleteEnd(props: {
+  readonly canDelete: boolean
+  readonly asking: boolean
+  readonly id: string
+  readonly label: (key: string) => string
+  readonly onAsk: (id: string) => void
+  readonly onCancel: () => void
+  readonly onConfirm: () => void
+}): ReactNode {
+  if (!props.canDelete) return undefined
+  // Confirm must not sit where the first click landed — a fast second click would delete.
+  // Trailing slot stays Cancel; Confirm moves left.
+  if (props.asking) {
+    return (
+      <span className="flex items-center gap-2" data-palette-confirm="">
+        <span className="max-w-28 truncate text-right text-[11px] leading-snug text-muted-foreground">{props.label('palette-confirm')}</span>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full bg-destructive px-3 py-1.5 text-sm text-destructive-foreground"
+          onClick={props.onConfirm}
+        >
+          {props.label('palette-delete-confirm')}
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+          onClick={props.onCancel}
+        >
+          {props.label('cancel')}
+        </button>
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+      aria-label={props.label('palette-delete')}
+      title={props.label('palette-delete')}
+      data-palette-delete={props.id}
+      onClick={() => props.onAsk(props.id)}
+    >
+      {props.label('palette-delete-confirm')}
+    </button>
+  )
 }
 
 /** Loopback panel origin for the draft or saved host port. */

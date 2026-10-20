@@ -84,7 +84,8 @@ describe('settings palette list', () => {
     const { host } = await mount(
       <PanelSettings client={client()} locale="en" mode="production" palettes={[ink, plum]} />,
     )
-    expect(host.querySelectorAll('[data-theme-preview="chip"]')).toHaveLength(2)
+    expect(host.querySelectorAll('[data-theme-preview="workbench"]')).toHaveLength(2)
+    expect(host.querySelectorAll('[data-theme-strip]')).toHaveLength(2)
     expect(host.textContent).toContain('Custom')
     expect(del(host)).toBeUndefined()
   })
@@ -103,6 +104,11 @@ describe('settings palette list', () => {
     await act(async () => { del(host)?.click() })
     expect(host.textContent).toContain('Delete this file?')
     expect(removed).toEqual([])
+    // Trailing control is Cancel so a second click on the same side does not delete.
+    expect(del(host)).toBeUndefined()
+    const row = host.querySelector('[data-palette-confirm]')
+    const actions = [...(row?.querySelectorAll('button') ?? [])]
+    expect(actions.map(item => item.textContent)).toEqual(['Delete', 'Cancel'])
     await act(async () => { cancelDelete(host)?.click() })
     expect(host.textContent).not.toContain('Delete this file?')
     expect(removed).toEqual([])
@@ -209,7 +215,7 @@ describe('settings palette list', () => {
         palettes={[{ id: 'odd', name: 'Odd', style: ':root { --primary: #123456 }', origin: 'builtin' }]}
       />,
     )
-    expect(host.querySelectorAll('[data-theme-preview="chip"]')).toHaveLength(0)
+    expect(host.querySelectorAll('[data-theme-preview="workbench"]')).toHaveLength(0)
     expect(host.textContent).toContain('Odd')
   })
 })

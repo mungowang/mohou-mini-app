@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { MarketList, MarketPack, MarketRow } from '../gallery/client.ts'
 import { panelText, type PanelLabelMode, type PanelLocale } from '../labels.ts'
-import { ThemeColorStrip, ThemeDualPreview, type ThemeDualTokens } from '../theme/preview.tsx'
+import { ThemePreviewCard } from '../theme/card.tsx'
+import type { ThemeDualTokens } from '../theme/preview.tsx'
 
 /**
  * Market tab. Apps and themes are separate grids. The card click confirms before a replace.
@@ -310,63 +311,50 @@ function Card(props: {
   const noticeExtra = row.tracked === false && row.localVersion !== undefined
     ? props.label('market-local-version').replace('{v}', row.localVersion)
     : undefined
-  // Theme cards: preview owns the height. Title + description + install on top, strip + workbench,
-  // then a one-line footer. App cards keep the older prose-first layout.
+  // Theme cards share ThemePreviewCard with Settings. App cards keep the prose-first layout.
   if (row.kind === 'theme') {
     const tokens = marketPreviewTokens(row)
     return (
-      <article key={row.id} className="flex flex-col overflow-hidden rounded-2xl border bg-card" data-market-card={row.id}>
-        <div className="flex items-start gap-3 px-4 pt-3.5 pb-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <h2 className="m-0 truncate text-[15px] font-semibold tracking-tight">{rowLabel(props.locale, row, 'name')}</h2>
-              <SourceIcon source={row.source} label={props.label} />
-            </div>
-            <p className="mt-0.5 truncate text-[12px] leading-5 text-muted-foreground">{rowLabel(props.locale, row, 'description')}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
+      <ThemePreviewCard
+        key={row.id}
+        data-market-card={row.id}
+        title={rowLabel(props.locale, row, 'name')}
+        description={rowLabel(props.locale, row, 'description')}
+        badge={<SourceIcon source={row.source} label={props.label} />}
+        headerEnd={(
+          <>
             {notice === undefined ? null : (
               <span className="max-w-24 truncate text-right text-[11px] leading-snug text-muted-foreground" title={[notice, noticeExtra].filter(Boolean).join(' · ')} data-market-notice="">
                 {row.tracked === false ? props.label('market-untracked-short') : props.label('market-overwrite-short')}
               </span>
             )}
             <Action {...props} />
-          </div>
-        </div>
-        <div className="px-4">
-          <ThemeColorStrip
-            {...(tokens?.light === undefined ? {} : { tokens: tokens.light })}
-            {...(row.colors === undefined ? {} : { colors: row.colors })}
-          />
-        </div>
-        <div className="mt-2.5 px-4">
-          {tokens === undefined ? null : (
-            <ThemeDualPreview
-              size="workbench"
-              tokens={tokens}
-              lightLabel={props.label('market-light')}
-              darkLabel={props.label('market-dark')}
-              primaryLabel={props.label('market-preview-primary')}
-              secondaryLabel={props.label('market-preview-secondary')}
-            />
-          )}
-        </div>
-        <div className="mt-auto flex items-center gap-2.5 px-4 pt-2.5 pb-3 text-[11px] text-muted-foreground" data-market-meta="">
-          <span className="tabular-nums">{`v${row.version}`}</span>
-          {row.official === true ? <OfficialMark label={props.label('market-official')} /> : null}
-          <span className="inline-flex min-w-0 items-center gap-1" data-market-id={row.id}>
-            <Hash size={11} strokeWidth={2} className="shrink-0 opacity-70" aria-label={props.label('market-id')} />
-            <span className="truncate font-mono text-[10.5px]">{row.id}</span>
-          </span>
-          {noticeExtra === undefined ? null : <span className="truncate text-[10.5px]">{noticeExtra}</span>}
-          {row.downloads === undefined ? null : (
-            <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
-              <Download size={11} strokeWidth={2} />
-              {row.downloads}
+          </>
+        )}
+        {...(tokens === undefined ? {} : { tokens })}
+        {...(row.colors === undefined ? {} : { colors: row.colors })}
+        lightLabel={props.label('market-light')}
+        darkLabel={props.label('market-dark')}
+        primaryLabel={props.label('market-preview-primary')}
+        secondaryLabel={props.label('market-preview-secondary')}
+        footer={(
+          <span className="contents" data-market-meta="">
+            <span className="tabular-nums">{`v${row.version}`}</span>
+            {row.official === true ? <OfficialMark label={props.label('market-official')} /> : null}
+            <span className="inline-flex min-w-0 items-center gap-1" data-market-id={row.id}>
+              <Hash size={11} strokeWidth={2} className="shrink-0 opacity-70" aria-label={props.label('market-id')} />
+              <span className="truncate font-mono text-[10.5px]">{row.id}</span>
             </span>
-          )}
-        </div>
-      </article>
+            {noticeExtra === undefined ? null : <span className="truncate text-[10.5px]">{noticeExtra}</span>}
+            {row.downloads === undefined ? null : (
+              <span className="ml-auto inline-flex items-center gap-1 tabular-nums">
+                <Download size={11} strokeWidth={2} />
+                {row.downloads}
+              </span>
+            )}
+          </span>
+        )}
+      />
     )
   }
 

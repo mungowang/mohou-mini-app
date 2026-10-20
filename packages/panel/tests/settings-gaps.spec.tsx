@@ -38,8 +38,8 @@ async function mount(node: ReactNode): Promise<{ host: HTMLDivElement; root: Ret
   return { host, root }
 }
 
-function button(host: ParentNode, text: string): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find(item => item.textContent === text || item.textContent?.includes(text))
+function button(host: ParentNode, text: string): HTMLElement | undefined {
+  return [...host.querySelectorAll<HTMLElement>('button, [role="button"]')].find(item => item.textContent === text || item.textContent?.includes(text))
 }
 
 describe('PanelSettings gaps', () => {

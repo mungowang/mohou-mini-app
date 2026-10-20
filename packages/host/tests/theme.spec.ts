@@ -100,7 +100,7 @@ describe('theme pin', () => {
     await writeFile(appThemePin(app.directory), 'null\n')
     expect(await pins.readPin('com.example.app')).toEqual({ kind: 'default' })
     const empty = createThemePins(registry, join(root, 'missing-themes'))
-    expect((await empty.listPalettes()).palettes.some(item => item.id === 'tokyo')).toBe(true)
+    expect((await empty.listPalettes()).palettes.some(item => item.id === 'verdant')).toBe(true)
     await writeFile(appThemeCss(app.directory), ':root { --background: white; }')
     await expect(pins.setPin('com.example.app', { kind: 'app-file' })).rejects.toMatchObject({ code: 'theme-invalid' })
     await writeFile(appThemeCss(app.directory), good)

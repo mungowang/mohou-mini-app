@@ -1,11 +1,27 @@
 ---
 status: locked
-updated: 2026-10-19
+updated: 2026-10-20
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.76
+
+Settings palette selection is clearer on large theme cards: a stronger primary ring and a 当前 / Current chip on the title row.
+
+## 1.0.75
+
+Builtin palettes are Default, Strawberry Matcha, Graphite, Hokage Dawn, and Verdant (青锋). Tundra, Tokyo Night, and Pill Yellow are gone. Settings delete confirm puts Cancel where the first Delete click was, so a fast second click does not remove the file.
+
+## 1.0.74
+
+Settings palette cards match the market theme shell more closely: footer meta and bottom pad stay, delete is a header pill, and confirm sits beside that action instead of over the preview.
+
+## 1.0.73
+
+Settings palette cards use the same strip and workbench preview as market theme cards, via a shared `ThemePreviewCard`.
 
 ## 1.0.72
 

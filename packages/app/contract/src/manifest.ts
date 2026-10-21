@@ -11,7 +11,10 @@ export interface Manifest {
   readonly entry: typeof appEntries.ui
   readonly acronym?: string
   readonly tags?: readonly string[]
-  readonly kind?: 'workbench'
+  /** Omitted or absent means an ordinary app. `workbench` and `website` are exclusive. */
+  readonly kind?: 'workbench' | 'website'
+  /** Default content url when `kind` is `website`. Required for that kind. */
+  readonly url?: string
 }
 
 const acronymToken = /^[\p{L}\p{N}]{2}$/u
@@ -58,12 +61,14 @@ export function resolveManifest(raw: unknown, directoryName: string): Manifest {
   const acronym = resolveAcronym(raw.acronym)
   const tags = resolveTags(raw.tags)
   const kind = resolveKind(raw.kind)
+  const url = resolveUrl(raw.url, kind)
   const admitted = { id, name, description, version, entry: appEntries.ui }
   return {
     ...admitted,
     ...acronym === undefined ? {} : { acronym },
     ...tags === undefined ? {} : { tags },
     ...kind === undefined ? {} : { kind },
+    ...url === undefined ? {} : { url },
   }
 }
 
@@ -75,10 +80,31 @@ function resolveAcronym(value: unknown): string | undefined {
   return value
 }
 
-function resolveKind(value: unknown): 'workbench' | undefined {
+function resolveKind(value: unknown): 'workbench' | 'website' | undefined {
   if (value === undefined || value === 'app') return undefined
   if (value === 'workbench') return 'workbench'
-  throw new ContractError('manifest-invalid', 'manifest kind must be app or workbench')
+  if (value === 'website') return 'website'
+  throw new ContractError('manifest-invalid', 'manifest kind must be app, workbench, or website')
+}
+
+function resolveUrl(value: unknown, kind: 'workbench' | 'website' | undefined): string | undefined {
+  if (kind !== 'website') {
+    if (value === undefined) return undefined
+    throw new ContractError('manifest-invalid', 'manifest url is only valid for kind website')
+  }
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new ContractError('manifest-invalid', 'manifest url is required for kind website')
+  }
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch (error) {
+    throw new ContractError('manifest-invalid', 'manifest url must be an absolute http(s) URL', { cause: error })
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new ContractError('manifest-invalid', 'manifest url must be http or https')
+  }
+  return value
 }
 
 function resolveTags(value: unknown): readonly string[] | undefined {

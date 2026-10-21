@@ -77,7 +77,7 @@ describe('file credentials', () => {
     const listed = await author.invoke('mini_app_credential_list', {})
     expect(listed).toEqual({ credentials: [{ name: 'github', description: '个人 GitHub' }] })
     expect(JSON.stringify(listed)).not.toContain(secret)
-    author.dispose()
+    await author.dispose()
 
     const brain = await bindBrain({
       provider: createEchoProvider(),

@@ -48,7 +48,7 @@ describe('reviewApp', () => {
     }
     expect(reloaded.ok).toBe(true)
     expect(reloaded.notices.map(item => item.code).sort()).toEqual(['keyframe-collision', 'keyframe-duplicate'])
-    author.dispose()
+    await author.dispose()
   })
 
   it('rejects an unbound component and keeps the previous backend', async () => {
@@ -84,7 +84,7 @@ describe('reviewApp', () => {
       ok: true,
       value: 'pong',
     })
-    author.dispose()
+    await author.dispose()
   })
 
   it('rejects React, DOM, ctx, and Node names in shared', async () => {

@@ -141,7 +141,7 @@ describe('onHostEvents', () => {
       expect(logs.some(line => line === 'com.example.boom onHostEvents failed: hook broke')).toBe(true)
       expect(starts).toBe(started)
     } finally {
-      author.dispose()
+      await author.dispose()
     }
   }, 60_000)
 
@@ -226,7 +226,7 @@ describe('onHostEvents', () => {
       await turn()
       expect(reloads()).toBe(before)
     } finally {
-      author.dispose()
+      await author.dispose()
     }
   }, 60_000)
 })

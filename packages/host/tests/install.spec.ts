@@ -105,8 +105,8 @@ describe('mini_app_install', () => {
       appId: 'com.example.app',
       packages: [{ name: '../evil' }],
     })).toMatchObject({ ok: false, code: 'install-denied' })
-    author.dispose()
-    failing.dispose()
+    await author.dispose()
+    await failing.dispose()
   })
 
   it('rejects a bad spec and restores after a thrown install', async () => {

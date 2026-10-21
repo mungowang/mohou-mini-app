@@ -1,5 +1,7 @@
 /// <reference path="./cdn-modules.d.ts" />
 export { AppRuntime, useApp } from './sdk/use-app';
+export { useWebsite } from './sdk/use-website';
+export { WebsiteFrame, type WebsiteFrameProps } from './components/website-frame';
 export { agentEventType, eventType, llmEventType } from './sdk/use-app';
 export type { AgentEvent, AppHandle, LlmEvent } from './sdk/use-app';
 export { AppErrorBoundary, reportAppError } from './sdk/app-error-boundary';

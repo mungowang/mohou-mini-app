@@ -6,6 +6,8 @@ export interface PanelClient {
   open(appId: string, title?: string): Promise<void>
   deleteApp(appId: string): Promise<void>
   reload?(appId: string): Promise<void>
+  /** End a website site session when the app tab closes. */
+  closeWebsite?(appId: string): Promise<void>
   listTrash?(): Promise<readonly GalleryApp[]>
   undeleteApp?(appId: string): Promise<void>
   listMarket?(): Promise<MarketList>

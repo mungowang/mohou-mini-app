@@ -19,7 +19,7 @@ export interface GalleryApp {
   readonly createdAt?: string
   readonly updatedAt?: string
   readonly activity?: { readonly openCount: number; readonly lastOpenedAt: string }
-  readonly kind?: 'workbench'
+  readonly kind?: 'workbench' | 'website'
 }
 
 export type GalleryKind = 'unreachable' | 'failed' | 'empty' | 'none' | 'ready'

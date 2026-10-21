@@ -159,7 +159,7 @@ describe('author tools', () => {
     expect(failed.ok).toBe(false)
     expect(failed.errors[0]?.message).toContain('defineApp')
     expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'ping' })).toEqual({ ok: true, value: 'pong' })
-    author.dispose()
+    await author.dispose()
   })
 
   it('keeps the esbuild text in a reload failure', async () => {
@@ -182,7 +182,7 @@ describe('author tools', () => {
     expect(failed.ok).toBe(false)
     expect(failed.errors[0]?.code).toBe('ui-invalid')
     expect(failed.errors[0]?.message).toContain('No matching export in "shared/mcp.ts" for import "MCP_PRESETS"')
-    author.dispose()
+    await author.dispose()
   })
 
   it('refuses a missing token file and a non-loopback caller', async () => {
@@ -237,7 +237,7 @@ describe('author tools', () => {
     }, mcpAccept)
     expect(initialized.status).not.toBe(400)
     await http.close()
-    author.dispose()
+    await author.dispose()
   })
 
   it('rejects bad arguments and projects the same catalog', async () => {
@@ -338,7 +338,7 @@ describe('author tools', () => {
     })
     expect(removed).toBe(404)
     await http.close()
-    author.dispose()
+    await author.dispose()
   })
 
   it('reuses an SSE session id and 404s after delete', async () => {
@@ -372,7 +372,7 @@ describe('author tools', () => {
     expect((await mcpStream(http.port, { method: 'DELETE', session: id })).status).toBe(200)
     expect((await post(http.port, '/mcp', 'secret', { jsonrpc: '2.0', id: 9, method: 'tools/list' }, { ...mcpAccept, 'mcp-session-id': id })).status).toBe(404)
     await http.close()
-    author.dispose()
+    await author.dispose()
   })
 })
 

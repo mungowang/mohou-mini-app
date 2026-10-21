@@ -59,7 +59,7 @@ describe('author settle', () => {
     await expect(pending).resolves.toEqual({ ok: true, value: 'done' })
     await expect(author.invoke('mini_app_list', {})).rejects.toMatchObject({ code: 'cancelled' })
     expect(existsSync(join(root, 'apps', 'com.example.app', 'go'))).toBe(true)
-    author.dispose()
+    await author.dispose()
   })
 })
 

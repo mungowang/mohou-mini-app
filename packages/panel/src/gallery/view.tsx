@@ -119,7 +119,7 @@ export function GalleryBody(props: {
   readonly onSetDefaultWorkbench?: (id: string) => void
   readonly onActiveApp?: (appId: string | undefined, title?: string) => void
 }): ReactNode {
-  const { state, dispatch } = props
+  const { state, dispatch, client } = props
   const label = (key: string) => panelText(props.locale, key, props.mode)
   const active = state.tabs.tabs[state.tabs.active]
   const kind = viewKind(state)
@@ -179,6 +179,10 @@ export function GalleryBody(props: {
                   aria-label={label('close-tab')}
                   onClick={(event) => {
                     event.stopPropagation()
+                    const closing = state.tabs.tabs[index]
+                    if (closing?.kind === 'app' && client.closeWebsite !== undefined) {
+                      void client.closeWebsite(closing.appId)
+                    }
                     dispatch({ type: 'close', index })
                   }}
                 >
@@ -310,7 +314,8 @@ export function GalleryBody(props: {
                   aria-label={label('open-workbench-tab')}
                   onClick={() => {
                     const open = state.tabs.tabs.some(tab => tab.kind === 'app' && tab.appId === desk.id)
-                    void openApp(props.client, desk.id, desk.name, dispatch, open)
+                    const kind = state.apps.find(app => app.id === desk.id)?.kind
+                    void openApp(props.client, desk.id, desk.name, dispatch, open, kind)
                   }}
                 >
                   <span>{label('open-workbench-tab-now')}</span>
@@ -417,7 +422,8 @@ export function GalleryBody(props: {
                         openAppIds={state.tabs.tabs.flatMap(tab => tab.kind === 'app' ? [tab.appId] : [])}
                         openApp={(id, title) => {
                           const open = state.tabs.tabs.some(tab => tab.kind === 'app' && tab.appId === id)
-                          void openApp(props.client, id, title ?? id, dispatch, open)
+                          const kind = state.apps.find(app => app.id === id)?.kind
+                          void openApp(props.client, id, title ?? id, dispatch, open, kind)
                         }}
                       />
                     ) : null}
@@ -453,7 +459,7 @@ export function GalleryBody(props: {
               setPaletteOpen(false)
               if (active?.kind === 'app' && active.appId === app.id) return
               const open = state.tabs.tabs.some(tab => tab.kind === 'app' && tab.appId === app.id)
-              openApp(props.client, app.id, app.name, dispatch, open)
+              openApp(props.client, app.id, app.name, dispatch, open, app.kind)
             }}
             onLibrary={() => {
               setPaletteOpen(false)
@@ -479,9 +485,10 @@ function openApp(
   title: string,
   dispatch: (action: GalleryAction) => void,
   open: boolean,
+  kind?: 'workbench' | 'website',
 ): void {
   dispatch({ type: 'open', appId, title })
-  void notifyOpen(client, appId, title, dispatch, open)
+  void notifyOpen(client, appId, title, dispatch, open, kind)
 }
 
 async function notifyOpen(
@@ -490,10 +497,12 @@ async function notifyOpen(
   title: string,
   dispatch: (action: GalleryAction) => void,
   open: boolean,
+  kind?: 'workbench' | 'website',
 ): Promise<void> {
   try {
     await client.open(appId, title)
-    if (!open && client.reload !== undefined) await client.reload(appId)
+    // Website ensure is already in flight; a first-open reload races spawn and adds lag.
+    if (!open && kind !== 'website' && client.reload !== undefined) await client.reload(appId)
   } catch (error) {
     dispatch({ type: 'drop-app', appId })
     dispatch({ type: 'open-failed', ...thrown(error) })

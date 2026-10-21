@@ -29,6 +29,7 @@ export interface LoopbackApp {
     readonly tags?: { readonly full: string; readonly initials: string }
   }
   readonly tags?: readonly string[]
+  readonly kind?: 'workbench' | 'website'
   readonly createdAt?: string
   readonly updatedAt?: string
   readonly activity?: { readonly openCount: number; readonly lastOpenedAt: string }
@@ -42,6 +43,11 @@ export interface LoopbackPorts {
   undeleteApp(appId: string): Promise<unknown>
   open(appId: string, title?: string): Promise<unknown>
   reload(appId: string): Promise<void>
+  websiteSnapshot(appId: string): Promise<unknown>
+  websiteRefresh(appId: string): Promise<unknown>
+  websiteRetry(appId: string): Promise<unknown>
+  websiteClose(appId: string): Promise<void>
+  websiteContent(appId: string, event: 'load' | 'load-failed' | 'document-idle', reason?: string): Promise<void>
   call(appId: string, method: string, args: unknown, publish?: (value: unknown) => Promise<void> | void): Promise<unknown>
   readPolicy(): HostPolicy
   writePolicy(raw: unknown): Promise<{ policy: HostPolicy; restartRequired: boolean }>

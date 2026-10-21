@@ -12,7 +12,7 @@ export interface AppListItem {
   readonly createdAt?: string
   readonly updatedAt?: string
   readonly activity?: { readonly openCount: number; readonly lastOpenedAt: string }
-  readonly kind?: 'workbench'
+  readonly kind?: 'workbench' | 'website'
 }
 
 /** One workbench the slot can show. `default` is the one the slot will use. */

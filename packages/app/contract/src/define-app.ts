@@ -1,6 +1,7 @@
 import type { AppContext } from './context.ts'
 import { ContractError } from './codes.ts'
 import type { HostNotice } from './host-notice.ts'
+import type { WebsiteDriver } from './website.ts'
 
 /** One backend method as the host calls it. `args` is the unchecked JSON. */
 export type AppApiMethod<State extends object = Record<string, never>> = (
@@ -31,6 +32,11 @@ export interface AppDefinition<State extends object = Record<string, never>> {
    * Not an `api` method. The view does not receive the notice on `useApp().on`.
    */
   onHostEvents?: (ctx: AppContext<State>, event: HostNotice) => unknown
+  /**
+   * Site session strategy. Required when the manifest kind is `website`.
+   * Host calls ensure/refresh/dispose and optional content hooks. Not an `api` method.
+   */
+  website?: WebsiteDriver<State>
 }
 
 function isObject(value: unknown): value is object {
@@ -57,5 +63,32 @@ export function defineApp<State extends object, Definition extends AppDefinition
   if (def.onHostEvents !== undefined && typeof def.onHostEvents !== 'function') {
     throw new ContractError('define-app-invalid', 'defineApp.onHostEvents must be a function')
   }
+  if (def.website !== undefined) admitWebsite(def.website)
   return def
+}
+
+function admitWebsite(value: unknown): void {
+  if (!isObject(value)) {
+    throw new ContractError('define-app-invalid', 'defineApp.website must be an object')
+  }
+  const driver = value as Record<string, unknown>
+  if (typeof driver.ensure !== 'function') {
+    throw new ContractError('define-app-invalid', 'defineApp.website.ensure must be a function')
+  }
+  if (driver.refresh !== undefined && typeof driver.refresh !== 'function') {
+    throw new ContractError('define-app-invalid', 'defineApp.website.refresh must be a function')
+  }
+  if (driver.dispose !== undefined && typeof driver.dispose !== 'function') {
+    throw new ContractError('define-app-invalid', 'defineApp.website.dispose must be a function')
+  }
+  if (driver.content === undefined) return
+  if (!isObject(driver.content)) {
+    throw new ContractError('define-app-invalid', 'defineApp.website.content must be an object')
+  }
+  const content = driver.content as Record<string, unknown>
+  for (const key of ['onLoad', 'onLoadFailed', 'onDocumentIdle'] as const) {
+    if (content[key] !== undefined && typeof content[key] !== 'function') {
+      throw new ContractError('define-app-invalid', `defineApp.website.content.${key} must be a function`)
+    }
+  }
 }

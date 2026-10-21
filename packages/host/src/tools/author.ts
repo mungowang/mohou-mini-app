@@ -3,7 +3,7 @@ import { closeSync, openSync, writeSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import { appEntries, resolveManifest, type AppApiMethod, type AppConfig, type AppContext, type AppId, type AppWorkbench, type HostNotice } from '@mohou/contract'
+import { appEntries, resolveManifest, type AppApiMethod, type AppConfig, type AppContext, type AppId, type AppWorkbench, type HostNotice, type WebsiteDriver } from '@mohou/contract'
 import type { McpClient } from '@mohou/mcp-client'
 import type { RuntimeProvider } from '@mohou/runtime-provider'
 
@@ -35,6 +35,7 @@ import { installLayout } from '../install/layout.ts'
 import { bindBrain, type BoundBrain } from '../kernel/bind-brain.ts'
 import { runCall, runNotice, type CallCapabilities } from '../kernel/call.ts'
 import { openStorage, type StorageFile } from '../storage/open.ts'
+import { createWebsiteSessions } from '../website/session.ts'
 import { listMcpForAuthor, toolsMcpForAuthor } from './mcp-list.ts'
 import { AuthorError } from './codes.ts'
 
@@ -106,10 +107,40 @@ interface LiveApp {
   id: AppId
   api: Record<string, AppApiMethod>
   onHostEvents?: (ctx: AppContext, event: HostNotice) => unknown
+  website?: WebsiteDriver
   storage: StorageFile
   directory: string
   ui?: string
-  kind?: 'workbench'
+  kind?: 'workbench' | 'website'
+  url?: string
+}
+
+/** Shared bag for author helpers once host streams exist. */
+interface AuthorBound {
+  readonly registry: Registry
+  readonly mcp: McpClient
+  readonly ports: AuthorCallPorts
+  readonly hostEvents: ReturnType<typeof createHostEvents>
+  readonly appEvents: AppEvents
+  readonly errors: ReturnType<typeof createErrorRing>
+  readonly views: ReturnType<typeof createViewQueries>
+  readonly live: Map<string, LiveApp>
+  websiteSessions: ReturnType<typeof createWebsiteSessions>
+  readonly storageNoticeBytes?: number
+  readonly reservedKeyframes?: readonly string[]
+  readonly now?: () => string
+  readonly onTreeChanged?: (appId: string) => void
+  readonly onWorkbenchRenamed?: (from: string, to: string) => void
+  readonly runNpm?: NpmRun
+  readonly installTimeoutMs?: number
+  readonly env?: NodeJS.ProcessEnv
+  readonly readMcpFailures?: () => readonly McpLoadFailure[]
+  readonly recordMcpFailures?: (failures: readonly McpLoadFailure[]) => void
+  readonly market?: {
+    list: () => Promise<MarketList>
+    install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
+    uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
+  }
 }
 
 interface Registry {
@@ -165,7 +196,29 @@ export function createAuthorTools(options: {
   const views = createViewQueries({
     ...options.viewTimeoutMs === undefined ? {} : { timeoutMs: options.viewTimeoutMs },
   })
-  const bound = { ...options, hostEvents, appEvents, errors, views }
+  const bound: AuthorBound = {
+    ...options,
+    hostEvents,
+    appEvents,
+    errors,
+    views,
+    live,
+    websiteSessions: null as unknown as ReturnType<typeof createWebsiteSessions>,
+  }
+  const websiteSessions = createWebsiteSessions({
+    buildCapabilities: async (appId) => {
+      const app = await ensureLive(bound, live, appId)
+      const brain = lazyBrain(bound, app, app.id)
+      return capabilitiesFor(bound, app, brain)
+    },
+    pushSnapshot: (appId, snapshot) => {
+      appEvents.push(appId, websiteSessions.snapshotEvent, snapshot)
+    },
+    log: (appId, message) => {
+      options.ports.log(appId, message)
+    },
+  })
+  bound.websiteSessions = websiteSessions
   const inflight = new Set<Promise<unknown>>()
   let stopping = false
   const track = <T>(work: Promise<T>): Promise<T> => {
@@ -198,13 +251,21 @@ export function createAuthorTools(options: {
     deleteApp: (appId: string) => track(removeApp(bound, live, appId)),
     undeleteApp: (appId: string) => track(restoreDeleted(bound, appId)),
     restoreStorage: (appId: string) => track(restoreAppStorage(bound, live, appId)),
+    websiteSnapshot: (appId: string) => websiteSessions.get(appId),
+    websiteRefresh: (appId: string) => track(websiteSessions.refresh(appId as AppId)),
+    websiteRetry: (appId: string) => track(websiteSessions.retry(appId as AppId)),
+    websiteClose: (appId: string) => track(websiteSessions.dispose(appId as AppId)),
+    websiteContent: (appId: string, event: 'load' | 'load-failed' | 'document-idle', reason?: string) => {
+      return track(websiteSessions.content(appId as AppId, event, reason))
+    },
     settle() {
       stopping = true
       return Promise.allSettled([...inflight]).then(() => undefined)
     },
-    dispose() {
+    async dispose() {
       stopping = true
       stopNotices()
+      await websiteSessions.disposeAll()
       for (const app of live.values()) app.storage.close()
       live.clear()
       appEvents.dispose()
@@ -244,28 +305,7 @@ function isAlreadyThere(error: unknown): boolean {
 }
 
 async function invoke(
-  options: {
-    registry: Registry
-    mcp: McpClient
-    /** Servers boot left out because a reference names nothing. The author list reports them. */
-    readMcpFailures?: () => readonly McpLoadFailure[]
-    recordMcpFailures?: (failures: readonly McpLoadFailure[]) => void
-    env?: NodeJS.ProcessEnv
-    ports: AuthorCallPorts
-    onTreeChanged?: (appId: string) => void
-    hostEvents: ReturnType<typeof createHostEvents>
-    appEvents: AppEvents
-    errors: ReturnType<typeof createErrorRing>
-    views: ReturnType<typeof createViewQueries>
-    runNpm?: NpmRun
-    installTimeoutMs?: number
-    storageNoticeBytes?: number
-    market?: {
-      list: () => Promise<MarketList>
-      install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
-      uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
-    }
-  },
+  options: AuthorBound,
   live: Map<string, LiveApp>,
   name: string,
   args: unknown,
@@ -350,7 +390,7 @@ async function invoke(
     case 'mini_app_history_reset':
       return historyReset(options, requiredString(input, 'appId'), requiredString(input, 'commitId'))
     case 'mini_app_open':
-      return openApp(options, requiredString(input, 'appId'), optionalString(input, 'title'))
+      return openApp(options, live, requiredString(input, 'appId'), optionalString(input, 'title'))
     case 'mini_app_errors':
       return readErrors(options, requiredString(input, 'appId'), optionalSince(input.since), optionalClear(input.clear))
     case 'mini_app_install':
@@ -444,23 +484,42 @@ async function historyReset(
 }
 
 async function openApp(
-  options: {
-    registry: Registry
-    hostEvents: ReturnType<typeof createHostEvents>
-    errors: ReturnType<typeof createErrorRing>
-    now?: () => string
-  },
+  options: AuthorBound,
+  live: Map<string, LiveApp>,
   appId: string,
   title: string | undefined,
 ) {
   const app = await options.registry.get(appId)
   recordOpen(options.registry.runtimeRoot, app.id, (options.now ?? (() => new Date().toISOString()))())
   options.errors.markOpened(app.id)
+  // Same as ordinary apps: notify the panel first so the tab mounts immediately.
+  // Website ensure (spawn local server) runs after; useWebsite shows Starting… until ready.
   options.hostEvents.publish({
     type: 'app:open',
     appId: app.id,
     ...title === undefined ? {} : { title },
   })
+  if (app.kind === 'website') {
+    if (app.url === undefined) {
+      throw new AuthorError('tool-args', 'website app needs defineApp.website and manifest.url')
+    }
+    const defaultUrl = app.url
+    const appDir = app.directory
+    const id = app.id
+    void ensureLive(options, live, id).then(async (loaded) => {
+      if (loaded.website === undefined) {
+        throw new AuthorError('tool-args', 'website app needs defineApp.website and manifest.url')
+      }
+      await options.websiteSessions.ensure({
+        appId: id,
+        defaultUrl,
+        driver: loaded.website,
+        appDir,
+      })
+    }).catch((error: unknown) => {
+      options.ports.log(id, `website ensure failed: ${error instanceof Error ? error.message : 'failed'}`)
+    })
+  }
   return { panel: options.hostEvents.connected ? 'notified' : 'no-panel-connected' }
 }
 
@@ -606,11 +665,13 @@ async function removeApp(
     registry: Registry
     errors: ReturnType<typeof createErrorRing>
     hostEvents: ReturnType<typeof createHostEvents>
+    websiteSessions?: ReturnType<typeof createWebsiteSessions>
   },
   live: Map<string, LiveApp>,
   appId: string,
 ) {
   const app = await options.registry.get(appId)
+  await options.websiteSessions?.dispose(app.id)
   live.get(app.id)?.storage.close()
   live.delete(app.id)
   options.errors.forget(app.id)
@@ -636,6 +697,7 @@ async function reload(
     views: ReturnType<typeof createViewQueries>
     storageNoticeBytes?: number
     reservedKeyframes?: readonly string[]
+    websiteSessions?: ReturnType<typeof createWebsiteSessions>
   },
   live: Map<string, LiveApp>,
   appId: string,
@@ -670,8 +732,17 @@ async function reload(
     }
     await cachedUiBundle(app.directory)
     const previous = live.get(app.id)
-    live.set(app.id, withKind(liveRecord(loaded, opened, app.directory, app.id), app.kind))
+    live.set(app.id, withKind(liveRecord(loaded, opened, app.directory, app.id), app.kind, app.url))
     previous?.storage.close()
+    if (app.kind === 'website' && loaded.website !== undefined && app.url !== undefined && options.websiteSessions !== undefined) {
+      // Keep the session and process; swap the Driver after source reload.
+      await options.websiteSessions.ensure({
+        appId: app.id,
+        defaultUrl: app.url,
+        driver: loaded.website,
+        appDir: app.directory,
+      })
+    }
     const committed = await commitApp(app.directory, reloadMessage).catch((error: unknown) => ({
       status: 'failed' as const,
       reason: error instanceof Error ? error.message : 'commit failed',
@@ -786,11 +857,13 @@ async function ensureLive(
 ): Promise<LiveApp> {
   const summary = await options.registry.get(appId)
   const cached = live.get(summary.id)
-  if (cached !== undefined && cached.directory === summary.directory) return withKind(cached, summary.kind)
+  if (cached !== undefined && cached.directory === summary.directory) {
+    return withKind(cached, summary.kind, summary.url)
+  }
   const storage = await openStorage(summary.directory, storageNotice(options, summary.id))
   try {
     const loaded = await loadBackend(summary.directory)
-    const next = withKind(liveRecord(loaded, storage, summary.directory, summary.id), summary.kind)
+    const next = withKind(liveRecord(loaded, storage, summary.directory, summary.id), summary.kind, summary.url)
     live.set(summary.id, next)
     return next
   } catch (error) {
@@ -833,6 +906,7 @@ function liveRecord(loaded: LoadedBackend, storage: StorageFile, directory: stri
     storage,
     directory,
     ...loaded.onHostEvents === undefined ? {} : { onHostEvents: loaded.onHostEvents },
+    ...loaded.website === undefined ? {} : { website: loaded.website },
   }
 }
 
@@ -898,13 +972,17 @@ function lazyBrain(
   }
 }
 
-function withKind(app: LiveApp, kind: 'workbench' | undefined): LiveApp {
+function withKind(app: LiveApp, kind: 'workbench' | 'website' | undefined, url?: string): LiveApp {
+  const next = { ...app }
   if (kind === undefined) {
-    const { kind: gone, ...rest } = app
-    void gone
-    return rest
+    delete next.kind
+    delete next.url
+    return next
   }
-  return { ...app, kind }
+  next.kind = kind
+  if (kind === 'website' && url !== undefined) next.url = url
+  else delete next.url
+  return next
 }
 
 function errorOf(error: unknown): { code: string; message: string } {
@@ -1197,6 +1275,7 @@ function registerManifest(input: Record<string, unknown>): Record<string, string
   if (input.acronym !== undefined) raw.acronym = input.acronym
   if (input.tags !== undefined) raw.tags = input.tags
   if (input.kind !== undefined) raw.kind = input.kind
+  if (input.url !== undefined) raw.url = input.url
   const admitted = resolveManifest(raw, appId)
   const body: Record<string, unknown> = {
     id: admitted.id,
@@ -1208,6 +1287,7 @@ function registerManifest(input: Record<string, unknown>): Record<string, string
   if (admitted.acronym !== undefined) body.acronym = admitted.acronym
   if (admitted.tags !== undefined) body.tags = admitted.tags
   if (admitted.kind !== undefined) body.kind = admitted.kind
+  if (admitted.url !== undefined) body.url = admitted.url
   return { [appEntries.manifest]: `${JSON.stringify(body, null, 2)}
 ` }
 }

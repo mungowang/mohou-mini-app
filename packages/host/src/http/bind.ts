@@ -107,6 +107,11 @@ export function bindLoopback(input: {
       ...title === undefined ? {} : { title },
     }),
     reload: appId => input.owner.reloadView(appId),
+    websiteSnapshot: appId => Promise.resolve(input.author.websiteSnapshot(appId) ?? null),
+    websiteRefresh: appId => input.author.websiteRefresh(appId),
+    websiteRetry: appId => input.author.websiteRetry(appId),
+    websiteClose: appId => input.author.websiteClose(appId),
+    websiteContent: (appId, event, reason) => input.author.websiteContent(appId, event, reason),
     call: (appId, method, args, observe) => {
       if (observe !== undefined) return input.author.callObserved(appId, method, args, observe)
       return input.author.invoke('mini_app_call', {

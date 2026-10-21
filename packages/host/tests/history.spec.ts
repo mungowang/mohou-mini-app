@@ -167,6 +167,6 @@ describe('history', () => {
       edits: [{ oldText: 'Example', newText: 1 }],
       commit: false,
     })
-    author.dispose()
+    await author.dispose()
   })
 })

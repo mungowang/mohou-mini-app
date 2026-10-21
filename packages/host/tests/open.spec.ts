@@ -92,6 +92,6 @@ describe('open and delete', () => {
     expect((await author.invoke('mini_app_list', {}) as { apps: unknown[] }).apps).toHaveLength(0)
     await expect(author.deleteApp('com.example.app')).rejects.toMatchObject({ code: 'app-not-registered' })
     stop()
-    author.dispose()
+    await author.dispose()
   })
 })

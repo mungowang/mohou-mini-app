@@ -1,4 +1,4 @@
-import { appsResource, httpLayout } from '@mohou/host/http'
+import { appsResource, httpLayout, websiteResource } from '@mohou/host/http'
 import {
   panelUpdateFailureCodes,
   PanelClientError,
@@ -40,6 +40,8 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
     deleteApp: appId => sendOk(origin, 'DELETE', `${httpLayout.app}/${encodeURIComponent(appId)}`),
     undeleteApp: appId => postOk(origin, `${httpLayout.trash}/${encodeURIComponent(appId)}/${httpLayout.restore}`),
     reload: appId => postOk(origin, appsResource(appId, httpLayout.reload)),
+    // Split path segments — appResource encodes each part; 'website/close' must not be one segment.
+    closeWebsite: appId => postOk(origin, websiteResource(appId, 'close')),
     listMarket: async () => {
       const body = (await getJson(origin, httpLayout.market)).result
       // A Host from before the bundle list answered a bare row array. Read it as no bundles.

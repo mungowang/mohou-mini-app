@@ -1,11 +1,43 @@
 ---
 status: locked
-updated: 2026-10-20
+updated: 2026-10-21
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.84
+
+WebsiteFrame product chrome: starting (slow hint), connecting veil with url, live, refresh bar, and trouble with expand-detail + copy icon. EN/ZH kit strings.
+
+## 1.0.83
+
+Website open is async again: `app:open` returns immediately and ensure runs in the background; the tab shows Starting… until ready. First-open reload is skipped for website so spawn is not raced.
+
+## 1.0.82
+
+Website UI reads Host `ok().result` for the session snapshot (was looking for `value`), so a ready session no longer stays on Starting…
+
+## 1.0.81
+
+Local app pack of 1.0.80 navigation: same-window http(s) iframe embeds stay; link clicks still open the system browser.
+
+## 1.0.80
+
+Window navigation: same-window `http`/`https` loads stay (iframe embeds of local or external sites). Only new windows / `target=_blank` and the runner leave-guard (link click, foreign form) open the system browser.
+
+## 1.0.79
+
+Website embed: the window keeps same-window loopback loads (any port) so a nested iframe to `pi-web` is not blocked and does not open the system browser. Open runs website `ensure` before `app:open`. Spawn sets `PI_WEB_NO_OPEN=1` as a backup for `--no-open`.
+
+## 1.0.78
+
+Website tab close posts `/api/app/:id/website/close` via `websiteResource` (segmented path). A single `website/close` segment was encoded as `website%2Fclose`, so dispose never ran and `pi-web` kept living.
+
+## 1.0.77
+
+Website app kind: `kind: website` plus `url`, session `ensure` / `refresh` / `dispose`, `ctx.spawn` for local servers, `useWebsite` / `WebsiteFrame`, and path-C content hooks (`onLoad` / `onLoadFailed` / `onDocumentIdle`). Closing a tab ends the session and kills registered children.
 
 ## 1.0.76
 

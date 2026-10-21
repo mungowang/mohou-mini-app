@@ -2,7 +2,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 
-import { appEntries, ContractError, type AppApiMethod, type AppContext, type HostNotice } from '@mohou/contract'
+import { appEntries, ContractError, type AppApiMethod, type AppContext, type HostNotice, type WebsiteDriver } from '@mohou/contract'
 import * as esbuild from 'esbuild'
 
 import { CompileError } from './codes.ts'
@@ -14,6 +14,7 @@ const require = createRequire(import.meta.url)
 export interface LoadedBackend {
   api: Record<string, AppApiMethod>
   onHostEvents?: (ctx: AppContext, event: HostNotice) => unknown
+  website?: WebsiteDriver
 }
 
 /**
@@ -53,8 +54,12 @@ export async function loadBackend(appDir: string, logLevel?: 'silent'): Promise<
   }
   const api = app.api as Record<string, AppApiMethod>
   const onHostEvents = app.onHostEvents
-  if (!isHostHook(onHostEvents)) return { api }
-  return { api, onHostEvents }
+  const website = isWebsiteDriver(app.website) ? app.website : undefined
+  return {
+    api,
+    ...isHostHook(onHostEvents) ? { onHostEvents } : {},
+    ...website === undefined ? {} : { website },
+  }
 }
 
 function allowlistPlugin(appDir: string, stopped: { code: string; message: string }): esbuild.Plugin {
@@ -100,4 +105,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isHostHook(value: unknown): value is NonNullable<LoadedBackend['onHostEvents']> {
   return typeof value === 'function'
+}
+
+function isWebsiteDriver(value: unknown): value is WebsiteDriver {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && typeof (value as WebsiteDriver).ensure === 'function'
 }

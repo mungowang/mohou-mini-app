@@ -34,7 +34,7 @@ describe('official MCP client', () => {
     } finally {
       await client.close().catch(() => undefined)
       await http.close()
-      author.dispose()
+      await author.dispose()
     }
   })
 })

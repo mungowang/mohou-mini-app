@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-10
+updated: 2026-10-21
 ---
 
 # Blueprint
@@ -11,7 +11,7 @@ What 1.0 already shipped, and what waits after, stay in [the 1.0 plan](../.agent
 
 ## 1.0
 
-- [Embedded navigation](product/shell/navigation.md). External links open outside the app. There is no contained browser.
+- [Embedded navigation](product/shell/navigation.md). Link clicks that leave open outside the app; nested iframe embeds may load http(s) in-window. There is no full contained browser chrome.
 - Restart keeps one live session. Window exit, `SIGINT`, and `SIGTERM` dispose that session.
 - UI-kit tests are self-contained. The coverage gate does not include the kit.
 - A smoke test spawns the process entry and the panel-window binary. A real-entry test checks a result outside that process and checks that exit leaves no child.

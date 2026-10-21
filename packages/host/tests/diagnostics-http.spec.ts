@@ -48,7 +48,7 @@ describe('diagnostic posts', () => {
       expect(absent).toHaveBeenCalledWith('com.example.app')
     } finally {
       await http.close()
-      author.dispose()
+      await author.dispose()
     }
   })
 
@@ -70,7 +70,7 @@ describe('diagnostic posts', () => {
       new Promise((resolve) => { setTimeout(() => { resolve('hung') }, 1500) }),
     ])
     socket.destroy()
-    author.dispose()
+    await author.dispose()
     expect(result).toBe('closed')
   })
 })

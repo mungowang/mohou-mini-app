@@ -86,7 +86,8 @@ function credentialsFor(provider: CredentialProvider): AppCredentials {
   }
 }
 
-function contextFor<State extends object>(capabilities: CallCapabilities<State>, signal: AbortSignal): AppContext<State> {
+/** Build `ctx` for a call or a host-owned hook. Exported for website session hooks. */
+export function contextFor<State extends object>(capabilities: CallCapabilities<State>, signal: AbortSignal): AppContext<State> {
   return {
     appId: capabilities.appId,
     appDir: capabilities.appDir,

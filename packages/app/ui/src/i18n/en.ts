@@ -309,6 +309,22 @@ export const en = {
     previous: 'Previous change',
     next: 'Next change',
   },
+  websiteFrame: {
+    starting: 'Starting…',
+    startingNamed: (name: string) => `Starting ${name}`,
+    startingHintLocal: 'Starting the local service',
+    startingHintRemote: 'Preparing the page',
+    startingSlow: 'Still starting… this can take a few seconds',
+    connecting: 'Opening page…',
+    disposing: 'Closing…',
+    trouble: 'Couldn’t start',
+    troubleHint: 'Check that the service is installed and the port is free.',
+    retry: 'Retry',
+    expandDetail: 'Expand detail',
+    collapseDetail: 'Hide detail',
+    copyDetail: 'Copy detail',
+    copied: 'Copied',
+  },
 }
 
 export type UiMessages = typeof en

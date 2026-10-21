@@ -246,6 +246,21 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     return ok(c, () => ports.open(c.req.param('appId'), title))
   })
   app.post(`${httpLayout.apps}/:appId/${httpLayout.reload}`, c => ok(c, () => ports.reload(c.req.param('appId'))))
+  app.get(`${httpLayout.app}/:appId/${httpLayout.website}`, c => ok(c, () => ports.websiteSnapshot(c.req.param('appId'))))
+  app.post(`${httpLayout.app}/:appId/${httpLayout.websiteRefresh}`, c => ok(c, () => ports.websiteRefresh(c.req.param('appId'))))
+  app.post(`${httpLayout.app}/:appId/${httpLayout.websiteRetry}`, c => ok(c, () => ports.websiteRetry(c.req.param('appId'))))
+  app.post(`${httpLayout.app}/:appId/${httpLayout.websiteClose}`, c => ok(c, () => ports.websiteClose(c.req.param('appId'))))
+  app.post(`${httpLayout.app}/:appId/${httpLayout.websiteContent}`, async (c) => {
+    const body = await readBody(c)
+    const event = isRecord(body) && (body.event === 'load' || body.event === 'load-failed' || body.event === 'document-idle')
+      ? body.event
+      : undefined
+    if (event === undefined) {
+      return c.json({ ok: false, error: { code: 'tool-args', message: 'website content event is invalid' } }, 400)
+    }
+    const reason = isRecord(body) && typeof body.reason === 'string' ? body.reason : undefined
+    return ok(c, () => ports.websiteContent(c.req.param('appId'), event, reason))
+  })
   app.get(`${httpLayout.apps}/:appId/${httpLayout.history}`, async (c) => {
     const raw = Number(c.req.query('limit') ?? '')
     const limit = Math.min(Number.isFinite(raw) && raw > 0 ? raw : historyListBound.default, historyListBound.max)

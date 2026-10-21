@@ -34,7 +34,7 @@ describe('agent file writes', () => {
     await writeFile(join(app.directory, appEntries.ui), 'export const n = 2\n')
     await author.invoke('mini_app_list_files', { appId: 'com.example.app' })
     expect(await readFile(join(app.directory, appEntries.ui), 'utf8')).toBe('export const n = 2\n')
-    author.dispose()
+    await author.dispose()
   })
 })
 

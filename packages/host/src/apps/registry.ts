@@ -36,7 +36,9 @@ export interface AppSummary {
   /** Manifest tags. Omitted when the author set none. */
   tags?: readonly string[]
   /** Manifest kind. Omitted for an ordinary app. */
-  kind?: 'workbench'
+  kind?: 'workbench' | 'website'
+  /** Default site url when kind is website. */
+  url?: string
   directory: string
 }
 
@@ -283,7 +285,16 @@ async function readManifest(directory: string, directoryName: string) {
 }
 
 function summaryOf(
-  manifest: { id: AppId; name: string; description: string; version: string; acronym?: string; tags?: readonly string[]; kind?: 'workbench' },
+  manifest: {
+    id: AppId
+    name: string
+    description: string
+    version: string
+    acronym?: string
+    tags?: readonly string[]
+    kind?: 'workbench' | 'website'
+    url?: string
+  },
   directory: string,
 ): AppSummary {
   return {
@@ -295,6 +306,7 @@ function summaryOf(
     directory,
     ...manifest.tags === undefined ? {} : { tags: manifest.tags },
     ...manifest.kind === undefined ? {} : { kind: manifest.kind },
+    ...manifest.url === undefined ? {} : { url: manifest.url },
   }
 }
 

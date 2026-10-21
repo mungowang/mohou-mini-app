@@ -75,6 +75,6 @@ describe('ctx.push', () => {
     })
     expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'tick' })).toEqual({ ok: true, value: 'ok' })
     expect(seen).toEqual(['tick'])
-    author.dispose()
+    await author.dispose()
   })
 })

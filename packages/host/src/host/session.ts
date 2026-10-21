@@ -51,6 +51,7 @@ export interface HostSession {
   readonly log: HostLog
   readonly owner: ReturnType<typeof createOwnerReads> & {
     reloadView(appId: string): Promise<void>
+    websiteClose(appId: string): Promise<void>
     runnerDocument(appId: string): Promise<string>
     themes: ReturnType<typeof createThemePins>
     readPolicy(): HostPolicy
@@ -218,9 +219,13 @@ export async function createHost(options: {
   const owner = {
     ...createOwnerReads(registry),
     themes,
-    reloadView: (appId: string) => reloadView(registry, (event) => {
-      author.hostEvents.publish(event)
-    }, appId),
+    reloadView: async (appId: string) => {
+      if (author.websiteSnapshot(appId) !== undefined) await author.websiteRefresh(appId)
+      await reloadView(registry, (event) => {
+        author.hostEvents.publish(event)
+      }, appId)
+    },
+    websiteClose: (appId: string) => author.websiteClose(appId),
     runnerDocument: (appId: string) => runnerDocument(registry, themes, policy.palette, policy.theme, policy.locale, themesDir, appId),
   }
   let http: { port: number; close: () => Promise<void> } | undefined
@@ -357,7 +362,7 @@ export async function createHost(options: {
       await mcp.dispose()
       await bash.dispose()
       await pwsh.dispose()
-      author.dispose()
+      await author.dispose()
     },
   }
 }

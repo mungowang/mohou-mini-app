@@ -82,7 +82,7 @@ describe('mini_app_mcp_add and mini_app_mcp_remove', () => {
     } finally {
       await http.close()
       await mcp.dispose()
-      author.dispose()
+      await author.dispose()
     }
   })
 
@@ -114,7 +114,7 @@ describe('mini_app_mcp_add and mini_app_mcp_remove', () => {
       expect(skipped.servers.find(server => server.id === 'quiet')).toMatchObject({ env: { GITHUB_TOKEN: 'ghp_*****' } })
     } finally {
       await mcp.dispose()
-      author.dispose()
+      await author.dispose()
     }
   })
 
@@ -131,7 +131,7 @@ describe('mini_app_mcp_add and mini_app_mcp_remove', () => {
       expect(await readMcpEditor(root, {})).toEqual([])
     } finally {
       await mcp.dispose()
-      author.dispose()
+      await author.dispose()
     }
   })
 })

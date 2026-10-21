@@ -1,4 +1,5 @@
 import type { AppId } from './app-id.ts'
+import type { AppSpawnHandle, AppSpawnOptions } from './website.ts'
 import type { AppWorkbench } from './workbench.ts'
 
 import { agentEventType, llmEventType } from './event-type.ts'
@@ -170,4 +171,9 @@ export interface AppContext<State extends object = Record<string, never>> {
   mcp(serverId: string, toolName: string, args?: Record<string, unknown>): Promise<unknown>
   /** Present only when the manifest kind is `workbench`. */
   workbench?: AppWorkbench
+  /**
+   * Long-lived child for a website session. Present while Host runs website hooks.
+   * The handle is registered on the session; close tab kills it. Not a one-shot shell.
+   */
+  spawn?(file: string, args?: readonly string[], options?: AppSpawnOptions): Promise<AppSpawnHandle>
 }

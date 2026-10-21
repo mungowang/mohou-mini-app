@@ -150,7 +150,7 @@ describe('mini_app_view_eval', () => {
     author.views.forgetAlive('com.example.app')
     const afterReload = await author.invoke('mini_app_view_eval', { appId: 'com.example.app', timeoutMs: 20 }) as { view: string }
     expect(afterReload.view).toBe('runner-not-booted')
-    author.dispose()
+    await author.dispose()
   })
 
   it('returns pending when a live view is already answering', async () => {
@@ -177,6 +177,6 @@ describe('mini_app_view_eval', () => {
     const event = seen.find(item => item.type === 'app:eval')
     if (event?.type === 'app:eval') author.views.answer(event.requestId, 'com.example.app', { result: 1 })
     await first
-    author.dispose()
+    await author.dispose()
   })
 })

@@ -16,6 +16,20 @@ export { assertImportAllowed, classifyImport, type ImportSide } from './imports.
 export { defineApp, type AppApiMethod, type AppDefinition } from './define-app.ts'
 export { type AppChange, type HostNotice } from './host-notice.ts'
 export { ContractError, definitionCodes, type DefinitionCode } from './codes.ts'
+export {
+  websiteSnapshotEvent,
+  type AppSpawnHandle,
+  type AppSpawnOptions,
+  type MaybePromise,
+  type WebsiteContentDriver,
+  type WebsiteContentInfo,
+  type WebsiteDriver,
+  type WebsiteError,
+  type WebsiteHandle,
+  type WebsitePhase,
+  type WebsiteSnapshot,
+  type WebsiteUrlResult,
+} from './website.ts'
 export { agentEventType, eventType, llmEventType, type AgentEventType, type EventType, type LlmEventType } from './event-type.ts'
 export type {
   AppAgentEvent,

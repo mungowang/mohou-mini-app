@@ -39,6 +39,11 @@ export const httpLayout = {
   panelScript: '/panel.js',
   open: 'open',
   reload: 'reload',
+  website: 'website',
+  websiteRefresh: 'website/refresh',
+  websiteRetry: 'website/retry',
+  websiteClose: 'website/close',
+  websiteContent: 'website/content',
   restore: 'restore',
   restoreStorage: 'restore',
   history: 'history',
@@ -63,4 +68,9 @@ export function appResource(appId: string, ...rest: string[]): string {
 
 export function appsResource(appId: string, ...rest: string[]): string {
   return [httpLayout.apps, encodeURIComponent(appId), ...rest.map(encodeURIComponent)].join('/')
+}
+
+export function websiteResource(appId: string, action?: string): string {
+  const base = appResource(appId, httpLayout.website)
+  return action === undefined ? base : `${base}/${action}`
 }

@@ -15,7 +15,8 @@ export async function registerWithFiles(
     version: typeof parsed.version === 'string' ? parsed.version : '1',
     ...typeof parsed.acronym === 'string' ? { acronym: parsed.acronym } : {},
     ...Array.isArray(parsed.tags) ? { tags: parsed.tags } : {},
-    ...parsed.kind === 'workbench' ? { kind: 'workbench' } : {},
+    ...parsed.kind === 'workbench' || parsed.kind === 'website' ? { kind: parsed.kind } : {},
+    ...typeof parsed.url === 'string' ? { url: parsed.url } : {},
   })
   for (const [relative, content] of Object.entries(files)) {
     if (relative === appEntries.manifest) continue

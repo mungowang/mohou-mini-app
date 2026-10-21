@@ -29,6 +29,7 @@ export function ownerClients(host: HostSession) {
       open: (appId: string, title?: string) => title === undefined ? host.owner.open(appId) : host.owner.open(appId, title),
       deleteApp: (appId: string) => host.owner.deleteApp(appId),
       reload: (appId: string) => host.owner.reloadView(appId),
+      closeWebsite: (appId: string) => host.owner.websiteClose(appId),
       listTrash: () => host.owner.listTrash(),
       undeleteApp: (appId: string) => host.owner.undeleteApp(appId),
     },

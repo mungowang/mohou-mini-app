@@ -157,7 +157,7 @@ enum Leave {
     Block,
 }
 
-fn classify_leave(origin: &Url, url: &Url, new_window: bool) -> Leave {
+fn classify_leave(_origin: &Url, url: &Url, new_window: bool) -> Leave {
     match url.scheme() {
         "javascript" | "about" => {
             if new_window {
@@ -168,10 +168,14 @@ fn classify_leave(origin: &Url, url: &Url, new_window: bool) -> Leave {
         }
         "mailto" => Leave::Outside,
         "http" | "https" => {
-            if !new_window && same_origin(origin, url) {
-                Leave::Stay
-            } else {
+            // Same-window loads stay: nested iframes (website embeds, docs, tools) are legitimate
+            // references. Link clicks that should leave are handled in the runner leave-guard
+            // (window.open) and by new_window / target=_blank here. Opening the system browser on
+            // every foreign iframe src both blanks the embed and feels like a false navigation.
+            if new_window {
                 Leave::Outside
+            } else {
+                Leave::Stay
             }
         }
         _ => Leave::Block,
@@ -189,6 +193,7 @@ fn leave_decision(origin: &Url, url: &Url, new_window: bool) -> bool {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn same_origin(origin: &Url, url: &Url) -> bool {
     url.scheme() == origin.scheme()
         && url.host_str() == origin.host_str()
@@ -269,22 +274,27 @@ mod tests {
     }
 
     #[test]
-    fn keeps_same_origin_loads_and_sends_foreign_urls_out() {
+    fn keeps_same_window_http_loads_and_sends_new_windows_out() {
         let origin = Url::parse("http://127.0.0.1:9743").unwrap();
         let app = Url::parse("http://127.0.0.1:9743/app/com.example.app").unwrap();
+        let local_service = Url::parse("http://127.0.0.1:30141/").unwrap();
         let foreign = Url::parse("https://example.com/x").unwrap();
         let mail = Url::parse("mailto:a@b.c").unwrap();
         let script = Url::parse("javascript:void(0)").unwrap();
         assert!(same_origin(&origin, &app));
+        // iframe src and same-frame loads stay (local or external).
         assert!(matches!(classify_leave(&origin, &app, false), Leave::Stay));
-        assert!(matches!(classify_leave(&origin, &foreign, false), Leave::Outside));
+        assert!(matches!(classify_leave(&origin, &local_service, false), Leave::Stay));
+        assert!(matches!(classify_leave(&origin, &foreign, false), Leave::Stay));
         assert!(matches!(classify_leave(&origin, &mail, false), Leave::Outside));
         assert!(matches!(classify_leave(&origin, &script, false), Leave::Stay));
         assert!(matches!(
             classify_leave(&origin, &Url::parse("ftp://files.example/a").unwrap(), false),
             Leave::Block
         ));
+        // Popups / target=_blank leave the window.
         assert!(matches!(classify_leave(&origin, &app, true), Leave::Outside));
+        assert!(matches!(classify_leave(&origin, &local_service, true), Leave::Outside));
         assert!(matches!(classify_leave(&origin, &foreign, true), Leave::Outside));
     }
 }

@@ -67,6 +67,19 @@ describe('resolveManifest', () => {
     expect(resolveManifest({ ...manifest, kind: 'workbench' }, 'com.example.app').kind).toBe('workbench')
     expect(() => resolveManifest({ ...manifest, kind: 'desk' }, 'com.example.app')).toThrow(ContractError)
   })
+
+  it('admits a website with url and rejects a bare website', () => {
+    expect(resolveManifest({
+      ...manifest,
+      kind: 'website',
+      url: 'http://127.0.0.1:5173',
+    }, 'com.example.app')).toMatchObject({
+      kind: 'website',
+      url: 'http://127.0.0.1:5173',
+    })
+    expect(() => resolveManifest({ ...manifest, kind: 'website' }, 'com.example.app')).toThrow(ContractError)
+    expect(() => resolveManifest({ ...manifest, url: 'http://127.0.0.1:1' }, 'com.example.app')).toThrow(ContractError)
+  })
 })
 
 describe('workbenchEntries', () => {

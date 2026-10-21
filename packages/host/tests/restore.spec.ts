@@ -99,6 +99,6 @@ describe('owner restore and authoring token', () => {
     expect(await readAuthoringToken(root)).toBe(token)
     await writeFile(hostAuthoringToken(root), '')
     await expect(readAuthoringToken(root)).rejects.toMatchObject({ code: 'authoring-token' })
-    author.dispose()
+    await author.dispose()
   })
 })

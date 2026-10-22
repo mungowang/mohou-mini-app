@@ -1,4 +1,4 @@
-import { appsResource, httpLayout, websiteResource } from '@mohou/host/http'
+import { appResource, appsResource, httpLayout, websiteResource } from '@mohou/host/http'
 import {
   panelUpdateFailureCodes,
   PanelClientError,
@@ -40,6 +40,8 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
     deleteApp: appId => sendOk(origin, 'DELETE', `${httpLayout.app}/${encodeURIComponent(appId)}`),
     undeleteApp: appId => postOk(origin, `${httpLayout.trash}/${encodeURIComponent(appId)}/${httpLayout.restore}`),
     reload: appId => postOk(origin, appsResource(appId, httpLayout.reload)),
+    enterView: appId => postOk(origin, appResource(appId, 'view', 'enter')),
+    releaseView: appId => postOk(origin, appResource(appId, 'view', 'leave')),
     // Split path segments — appResource encodes each part; 'website/close' must not be one segment.
     closeWebsite: appId => postOk(origin, websiteResource(appId, 'close')),
     listMarket: async () => {

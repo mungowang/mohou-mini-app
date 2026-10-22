@@ -37,7 +37,7 @@ import { homeThemesDir, hostAppsDir, hostTrashDir } from './layout.ts'
 import { createHostLog, type HostLog } from './log.ts'
 import { loadMcpServers, mcpReferenceSources, type McpLoadFailure } from './mcp.ts'
 import { createAppWorkbench } from './workbench.ts'
-import { reclaimWebsiteSpawns } from '../website/spawn-ledger.ts'
+import { reclaimAppSpawns } from '../process/spawn-ledger.ts'
 
 /** Command and HTTP bounds for a booted host. Not locked numbers. */
 const commandPolicy: CommandPolicy = { timeoutMs: 30_000, maxOutputBytes: 1_000_000 }
@@ -52,7 +52,9 @@ export interface HostSession {
   readonly log: HostLog
   readonly owner: ReturnType<typeof createOwnerReads> & {
     reloadView(appId: string): Promise<void>
-    websiteClose(appId: string): Promise<void>
+    enterView(appId: string): Promise<unknown>
+    releaseView(appId: string): Promise<unknown>
+    websiteClose(appId: string): Promise<unknown>
     runnerDocument(appId: string): Promise<string>
     themes: ReturnType<typeof createThemePins>
     readPolicy(): HostPolicy
@@ -100,10 +102,10 @@ export async function createHost(options: {
   await mkdir(options.runtimeRoot, { recursive: true })
   ensureAuthoringToken(options.runtimeRoot)
   // Reap website children left by a previous crash or force-quit (detached process groups).
-  const reaped = await reclaimWebsiteSpawns(options.runtimeRoot)
+  const reaped = await reclaimAppSpawns(options.runtimeRoot)
   if (reaped.reaped.length > 0) {
     // Host log may not exist yet; stderr is enough for operators.
-    console.warn(`website spawn reclaim: stopped ${reaped.reaped.length} leftover process(es)`)
+    console.warn(`app spawn reclaim: stopped ${reaped.reaped.length} leftover process(es)`)
   }
   let policy = await resolveHostConfig(options.runtimeRoot, options.seed)
   if (options.seedStartup !== false) {
@@ -232,7 +234,9 @@ export async function createHost(options: {
         author.hostEvents.publish(event)
       }, appId)
     },
-    websiteClose: (appId: string) => author.websiteClose(appId),
+    enterView: (appId: string) => author.enterView(appId),
+    releaseView: (appId: string) => author.releaseView(appId),
+    websiteClose: (appId: string) => author.releaseView(appId),
     runnerDocument: (appId: string) => runnerDocument(registry, themes, policy.palette, policy.theme, policy.locale, themesDir, appId),
   }
   let http: { port: number; close: () => Promise<void> } | undefined

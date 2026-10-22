@@ -47,6 +47,7 @@ describe('pi-web website app', () => {
     })
     try {
       await host.start()
+      await host.owner.enterView('com.mohou.pi-web')
       await host.owner.open('com.mohou.pi-web', 'Pi Web')
       let snapshot = host.author.websiteSnapshot('com.mohou.pi-web')
       const deadline = Date.now() + 45_000
@@ -60,7 +61,7 @@ describe('pi-web website app', () => {
       expect(snapshot?.phase).toBe('ready')
       expect(snapshot?.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+/)
       await host.author.websiteContent('com.mohou.pi-web', 'load')
-      await host.owner.websiteClose('com.mohou.pi-web')
+      await host.owner.releaseView('com.mohou.pi-web')
       expect(host.author.websiteSnapshot('com.mohou.pi-web')).toBeUndefined()
     } finally {
       await host.dispose()

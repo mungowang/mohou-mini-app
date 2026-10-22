@@ -36,6 +36,7 @@ import { bindBrain, type BoundBrain } from '../kernel/bind-brain.ts'
 import { runCall, runNotice, type CallCapabilities } from '../kernel/call.ts'
 import { openStorage, type StorageFile } from '../storage/open.ts'
 import { createWebsiteSessions } from '../website/session.ts'
+import { createViewSessions } from '../process/view-session.ts'
 import { listMcpForAuthor, toolsMcpForAuthor } from './mcp-list.ts'
 import { AuthorError } from './codes.ts'
 
@@ -126,6 +127,7 @@ interface AuthorBound {
   readonly views: ReturnType<typeof createViewQueries>
   readonly live: Map<string, LiveApp>
   websiteSessions: ReturnType<typeof createWebsiteSessions>
+  viewSessions: ReturnType<typeof createViewSessions>
   readonly storageNoticeBytes?: number
   readonly reservedKeyframes?: readonly string[]
   readonly now?: () => string
@@ -204,6 +206,7 @@ export function createAuthorTools(options: {
     views,
     live,
     websiteSessions: null as unknown as ReturnType<typeof createWebsiteSessions>,
+    viewSessions: null as unknown as ReturnType<typeof createViewSessions>,
   }
   const websiteSessions = createWebsiteSessions({
     runtimeRoot: options.registry.runtimeRoot,
@@ -220,6 +223,16 @@ export function createAuthorTools(options: {
     },
   })
   bound.websiteSessions = websiteSessions
+  const viewSessions = createViewSessions({
+    onEnd: async (appId) => {
+      await websiteSessions.dispose(appId).catch(() => undefined)
+      const app = live.get(appId)
+      if (app === undefined) return
+      app.storage.close()
+      live.delete(appId)
+    },
+  })
+  bound.viewSessions = viewSessions
   const inflight = new Set<Promise<unknown>>()
   let stopping = false
   const track = <T>(work: Promise<T>): Promise<T> => {
@@ -255,7 +268,9 @@ export function createAuthorTools(options: {
     websiteSnapshot: (appId: string) => websiteSessions.get(appId),
     websiteRefresh: (appId: string) => track(websiteSessions.refresh(appId as AppId)),
     websiteRetry: (appId: string) => track(websiteSessions.retry(appId as AppId)),
-    websiteClose: (appId: string) => track(websiteSessions.dispose(appId as AppId)),
+    releaseView: (appId: string) => track(viewSessions.leave(appId as AppId)),
+    websiteClose: (appId: string) => track(viewSessions.leave(appId as AppId)),
+    enterView: (appId: string) => track(viewSessions.enter(appId as AppId)),
     websiteContent: (appId: string, event: 'load' | 'load-failed' | 'document-idle', reason?: string) => {
       return track(websiteSessions.content(appId as AppId, event, reason))
     },
@@ -266,6 +281,7 @@ export function createAuthorTools(options: {
     async dispose() {
       stopping = true
       stopNotices()
+      await viewSessions.endAll()
       await websiteSessions.disposeAll()
       for (const app of live.values()) app.storage.close()
       live.clear()
@@ -931,12 +947,18 @@ function isHostNotice(event: HostEvent): event is HostNotice {
 }
 
 async function deliverHostNotice(
-  options: { mcp: McpClient; ports: AuthorCallPorts; appEvents: AppEvents },
+  options: {
+    mcp: McpClient
+    ports: AuthorCallPorts
+    appEvents: AppEvents
+    viewSessions?: ReturnType<typeof createViewSessions>
+  },
   live: Map<string, LiveApp>,
   event: HostNotice,
 ): Promise<void> {
   for (const app of [...live.values()]) {
     if (app.onHostEvents === undefined || live.get(app.id) !== app) continue
+    if (options.viewSessions !== undefined && !options.viewSessions.hasView(app.id)) continue
     const brain = lazyBrain(options, app, app.id)
     try {
       await runNotice(capabilitiesFor(options, app, brain), app.onHostEvents, event)

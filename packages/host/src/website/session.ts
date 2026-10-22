@@ -9,7 +9,7 @@ import {
 
 import type { CallCapabilities } from '../kernel/call.ts'
 import { contextFor } from '../kernel/call.ts'
-import { createSpawnRegistry, SpawnError } from './spawn.ts'
+import { createSpawnRegistry, SpawnError, type AppSpawnRegistry } from '../process/spawn.ts'
 
 export interface WebsiteSessionPorts {
   readonly runtimeRoot: string
@@ -26,7 +26,7 @@ interface SessionRecord {
   url?: string
   error?: WebsiteSnapshot['error']
   generation: number
-  readonly spawn: ReturnType<typeof createSpawnRegistry>
+  readonly spawn: AppSpawnRegistry
   chain: Promise<void>
 }
 
@@ -64,7 +64,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
     const base = contextFor(capabilities, controller.signal)
     const ctx: AppContext = {
       ...base,
-      spawn: (file, args, options) => session.spawn.spawn(file, args, options),
+      spawn: (file, args, options) => session.spawn.spawnWebsite(file, args, options),
     }
     try {
       return await work(ctx)
@@ -108,7 +108,11 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
       driver: input.driver,
       phase: 'ensuring',
       generation: 0,
-      spawn: createSpawnRegistry({ cwd: input.appDir, runtimeRoot: ports.runtimeRoot }),
+      spawn: createSpawnRegistry({
+        cwd: input.appDir,
+        runtimeRoot: ports.runtimeRoot,
+        appId: input.appId,
+      }),
       chain: Promise.resolve(),
     }
     sessions.set(input.appId, session)
@@ -127,7 +131,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
         session.error = undefined
         publish(session)
       } catch (error) {
-        await session.spawn.dispose().catch(() => undefined)
+        await session.spawn.disposeAll().catch(() => undefined)
         if (!sessions.has(session.appId)) return
         fail(session, error, 'website-ensure-failed')
       }
@@ -174,7 +178,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
       session.error = undefined
       publish(session)
       try {
-        await session.spawn.dispose().catch(() => undefined)
+        await session.spawn.disposeAll().catch(() => undefined)
         const result = await withCtx(session, ctx => session.driver.ensure(ctx))
         if (!sessions.has(session.appId)) return
         session.url = pickUrl(result, session.defaultUrl, session.url)
@@ -183,7 +187,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
         session.error = undefined
         publish(session)
       } catch (error) {
-        await session.spawn.dispose().catch(() => undefined)
+        await session.spawn.disposeAll().catch(() => undefined)
         if (!sessions.has(session.appId)) return
         fail(session, error, 'website-ensure-failed')
       }
@@ -209,7 +213,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
           })
         }
       } finally {
-        await session.spawn.dispose().catch(() => undefined)
+        await session.spawn.disposeAll().catch(() => undefined)
       }
     })
   }

@@ -112,6 +112,7 @@ export default defineApp({
     })
 
     await author.invoke('mini_app_reload', { appId: 'com.example.site' })
+    await author.enterView('com.example.site')
     await author.invoke('mini_app_open', { appId: 'com.example.site', title: 'Site' })
 
     let snapshot = author.websiteSnapshot('com.example.site')
@@ -130,10 +131,11 @@ export default defineApp({
     await author.websiteContent('com.example.site', 'load')
     await author.websiteContent('com.example.site', 'document-idle')
 
-    await author.websiteClose('com.example.site')
+    await author.releaseView('com.example.site')
     expect(author.websiteSnapshot('com.example.site')).toBeUndefined()
 
     // Open again then delete (covers removeApp dispose path).
+    await author.enterView('com.example.site')
     await author.invoke('mini_app_open', { appId: 'com.example.site' })
     snapshot = author.websiteSnapshot('com.example.site')
     const reopenDeadline = Date.now() + 10_000
@@ -142,6 +144,7 @@ export default defineApp({
       snapshot = author.websiteSnapshot('com.example.site')
     }
     expect(snapshot?.phase).toBe('ready')
+    await author.releaseView('com.example.site').catch(() => undefined)
     await author.deleteApp('com.example.site')
     expect(author.websiteSnapshot('com.example.site')).toBeUndefined()
   })

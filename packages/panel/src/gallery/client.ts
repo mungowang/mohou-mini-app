@@ -6,7 +6,11 @@ export interface PanelClient {
   open(appId: string, title?: string): Promise<void>
   deleteApp(appId: string): Promise<void>
   reload?(appId: string): Promise<void>
-  /** End a website site session when the app tab closes. */
+  /** Take a view-session reference when opening a new app tab. */
+  enterView?(appId: string): Promise<void>
+  /** Drop a view-session reference when an app tab closes (all kinds). */
+  releaseView?(appId: string): Promise<void>
+  /** @deprecated Use releaseView. */
   closeWebsite?(appId: string): Promise<void>
   listTrash?(): Promise<readonly GalleryApp[]>
   undeleteApp?(appId: string): Promise<void>

@@ -180,8 +180,9 @@ export function GalleryBody(props: {
                   onClick={(event) => {
                     event.stopPropagation()
                     const closing = state.tabs.tabs[index]
-                    if (closing?.kind === 'app' && client.closeWebsite !== undefined) {
-                      void client.closeWebsite(closing.appId)
+                    if (closing?.kind === 'app') {
+                      if (client.releaseView !== undefined) void client.releaseView(closing.appId)
+                      else if (client.closeWebsite !== undefined) void client.closeWebsite(closing.appId)
                     }
                     dispatch({ type: 'close', index })
                   }}
@@ -500,10 +501,13 @@ async function notifyOpen(
   kind?: 'workbench' | 'website',
 ): Promise<void> {
   try {
+    // New tab only: take a view-session reference. Focus of an existing tab does not enter again.
+    if (!open && client.enterView !== undefined) await client.enterView(appId)
     await client.open(appId, title)
     // Website ensure is already in flight; a first-open reload races spawn and adds lag.
     if (!open && kind !== 'website' && client.reload !== undefined) await client.reload(appId)
   } catch (error) {
+    if (!open && client.releaseView !== undefined) void client.releaseView(appId)
     dispatch({ type: 'drop-app', appId })
     dispatch({ type: 'open-failed', ...thrown(error) })
   }

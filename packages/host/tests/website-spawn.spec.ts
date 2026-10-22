@@ -1,31 +1,31 @@
 import { createServer } from 'node:http'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createSpawnRegistry } from '../src/website/spawn.ts'
+import { createSpawnRegistry } from '../src/process/spawn.ts'
 
 describe('website spawn registry', () => {
   const registries: Array<ReturnType<typeof createSpawnRegistry>> = []
 
   afterEach(async () => {
-    await Promise.all(registries.splice(0).map(item => item.dispose()))
+    await Promise.all(registries.splice(0).map(item => item.disposeAll()))
   })
 
   it('kills a registered child on dispose', async () => {
-    const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd() })
+    const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd(), appId: 'com.example.spawn' })
     registries.push(registry)
-    const child = await registry.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+    const child = await registry.spawnWebsite(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
     expect(child.pid).toEqual(expect.any(Number))
-    await registry.dispose()
+    await registry.disposeAll()
     const result = await child.exited
     expect(result.exitCode === null || typeof result.exitCode === 'number').toBe(true)
   })
 
   it('rejects an empty spawn file, missing binary, and times out ready', async () => {
-    const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd() })
+    const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd(), appId: 'com.example.spawn' })
     registries.push(registry)
-    await expect(registry.spawn('')).rejects.toMatchObject({ code: 'spawn-failed' })
-    await expect(registry.spawn('/no/such/website-binary-xyz')).rejects.toMatchObject({ code: 'spawn-failed' })
-    const child = await registry.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+    await expect(registry.spawnWebsite('')).rejects.toMatchObject({ code: 'spawn-failed' })
+    await expect(registry.spawnWebsite('/no/such/website-binary-xyz')).rejects.toMatchObject({ code: 'spawn-failed' })
+    const child = await registry.spawnWebsite(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
     await child.kill()
     await expect(child.ready({
       url: 'http://127.0.0.1:1',
@@ -47,9 +47,9 @@ describe('website spawn registry', () => {
     if (address === null || typeof address === 'string') throw new Error('no port')
     const url = `http://127.0.0.1:${address.port}`
     try {
-      const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd() })
+      const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd(), appId: 'com.example.spawn' })
       registries.push(registry)
-      const child = await registry.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
+      const child = await registry.spawnWebsite(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
       await child.ready({ url, timeoutMs: 5_000 })
     } finally {
       await new Promise<void>((resolve, reject) => {

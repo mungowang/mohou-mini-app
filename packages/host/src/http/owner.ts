@@ -250,6 +250,8 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
   app.post(`${httpLayout.app}/:appId/${httpLayout.websiteRefresh}`, c => ok(c, () => ports.websiteRefresh(c.req.param('appId'))))
   app.post(`${httpLayout.app}/:appId/${httpLayout.websiteRetry}`, c => ok(c, () => ports.websiteRetry(c.req.param('appId'))))
   app.post(`${httpLayout.app}/:appId/${httpLayout.websiteClose}`, c => ok(c, () => ports.websiteClose(c.req.param('appId'))))
+  app.post(`${httpLayout.app}/:appId/view/enter`, c => ok(c, () => ports.enterView(c.req.param('appId'))))
+  app.post(`${httpLayout.app}/:appId/view/leave`, c => ok(c, () => ports.releaseView(c.req.param('appId'))))
   app.post(`${httpLayout.app}/:appId/${httpLayout.websiteContent}`, async (c) => {
     const body = await readBody(c)
     const event = isRecord(body) && (body.event === 'load' || body.event === 'load-failed' || body.event === 'document-idle')

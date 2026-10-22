@@ -46,7 +46,9 @@ export interface LoopbackPorts {
   websiteSnapshot(appId: string): Promise<unknown>
   websiteRefresh(appId: string): Promise<unknown>
   websiteRetry(appId: string): Promise<unknown>
-  websiteClose(appId: string): Promise<void>
+  enterView(appId: string): Promise<unknown>
+  releaseView(appId: string): Promise<unknown>
+  websiteClose(appId: string): Promise<unknown>
   websiteContent(appId: string, event: 'load' | 'load-failed' | 'document-idle', reason?: string): Promise<void>
   call(appId: string, method: string, args: unknown, publish?: (value: unknown) => Promise<void> | void): Promise<unknown>
   readPolicy(): HostPolicy

@@ -307,8 +307,9 @@ export function installViewBridge(deps: ViewBridgeDeps): void {
     if (typeof value === 'function') return `[Function ${value.name || 'anonymous'}]`
     if (typeof value === 'string') return JSON.stringify(value)
     try {
-      // JSON.stringify(undefined) returns undefined; an eval without a return must not crash the bridge.
-      return JSON.stringify(value) ?? 'undefined'
+      // JSON.stringify(undefined) returns undefined at runtime. The lib types that call as string.
+      const encoded: unknown = JSON.stringify(value)
+      return typeof encoded === 'string' ? encoded : 'undefined'
     } catch {
       return Object.prototype.toString.call(value)
     }

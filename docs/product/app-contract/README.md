@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-09-21
+updated: 2026-10-22
 ---
 
 # App contract
@@ -13,10 +13,12 @@ The app contract is what an author writes and what a running mini-app may call. 
 - [App assets](assets.md)
 - [Import allowlists](imports.md)
 - [defineApp and call](define-app.md)
+- [Website kind](website.md)
 - [Identity, storage, state, credentials, config, log, signal](identity.md)
 - [ctx.http](ctx-http.md)
 - [ctx.bash](ctx-bash.md)
 - [ctx.pwsh](ctx-pwsh.md)
+- [ctx.spawn](ctx-spawn.md)
 - [ctx.log](ctx-log.md)
 - [ctx.system.metrics](ctx-metrics.md)
 - [ctx.push and useApp events](ctx-push.md)

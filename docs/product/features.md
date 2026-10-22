@@ -1,6 +1,6 @@
 ---
 status: index
-updated: 2026-10-10
+updated: 2026-10-22
 ---
 
 # Product features
@@ -18,16 +18,19 @@ Adapters that embed this platform in another agent product are out of scope.
 | App contract | [App assets](app-contract/assets.md) |
 | App contract | [Import allowlists](app-contract/imports.md) |
 | App contract | [defineApp and call](app-contract/define-app.md) |
+| App contract | [Website kind](app-contract/website.md) |
 | App contract | [Identity, storage, state, credentials, config, log, signal](app-contract/identity.md) |
 | App contract | [ctx.http](app-contract/ctx-http.md) |
 | App contract | [ctx.bash](app-contract/ctx-bash.md) |
 | App contract | [ctx.pwsh](app-contract/ctx-pwsh.md) |
+| App contract | [ctx.spawn](app-contract/ctx-spawn.md) |
 | App contract | [ctx.system.metrics](app-contract/ctx-metrics.md) |
 | App contract | [ctx.push and useApp events](app-contract/ctx-push.md) |
 | App contract | [UI kit](app-contract/ui-kit.md) |
 | App contract | [Style, in one pass](app-contract/style.md) |
 | App contract | [Colour the app consumes](app-contract/colour.md) |
 | Host | [App lifecycle](host/lifecycle.md) |
+| Host | [View session](host/view-session.md) |
 | Host | [Compile and reload](host/compile.md) |
 | Host | [Version history](host/history.md) |
 | Host | [Events](host/events.md) |

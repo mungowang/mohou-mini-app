@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-19
+updated: 2026-10-22
 ---
 
 # Compile and reload
@@ -10,7 +10,7 @@ Layer: [Host](README.md). Index: [features.md](../features.md).
 
 - Owner: Host.
 - Input: `mini_app_reload({ appId, cleanCaches? })`. Default `cleanCaches` is true.
-- Output: `{ ok, errors, notices?, compiled, committed, caches }`. On success the in-memory API module, UI bundle, and app CSS are dropped (`caches.appCss` is `dropped`), on-disk build output is purged when `cleanCaches` is true, and open panels are told to refetch. `caches.views` is `refetch` when a subscriber was told, and `not-open` when nobody was listening. Host does not wait for the browser.
+- Output: `{ ok, errors, notices?, compiled, committed, caches }`. On success the in-memory API module, UI bundle, and app CSS are dropped (`caches.appCss` is `dropped`), on-disk build output is purged when `cleanCaches` is true, and open panels are told to refetch. `caches.views` is `refetch` when a subscriber was told, and `not-open` when nobody was listening. Host does not wait for the browser. While a [view session](view-session.md) remains, spawn follows [ctx.spawn](../app-contract/ctx-spawn.md): ordinary apps kill all spawns before the new module runs; a [website](../app-contract/website.md) kills only `app`-tagged spawns and runs `website.refresh` without killing `website`-tagged spawns.
 - Stages, in order: backend transpile and module load; UI bundle; undefined-identifier pass. The iframe does not compile. `react` is served as the platform runtime. The UI kit is served as the platform SDK. Each vendor is served as its own file.
 - Failure codes, and the only next step they imply. The message is for a person. A `backend-invalid` or `ui-invalid` failure that no resolve plugin named carries esbuild's own text, one line per message as `file:line:column: text`. Codes: [implementation.md](../implementation.md).
 

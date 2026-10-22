@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-08
+updated: 2026-10-22
 ---
 
 # Owner surface
@@ -15,7 +15,7 @@ Codes are in [implementation.md](implementation.md).
 ## list
 
 - Input: none. Search and card style are panel-local filters. They are not host fields.
-- Output: `{ id, name, description, version, acronym, tags?, kind?, createdAt?, updatedAt?, activity? }[]`. `kind` is `workbench` when the manifest says so, and omitted for an ordinary app. `tags`, when present, are the manifest tags. [Directory and entries](app-contract/directory.md) owns the token rule. Omitted `tags` means the manifest omitted them. `createdAt` is the time of the first history commit. `updatedAt` is the time of the latest history commit. Either is omitted when that commit does not exist. `activity`, when present, is `{ openCount, lastOpenedAt }` from [Heat](host/heat.md). Omitted `activity` means the app has not been opened. The list order is not a sort.
+- Output: `{ id, name, description, version, acronym, tags?, kind?, createdAt?, updatedAt?, activity? }[]`. `kind` is `workbench` or `website` when the manifest says so, and omitted for an ordinary app. `tags`, when present, are the manifest tags. [Directory and entries](app-contract/directory.md) owns the token rule. Omitted `tags` means the manifest omitted them. `createdAt` is the time of the first history commit. `updatedAt` is the time of the latest history commit. Either is omitted when that commit does not exist. `activity`, when present, is `{ openCount, lastOpenedAt }` from [Heat](host/heat.md). Omitted `activity` means the app has not been opened. The list order is not a sort.
 - Failure: the host is unreachable, or the call fails. That is an error state. An empty array is an empty gallery, not an error.
 - Non-goals: editing source; opening an app by writing its directory.
 

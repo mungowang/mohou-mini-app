@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-10
+updated: 2026-10-22
 ---
 
 # Product decisions
@@ -14,7 +14,10 @@ One fact per bullet. Feature pages under `docs/product/` rely on these sentences
 - Host does not embed a model provider. Shell injects a runtime provider at boot. That provider supplies `llm` and `agent` only.
 - There is no `ctx.tool` and no `listTools`. Tools stay on the runtime provider. Switching model does not change the tool set. Switching provider replaces the brain, and the new provider's tool set is the one that runs. The authoring tool catalog is never part of an in-app agent tool set.
 - `ctx.mcp(serverId, toolName, args)` is the only external-tool call. Args are the tool's own object, never wrapped as `{ input: string }`.
-- `ctx.llm` and `ctx.agent` return string. `ctx.http` returns `{ ok, status, headers, text, json }`. `ctx.bash` returns `{ stdout, stderr, exitCode }`.
+- `ctx.llm` and `ctx.agent` return string. `ctx.http` returns `{ ok, status, headers, text, json }`. `ctx.bash` returns `{ stdout, stderr, exitCode }`. `ctx.spawn` returns a handle; Host owns the child for the current view or ephemeral session.
+- An app’s live backend exists only while a view session is open (tab or workbench slot, refcounted) or while an ephemeral `mini_app_call` runs. Closing the last view ends the session: spawns are killed and the module is unloaded. `onHostEvents` runs only for apps with a view session.
+- `ctx.spawn` is available to every app in a session. Spawns from `api` are tagged `app`; spawns from website driver hooks are tagged `website`. Session end kills both. Ordinary reload kills all spawns for that app. Website refresh does not kill `website`-tagged spawns; the author may `kill` inside `refresh`. There is no lifetime parameter on spawn in this cut.
+- Manifest `kind` may be `website` with required `url`. A website is a full app plus a driver (`ensure` / `refresh?` / `dispose?` / `content?`) and UI `WebsiteFrame` / `useWebsite`.
 - A missing config file is bootstrapped to a complete `host.json`. A present but corrupt config fails loud. Load does not fill missing fields and does not skip a bad file.
 - Authoring MCP exposes only platform authoring tools, not the app `ctx` capability bag. It does not re-export external MCP servers. `ctx.mcp` does not see authoring tools.
 - UI imports are `react`, the UI kit, `lodash`, `lodash-es`, `motion`, `motion/react`, and relative paths inside the app that are not `api/**` and not `main.api.ts`.

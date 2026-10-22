@@ -1,0 +1,11 @@
+{
+  "id": "com.example.site",
+  "name": "网站示例",
+  "description": "嵌入网页：website kind + WebsiteFrame + driver 钩子",
+  "version": "0.1.0",
+  "entry": "ui.tsx",
+  "kind": "website",
+  "url": "https://example.com",
+  "acronym": "网",
+  "tags": ["website"]
+}

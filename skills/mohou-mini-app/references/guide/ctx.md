@@ -98,6 +98,8 @@ UI: `<WebsiteFrame />` or `useWebsite()` from `@mohou/ui`. Snapshot phases: `ens
 
 Register with `kind: "website"` and `url`. Do not hand-roll a naked foreign iframe without the session hooks when a local process must start.
 
+Worked example: `templates/site/`.
+
 ## Workbench
 
 `ctx.workbench` is present only when `manifest.json` has `"kind": "workbench"`. On any other app the field is absent. Do not invent it. The UI still uses `call`. It does not import a panel client. The first screen is the author's own material. The app list is a rail beside that, not the whole page. Worked example: `templates/workbench/`.

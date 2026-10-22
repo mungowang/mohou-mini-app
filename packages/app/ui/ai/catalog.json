@@ -1573,6 +1573,17 @@
       "when": "Assignee/owner fields; you supply the user list.",
       "contract": "references/contracts/user-picker.md"
     },
+    "WebsiteFrame": {
+      "componentType": "component",
+      "family": "Surface",
+      "primitive": true,
+      "when": "Default website chrome: lifecycle states around the content iframe. Authors may skip this and compose with `useWebsite` instead.",
+      "contract": "references/contracts/website-frame.md",
+      "parts": [
+        "WebsiteFrame"
+      ],
+      "helpers": []
+    },
     "WizardShell": {
       "componentType": "block",
       "family": "Layout & structure",

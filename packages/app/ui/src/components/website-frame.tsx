@@ -30,6 +30,7 @@ export interface WebsiteFrameProps {
 /**
  * Default website chrome: lifecycle states around the content iframe.
  * Authors may skip this and compose with `useWebsite` instead.
+ * @family Surface
  */
 export function WebsiteFrame(props: WebsiteFrameProps) {
   const site = useWebsite()

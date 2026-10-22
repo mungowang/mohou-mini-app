@@ -73,6 +73,7 @@ Elevates content above the page: card, dialog, sheet, drawer, popover, tooltip, 
 | `Popover` | component | `Popover` `PopoverContent` +4 | Small editor/filter anchored to a control. Menus of commands → `DropdownMenu`. | [docs](contracts/popover.md) |
 | `Sheet` | component | `Sheet` `SheetClose` +6 | Detail/edit panel that keeps the list visible — the usual master-detail pattern. Size it with `width` on `SheetContent`: the panel carries its own `data-[side=right]:sm:max-w-sm` / `data-[side=left]:sm:max-w-sm`, so a `max-w-*` in `className` loses at ≥sm (inline style or `!max-w-*` also work). | [docs](contracts/sheet.md) |
 | `Tooltip` | component | `Tooltip` `TooltipContent` +2 | Explaining an icon-only button. Never put an action in it. | [docs](contracts/tooltip.md) |
+| `WebsiteFrame` | component | `WebsiteFrame` | Default website chrome: lifecycle states around the content iframe. Authors may skip this and compose with `useWebsite` instead. | [docs](contracts/website-frame.md) |
 
 ## Form
 

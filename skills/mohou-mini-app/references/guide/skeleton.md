@@ -96,4 +96,4 @@ export default function App() {
 }
 ```
 
-`website.ensure` is required. Optional `refresh`, `dispose`, and `content` (`onLoad` / `onLoadFailed` / `onDocumentIdle`). Long-lived processes: `ctx.spawn` only — Host tags website-hook spawns and kills every tag when the view session ends. Panel refresh does not kill website-tag by default. On spawn/`ready` failure, call `child.output()` (and/or read website `error.detail` in the frame) for analysis — not a live log stream. Do not `ctx.bash("… &")`.
+`website.ensure` is required. Optional `refresh`, `dispose`, and `content` (`onLoad` / `onLoadFailed` / `onDocumentIdle`). Long-lived processes: `ctx.spawn` only — Host tags website-hook spawns and kills every tag when the view session ends. Panel refresh does not kill website-tag by default. On spawn/`ready` failure, call `child.output()` (and/or read website `error.detail` in the frame) for analysis — not a live log stream. Do not `ctx.bash("… &")`. Worked example: `templates/site/`.

@@ -16,6 +16,7 @@ Looks (style recipes, not apps) live in [`../references/looks/`](../references/l
 | [watch](./watch/) | numbers move by themselves | Live status, stop when hidden | `ctx.system.metrics()` + polling that stops when hidden. tape. **Reveal** |
 | [lab](./lab/) | I drive a model or an MCP tool, once, and keep the record | Model workbench, MCP tool picker, a run log | `ctx.llm` vs `ctx.agent` + `ctx.mcp` in one app; a catalog of MCP servers in `shared/mcp.ts`; a run table in SQLite. No Look. |
 | [workbench](./workbench/) | a custom homepage | What to see first, and how other apps are entered | `kind: "workbench"`, `ctx.workbench`, and `onHostEvents` so a library change refreshes the rail. That hook is available on any app. Any layout. This sample is one homepage: a queue and a rail. No Look. |
+| [site](./site/) | embed a page in product chrome | A remote tool page, or a local service behind one | `kind: "website"` + `url`, `WebsiteFrame` / `useWebsite`, driver `ensure` / `refresh` / `dispose` / `content`, and when `ctx.spawn` is website-tagged. No Look. |
 
 ## Templates that need a library
 

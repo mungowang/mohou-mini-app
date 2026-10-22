@@ -67,8 +67,11 @@ describe('open and delete', () => {
     const stop = author.hostEvents.subscribe((event) => {
       seen.push(event)
     })
-    expect(await author.invoke('mini_app_open', { appId: 'com.example.app', title: 'Example' })).toEqual({ panel: 'notified' })
+    expect(await author.invoke('mini_app_open', { appId: 'com.example.app' })).toEqual({ panel: 'notified' })
     expect(seen[0]).toEqual({ type: 'app:open', appId: 'com.example.app', title: 'Example' })
+    seen.length = 0
+    expect(await author.invoke('mini_app_open', { appId: 'com.example.app', title: 'Custom' })).toEqual({ panel: 'notified' })
+    expect(seen[0]).toEqual({ type: 'app:open', appId: 'com.example.app', title: 'Custom' })
     author.errors.record('com.example.app', { kind: 'render', message: 'boom', componentStack: 'at App' })
     author.errors.record('com.example.app', { kind: 'noise', message: 'drop' })
     author.errors.record('com.example.app', { kind: 'uncaught', message: '' })
@@ -84,7 +87,12 @@ describe('open and delete', () => {
       appId: 'com.example.app',
       packages: [{ name: 'left-pad', version: 1 }],
     })).rejects.toMatchObject({ code: 'tool-args' })
+    seen.length = 0
     expect(await author.invoke('mini_app_open', { appId: 'com.example.app', title: '' })).toMatchObject({ panel: 'notified' })
+    expect(seen[0]).toEqual({ type: 'app:open', appId: 'com.example.app', title: 'Example' })
+    seen.length = 0
+    expect(await author.invoke('mini_app_open', { appId: 'com.example.app', title: '   ' })).toMatchObject({ panel: 'notified' })
+    expect(seen[0]).toEqual({ type: 'app:open', appId: 'com.example.app', title: 'Example' })
     await expect(author.invoke('mini_app_history_list', { appId: 'com.example.app', limit: '2' })).rejects.toMatchObject({ code: 'tool-args' })
     await expect(author.invoke('mini_app_install', { appId: 'com.example.app', remove: [''] })).rejects.toMatchObject({ code: 'tool-args' })
     await expect(author.invoke('mini_app_install', { appId: 'com.example.app', packages: [{}] })).rejects.toMatchObject({ code: 'tool-args' })

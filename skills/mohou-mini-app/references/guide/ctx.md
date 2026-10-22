@@ -21,7 +21,7 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.http(url, opts?)` | `{ ok, status, headers, text, json }` | 4xx/5xx do not throw. `json` is set only when the content type contains json and parsing succeeds |
 | `ctx.bash(command)` | `{ stdout, stderr, exitCode }` | This machine. One-shot only. Do not curl through bash. Do not background long-lived servers (`&`) |
 | `ctx.pwsh(command)` | `{ stdout, stderr, exitCode }` | Windows path of the same idea |
-| `ctx.spawn?(file, args?, opts?)` | `AppSpawnHandle` | **Website session only** (while Host runs `website.*` hooks). Long-lived child; Host kills it on tab close / Host dispose. `ready({ url })` polls until HTTP answers |
+| `ctx.spawn(file, args?, opts?)` | `AppSpawnHandle` | Long-lived child owned by Host. From `api` / notices Host tags **app**; from `website.*` hooks Host tags **website**. Session end (last tab/slot leave, or ephemeral call end) kills **every** tag. Ordinary reload kills app-tag (all on ordinary apps). Website panel refresh does **not** kill website-tag (author may `kill` inside `refresh`). `ready({ url })` polls until HTTP answers. `output()` is a bounded stdout/stderr tail for **failure analysis** (also may appear on website `error.detail`) — not a live stream |
 | `ctx.system.metrics()` | OS snapshot | `loadavg` is `null` where the OS has none |
 | `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime. `images` is inline base64 or a file path the host reads |
 | `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm`. Same `images` field |
@@ -81,14 +81,18 @@ Restore is a panel action. The app does not restore backups.
 
 ## Website
 
-When `manifest.json` has `"kind": "website"` and a required `url`, Host runs a site session per open tab:
+A website is still a full app (`ui.tsx`, optional `api`). It adds a **driver** on top of the shared **view session** (tabs + workbench slot refcount).
+
+When `manifest.json` has `"kind": "website"` and a required `url`:
 
 | Hook | When |
 |---|---|
-| `website.ensure(ctx)` | After open (async). May `ctx.spawn` and `return { url }` to override the manifest default |
-| `website.refresh?(ctx, { url })` | Panel reload / `useWebsite().refresh` — do not kill the process |
-| `website.dispose?(ctx)` | Tab close — Host still kills registered spawns |
+| `website.ensure(ctx)` | When the view session starts (open tab). May `ctx.spawn` (website-tag) and `return { url }` |
+| `website.refresh?(ctx, { url })` | Panel reload / `useWebsite().refresh` while the view stays. Host does **not** kill website-tag spawns; kill+respawn yourself if needed |
+| `website.dispose?(ctx)` | View session end — Host still kills remaining spawns after |
 | `website.content?.onLoad` / `onLoadFailed` / `onDocumentIdle` | Content-frame moments (path C) |
+
+`api` methods may also `ctx.spawn` (app-tag). Those die on ordinary reload like any app worker.
 
 UI: `<WebsiteFrame />` or `useWebsite()` from `@mohou/ui`. Snapshot phases: `ensuring`, `ready`, `refreshing`, `failing`, `disposing`.
 
@@ -109,7 +113,7 @@ An unknown id, or an app that is not a workbench, does not change the stored id.
 
 ## Host notices
 
-`defineApp({ onHostEvents(ctx, event) })` is optional on any app. It is not an `api` method and is not limited to a workbench. The host calls it on each loaded instance that defined it, with a fresh `ctx`. The view does not receive the notice on `useApp().on`. The hook may `ctx.push` a name this app owns so the view can react. An omitted hook is skipped. An instance that is not loaded is skipped. `app:eval` is not a notice. A thrown hook is logged; later instances still run, and the write that published the notice still stands.
+`defineApp({ onHostEvents(ctx, event) })` is optional on any app. It is not an `api` method and is not limited to a workbench. The host calls it only while the app has a **view session** (open tab or workbench slot), with a fresh `ctx`. The view does not receive the notice on `useApp().on`. The hook may `ctx.push` a name this app owns so the view can react. An omitted hook is skipped. An instance that is not loaded is skipped. `app:eval` is not a notice. A thrown hook is logged; later instances still run, and the write that published the notice still stands.
 
 `event.type` is one of:
 

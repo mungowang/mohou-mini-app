@@ -98,14 +98,17 @@ describe('onHostEvents', () => {
         'com.example.boom',
         'onHostEvents() { throw new Error(\'hook broke\') }',
       ))
-      expect(await author.invoke('mini_app_call', { appId: 'com.example.boom', method: 'ping' })).toEqual({ ok: true, value: 'ok' })
+      await author.enterView('com.example.boom')
+      expect(await author.invoke('mini_app_call', { appId: 'com.example.boom', method: 'ping' })).toEqual({ ok: true, value: 'ok', session: 'view' })
       await registerWithFiles(author, 'com.example.quiet', files('com.example.quiet'))
-      expect(await author.invoke('mini_app_call', { appId: 'com.example.quiet', method: 'ping' })).toEqual({ ok: true, value: 'ok' })
+      await author.enterView('com.example.quiet')
+      expect(await author.invoke('mini_app_call', { appId: 'com.example.quiet', method: 'ping' })).toEqual({ ok: true, value: 'ok', session: 'view' })
       await registerWithFiles(author, 'com.example.watch', files(
         'com.example.watch',
         'onHostEvents(ctx, event) { ctx.push(\'desk\', event) }',
       ))
-      expect(await author.invoke('mini_app_call', { appId: 'com.example.watch', method: 'ping' })).toEqual({ ok: true, value: 'ok' })
+      await author.enterView('com.example.watch')
+      expect(await author.invoke('mini_app_call', { appId: 'com.example.watch', method: 'ping' })).toEqual({ ok: true, value: 'ok', session: 'view' })
       const started = starts
       await registerWithFiles(author, 'com.example.new', files('com.example.new'))
       author.hostEvents.publish({
@@ -180,12 +183,15 @@ describe('onHostEvents', () => {
     const push = (generation: string) => `onHostEvents(ctx, event) { ctx.push('desk', { generation: '${generation}', event }) }`
     try {
       await registerWithFiles(author, 'com.example.watch', files('com.example.watch', push('old')))
-      expect(await author.invoke('mini_app_call', { appId: 'com.example.watch', method: 'ping' })).toEqual({ ok: true, value: 'ok' })
+      await author.enterView('com.example.watch')
+      expect(await author.invoke('mini_app_call', { appId: 'com.example.watch', method: 'ping' })).toEqual({ ok: true, value: 'ok', session: 'view' })
       await registerWithFiles(author, 'com.example.victim', files('com.example.victim', push('victim')))
-      expect(await author.invoke('mini_app_call', { appId: 'com.example.victim', method: 'ping' })).toEqual({ ok: true, value: 'ok' })
+      await author.enterView('com.example.victim')
+      expect(await author.invoke('mini_app_call', { appId: 'com.example.victim', method: 'ping' })).toEqual({ ok: true, value: 'ok', session: 'view' })
       await author.invoke('mini_app_rename', { appId: 'com.example.victim', newAppId: 'com.example.renamed' })
       await registerWithFiles(author, 'com.example.quiet', files('com.example.quiet', push('quiet')))
-      expect(await author.invoke('mini_app_call', { appId: 'com.example.quiet', method: 'ping' })).toEqual({ ok: true, value: 'ok' })
+      await author.enterView('com.example.quiet')
+      expect(await author.invoke('mini_app_call', { appId: 'com.example.quiet', method: 'ping' })).toEqual({ ok: true, value: 'ok', session: 'view' })
       await author.deleteApp('com.example.quiet')
       await author.invoke('mini_app_write', {
         appId: 'com.example.watch',

@@ -1,13 +1,38 @@
 ---
 status: locked
-updated: 2026-10-21
+updated: 2026-10-22
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.91
+
+`mini_app_open` without a title uses the app manifest name on `app:open`, so the panel tab matches a library click instead of showing the app id.
+
+## 1.0.90
+
+Panel `app:open` / focus path calls `enterView` when opening a new tab so `mini_app_open` then `mini_app_call` reports `session: view`. Ephemeral call (no tab) still returns `session: ephemeral` and kills spawns when the call ends.
+
+## 1.0.89
+
+Website open takes a view ref **synchronously** before scheduling ensure (so Starting is not skipped). The async ensure callback must not re-enter a view after the user closed the tab — that bug blocked startup and left orphans.
+
+## 1.0.88
+
+Website open always takes a view-session ref before ensure when the panel did not enterView, so Starting is not stuck forever with no session. Spawn force-kill stays on dispose/grace, not an immediate kill that races boot.
+
+## 1.0.87
+
+Website tab close always tears down the site session and force-kills spawn process groups (including pi-web → next). Closing during in-flight ensure no longer leaves an orphan server after ensure finishes.
+
+## 1.0.86
+
+Unified view session for every app (tab + workbench slot refcount; last leave unloads LiveApp and kills spawns). General `ctx.spawn` with Host tags `app` vs `website`. Ordinary reload kills app-tagged spawns; website refresh keeps website-tagged by default. Tab-less `mini_app_call` is ephemeral (`session: view | ephemeral`) with no grace. Spawn stdout/stderr is a bounded ring (`output()`, failing `error.detail`) for failure analysis. Local release lanes documented for agents (`bump-local-npm` vs `bump-local-app`).
+
 ## 1.0.85
+
 
 Website spawn ledger (`website-spawns.json`): reaped on Host boot after crash/force-quit. Author skill documents website kind, `ctx.spawn`, and `WebsiteFrame`.
 

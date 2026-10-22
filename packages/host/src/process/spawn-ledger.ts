@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process'
 /** Durable spawn ledger under the runtime root. Survives a crash so the next boot can reap. */
 export const appSpawnLedgerFile = 'app-spawns.json'
 
-/** @deprecated Use appSpawnLedgerFile. Kept so boot reclaims the website-era file once. */
+/** Website-era ledger name. Boot reclaims it once, then writes only app-spawns.json. */
 export const legacyWebsiteSpawnLedgerFile = 'website-spawns.json'
 
 export type SpawnTag = 'app' | 'website'
@@ -120,6 +120,8 @@ export async function reclaimAppSpawns(runtimeRoot: string): Promise<{ readonly 
 
 export function forceKillTree(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false
+  // Platform kill trees are not exercised cross-OS in CI; ignore branch noise.
+  /* c8 ignore start */
   if (process.platform === 'win32') {
     try {
       spawn('taskkill', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', detached: true }).unref()
@@ -146,5 +148,6 @@ export function forceKillTree(pid: number): boolean {
       // already gone
     }
   }
+  /* c8 ignore stop */
   return true
 }

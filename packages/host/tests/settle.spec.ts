@@ -56,7 +56,7 @@ describe('author settle', () => {
     const settled = author.settle()
     await writeFile(join(root, 'apps', 'com.example.app', 'go'), '1')
     await settled
-    await expect(pending).resolves.toEqual({ ok: true, value: 'done' })
+    await expect(pending).resolves.toEqual({ ok: true, value: 'done', session: 'ephemeral' })
     await expect(author.invoke('mini_app_list', {})).rejects.toMatchObject({ code: 'cancelled' })
     expect(existsSync(join(root, 'apps', 'com.example.app', 'go'))).toBe(true)
     await author.dispose()

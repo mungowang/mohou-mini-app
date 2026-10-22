@@ -172,8 +172,9 @@ export interface AppContext<State extends object = Record<string, never>> {
   /** Present only when the manifest kind is `workbench`. */
   workbench?: AppWorkbench
   /**
-   * Long-lived child for a website session. Present while Host runs website hooks.
-   * The handle is registered on the session; close tab kills it. Not a one-shot shell.
+   * Long-lived child owned by Host for this app session (view or ephemeral).
+   * Tag is set by Host: `app` from api/notices, `website` from driver hooks.
+   * Session end kills every spawn. Not a one-shot shell.
    */
-  spawn?(file: string, args?: readonly string[], options?: AppSpawnOptions): Promise<AppSpawnHandle>
+  spawn(file: string, args?: readonly string[], options?: AppSpawnOptions): Promise<AppSpawnHandle>
 }

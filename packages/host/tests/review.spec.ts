@@ -80,9 +80,11 @@ describe('reviewApp', () => {
       'ui.tsx uses Missing, which is not declared',
       'ui.tsx uses greetx, which is not declared',
     ])
+    // Previous successful reload left live; failed reload does not clobber it.
     expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'ping' })).toEqual({
       ok: true,
       value: 'pong',
+      session: 'ephemeral',
     })
     await author.dispose()
   })

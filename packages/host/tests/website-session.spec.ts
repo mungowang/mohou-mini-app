@@ -117,7 +117,7 @@ describe('website sessions', () => {
       log: () => undefined,
     })
     try {
-      const { SpawnError } = await import('../src/website/spawn.ts')
+      const { SpawnError } = await import('../src/process/spawn.ts')
       const spawnFail = await sessions.ensure({
         appId,
         defaultUrl: 'http://example.test/',
@@ -184,7 +184,7 @@ describe('website sessions', () => {
     }
   })
 
-  it('ensure spawns, becomes ready, dispose kills children', async () => {
+  it('ensure spawns, becomes ready, dispose ends session', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-website-'))
     roots.push(root)
     const appDir = join(root, 'app')
@@ -205,9 +205,15 @@ describe('website sessions', () => {
 
     const appEvents = createAppEvents({ tailLength: 20 })
     const appId = 'com.example.site' as AppId
+    const { createSpawnRegistry } = await import('../src/process/spawn.ts')
+    const registry = createSpawnRegistry({ cwd: appDir, runtimeRoot: root, appId })
     const sessions = createWebsiteSessions({
       runtimeRoot: root,
-      buildCapabilities: () => fakeCapabilities(appDir),
+      buildCapabilities: () => ({
+        ...fakeCapabilities(appDir),
+        spawn: (file, args, options) => registry.spawnWebsite(file, args, options),
+      }),
+      disposeWebsiteSpawns: () => registry.disposeWebsiteTagged(),
       pushSnapshot: (_id, snapshot) => {
         appEvents.push(appId, sessions.snapshotEvent, snapshot)
       },
@@ -265,6 +271,7 @@ describe('website sessions', () => {
       expect(again.phase).toBe('ready')
 
       await sessions.dispose(appId)
+      await registry.disposeAll()
       expect(sessions.get(appId)).toBeUndefined()
       expect(await sessions.refresh(appId)).toMatchObject({
         phase: 'failing',
@@ -272,6 +279,7 @@ describe('website sessions', () => {
       })
     } finally {
       await sessions.disposeAll()
+      await registry.disposeAll()
       appEvents.dispose()
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -281,6 +289,57 @@ describe('website sessions', () => {
       })
     }
   })
+  it('attaches spawn output as error.detail on ensure failure', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-website-detail-'))
+    roots.push(root)
+    const appDir = join(root, 'app')
+    await mkdir(appDir)
+    const appId = 'com.example.detail' as AppId
+    const { createSpawnRegistry } = await import('../src/process/spawn.ts')
+    const registry = createSpawnRegistry({ cwd: appDir, runtimeRoot: root, appId })
+    let lastOutput = ''
+    const sessions = createWebsiteSessions({
+      runtimeRoot: root,
+      buildCapabilities: () => ({
+        ...fakeCapabilities(appDir),
+        spawn: async (file, args, options) => {
+          const handle = await registry.spawnWebsite(file, args, options)
+          return handle
+        },
+      }),
+      disposeWebsiteSpawns: async () => {
+        lastOutput = registry.collectedOutput('website')
+        await registry.disposeWebsiteTagged()
+      },
+      websiteOutput: () => lastOutput || registry.collectedOutput('website'),
+      pushSnapshot: () => undefined,
+      log: () => undefined,
+    })
+    try {
+      const snap = await sessions.ensure({
+        appId,
+        defaultUrl: 'http://127.0.0.1:9',
+        appDir,
+        driver: {
+          async ensure(ctx) {
+            const child = await ctx.spawn(process.execPath, [
+              '-e',
+              'process.stderr.write("pi-web blew up\\n"); setInterval(() => {}, 1000)',
+            ])
+            await new Promise(r => setTimeout(r, 80))
+            await child.ready({ url: 'http://127.0.0.1:9', timeoutMs: 400 })
+          },
+        },
+      })
+      expect(snap.phase).toBe('failing')
+      expect(snap.error?.code).toMatch(/spawn-ready-timeout|website-ensure-failed/)
+      expect(snap.error?.detail ?? '').toMatch(/blew up|stderr/)
+    } finally {
+      await sessions.disposeAll()
+      await registry.disposeAll()
+    }
+  })
+
 })
 
 function fakeCapabilities(appDir: string): CallCapabilities {
@@ -335,5 +394,12 @@ function fakeCapabilities(appDir: string): CallCapabilities {
       agent: async () => '',
       stop: async () => undefined,
     },
+    spawn: async () => ({
+      pid: undefined,
+      exited: Promise.resolve({ exitCode: null }),
+      kill: async () => undefined,
+      ready: async () => undefined,
+      output: () => '',
+    }),
   }
 }

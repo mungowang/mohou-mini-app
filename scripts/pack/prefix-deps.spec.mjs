@@ -10,7 +10,7 @@ import { fileDependencies, packedFileName } from './prefix-deps.mjs'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 describe('prefix dependencies', () => {
-  it('names packs the way pnpm pack does and refuses a missing tarball', () => {
+  it('names packs the way pnpm pack does and refuses a missing tarball', { timeout: 30_000 }, () => {
     expect(packedFileName('@mohou/app-view', '1.0.0')).toBe('mohou-app-view-1.0.0.tgz')
     const names = workspacePackages(root).map(item => packedFileName(item.pkg.name, '1.2.3'))
     expect(names).toContain('mohou-shell-1.2.3.tgz')

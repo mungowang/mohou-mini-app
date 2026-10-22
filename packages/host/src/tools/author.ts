@@ -37,6 +37,7 @@ import { runCall, runNotice, type CallCapabilities } from '../kernel/call.ts'
 import { openStorage, type StorageFile } from '../storage/open.ts'
 import { createWebsiteSessions } from '../website/session.ts'
 import { createViewSessions } from '../process/view-session.ts'
+import { createSpawnRegistry, type AppSpawnRegistry } from '../process/spawn.ts'
 import { listMcpForAuthor, toolsMcpForAuthor } from './mcp-list.ts'
 import { AuthorError } from './codes.ts'
 
@@ -111,6 +112,7 @@ interface LiveApp {
   website?: WebsiteDriver
   storage: StorageFile
   directory: string
+  spawns: AppSpawnRegistry
   ui?: string
   kind?: 'workbench' | 'website'
   url?: string
@@ -128,6 +130,7 @@ interface AuthorBound {
   readonly live: Map<string, LiveApp>
   websiteSessions: ReturnType<typeof createWebsiteSessions>
   viewSessions: ReturnType<typeof createViewSessions>
+  teardownAppSession: (appId: AppId) => Promise<void>
   readonly storageNoticeBytes?: number
   readonly reservedKeyframes?: readonly string[]
   readonly now?: () => string
@@ -207,13 +210,24 @@ export function createAuthorTools(options: {
     live,
     websiteSessions: null as unknown as ReturnType<typeof createWebsiteSessions>,
     viewSessions: null as unknown as ReturnType<typeof createViewSessions>,
+    teardownAppSession: () => Promise.resolve(),
   }
   const websiteSessions = createWebsiteSessions({
     runtimeRoot: options.registry.runtimeRoot,
     buildCapabilities: async (appId) => {
       const app = await ensureLive(bound, live, appId)
       const brain = lazyBrain(bound, app, app.id)
-      return capabilitiesFor(bound, app, brain)
+      return capabilitiesFor(bound, app, brain, 'website')
+    },
+    disposeWebsiteSpawns: async (appId) => {
+      const app = live.get(appId)
+      if (app === undefined) return
+      await app.spawns.disposeWebsiteTagged()
+    },
+    websiteOutput: (appId) => {
+      const app = live.get(appId)
+      if (app === undefined) return ''
+      return app.spawns.collectedOutput('website')
     },
     pushSnapshot: (appId, snapshot) => {
       appEvents.push(appId, websiteSessions.snapshotEvent, snapshot)
@@ -223,16 +237,19 @@ export function createAuthorTools(options: {
     },
   })
   bound.websiteSessions = websiteSessions
+  async function teardownAppSession(appId: AppId): Promise<void> {
+    await websiteSessions.dispose(appId).catch(() => undefined)
+    const app = live.get(appId)
+    if (app === undefined) return
+    await app.spawns.disposeAll().catch(() => undefined)
+    app.storage.close()
+    live.delete(appId)
+  }
   const viewSessions = createViewSessions({
-    onEnd: async (appId) => {
-      await websiteSessions.dispose(appId).catch(() => undefined)
-      const app = live.get(appId)
-      if (app === undefined) return
-      app.storage.close()
-      live.delete(appId)
-    },
+    onEnd: teardownAppSession,
   })
   bound.viewSessions = viewSessions
+  bound.teardownAppSession = teardownAppSession
   const inflight = new Set<Promise<unknown>>()
   let stopping = false
   const track = <T>(work: Promise<T>): Promise<T> => {
@@ -266,11 +283,22 @@ export function createAuthorTools(options: {
     undeleteApp: (appId: string) => track(restoreDeleted(bound, appId)),
     restoreStorage: (appId: string) => track(restoreAppStorage(bound, live, appId)),
     websiteSnapshot: (appId: string) => websiteSessions.get(appId),
-    websiteRefresh: (appId: string) => track(websiteSessions.refresh(appId as AppId)),
+    websiteRefresh: (appId: string) => track((async () => {
+      const app = live.get(appId)
+      if (app !== undefined) await app.spawns.disposeAppTagged().catch(() => undefined)
+      return websiteSessions.refresh(appId as AppId)
+    })()),
     websiteRetry: (appId: string) => track(websiteSessions.retry(appId as AppId)),
-    releaseView: (appId: string) => track(viewSessions.leave(appId as AppId)),
-    websiteClose: (appId: string) => track(viewSessions.leave(appId as AppId)),
-    enterView: (appId: string) => track(viewSessions.enter(appId as AppId)),
+    releaseView: (appId: string) => track((async () => {
+      await viewSessions.leave(appId as AppId)
+      // leave is a no-op if enterView never ran; still reap website spawns for this app.
+      if (!viewSessions.hasView(appId)) await teardownAppSession(appId as AppId)
+    })()),
+    websiteClose: (appId: string) => track((async () => {
+      await viewSessions.leave(appId as AppId)
+      if (!viewSessions.hasView(appId)) await teardownAppSession(appId as AppId)
+    })()),
+    enterView: (appId: string) => track(Promise.resolve(viewSessions.enter(appId as AppId))),
     websiteContent: (appId: string, event: 'load' | 'load-failed' | 'document-idle', reason?: string) => {
       return track(websiteSessions.content(appId as AppId, event, reason))
     },
@@ -511,10 +539,12 @@ async function openApp(
   options.errors.markOpened(app.id)
   // Same as ordinary apps: notify the panel first so the tab mounts immediately.
   // Website ensure (spawn local server) runs after; useWebsite shows Starting… until ready.
+  // Tab label: explicit title, else manifest name (not appId) — matches a library click.
+  const tabTitle = title !== undefined && title.trim().length > 0 ? title.trim() : app.name
   options.hostEvents.publish({
     type: 'app:open',
     appId: app.id,
-    ...title === undefined ? {} : { title },
+    title: tabTitle,
   })
   if (app.kind === 'website') {
     if (app.url === undefined) {
@@ -523,16 +553,27 @@ async function openApp(
     const defaultUrl = app.url
     const appDir = app.directory
     const id = app.id
+    // open implies a view. Enter synchronously before scheduling ensure — never re-enter inside
+    // the async callback (that would revive a view the user already closed).
+    if (!options.viewSessions.hasView(id)) {
+      options.viewSessions.enter(id)
+    }
     void ensureLive(options, live, id).then(async (loaded) => {
       if (loaded.website === undefined) {
         throw new AuthorError('tool-args', 'website app needs defineApp.website and manifest.url')
       }
+      // Tab closed before ensure ran — do not spawn.
+      if (!options.viewSessions.hasView(id)) return
       await options.websiteSessions.ensure({
         appId: id,
         defaultUrl,
         driver: loaded.website,
         appDir,
       })
+      // Ensure finished after last leave: reap orphan session + spawns.
+      if (!options.viewSessions.hasView(id)) {
+        await options.teardownAppSession(id)
+      }
     }).catch((error: unknown) => {
       options.ports.log(id, `website ensure failed: ${error instanceof Error ? error.message : 'failed'}`)
     })
@@ -683,14 +724,23 @@ async function removeApp(
     errors: ReturnType<typeof createErrorRing>
     hostEvents: ReturnType<typeof createHostEvents>
     websiteSessions?: ReturnType<typeof createWebsiteSessions>
+    viewSessions?: ReturnType<typeof createViewSessions>
   },
   live: Map<string, LiveApp>,
   appId: string,
 ) {
   const app = await options.registry.get(appId)
-  await options.websiteSessions?.dispose(app.id)
-  live.get(app.id)?.storage.close()
-  live.delete(app.id)
+  if (options.viewSessions !== undefined) {
+    await options.viewSessions.end(app.id)
+  } else {
+    await options.websiteSessions?.dispose(app.id)
+    const held = live.get(app.id)
+    if (held !== undefined) {
+      await held.spawns.disposeAll().catch(() => undefined)
+      held.storage.close()
+      live.delete(app.id)
+    }
+  }
   options.errors.forget(app.id)
   await options.registry.trash(app.id)
   publishChanged(options.hostEvents, app.id, 'deleted')
@@ -715,6 +765,7 @@ async function reload(
     storageNoticeBytes?: number
     reservedKeyframes?: readonly string[]
     websiteSessions?: ReturnType<typeof createWebsiteSessions>
+    env?: NodeJS.ProcessEnv
   },
   live: Map<string, LiveApp>,
   appId: string,
@@ -749,16 +800,33 @@ async function reload(
     }
     await cachedUiBundle(app.directory)
     const previous = live.get(app.id)
-    live.set(app.id, withKind(liveRecord(loaded, opened, app.directory, app.id), app.kind, app.url))
-    previous?.storage.close()
+    const spawns = previous?.spawns ?? spawnRegistryFor(options, app)
+    // Reload keeps the view session. Ordinary apps lose every spawn; websites keep website-tag only.
+    if (previous !== undefined) {
+      if (app.kind === 'website') await previous.spawns.disposeAppTagged().catch(() => undefined)
+      else await previous.spawns.disposeAll().catch(() => undefined)
+    }
+    live.set(app.id, withKind(liveRecord(loaded, opened, app.directory, app.id, spawns), app.kind, app.url))
+    if (previous !== undefined && previous.storage !== opened) previous.storage.close()
     if (app.kind === 'website' && loaded.website !== undefined && app.url !== undefined && options.websiteSessions !== undefined) {
-      // Keep the session and process; swap the Driver after source reload.
-      await options.websiteSessions.ensure({
-        appId: app.id,
-        defaultUrl: app.url,
-        driver: loaded.website,
-        appDir: app.directory,
-      })
+      const existing = options.websiteSessions.get(app.id)
+      if (existing === undefined) {
+        await options.websiteSessions.ensure({
+          appId: app.id,
+          defaultUrl: app.url,
+          driver: loaded.website,
+          appDir: app.directory,
+        })
+      } else {
+        // Swap driver; refresh keeps website-tagged processes (author may kill inside refresh).
+        await options.websiteSessions.ensure({
+          appId: app.id,
+          defaultUrl: app.url,
+          driver: loaded.website,
+          appDir: app.directory,
+        })
+        await options.websiteSessions.refresh(app.id)
+      }
     }
     const committed = await commitApp(app.directory, reloadMessage).catch((error: unknown) => ({
       status: 'failed' as const,
@@ -799,6 +867,8 @@ async function callApp(
     appEvents: AppEvents
     hostEvents: ReturnType<typeof createHostEvents>
     storageNoticeBytes?: number
+    env?: NodeJS.ProcessEnv
+    viewSessions?: ReturnType<typeof createViewSessions>
   },
   live: Map<string, LiveApp>,
   input: Record<string, unknown>,
@@ -826,13 +896,22 @@ async function oneCall(
     appEvents: AppEvents
     hostEvents: ReturnType<typeof createHostEvents>
     storageNoticeBytes?: number
+    env?: NodeJS.ProcessEnv
+    viewSessions?: ReturnType<typeof createViewSessions>
   },
   live: Map<string, LiveApp>,
   appId: string,
   method: string,
   args: unknown,
   publish?: (value: unknown) => Promise<void> | void,
-): Promise<{ ok: true; value: unknown } | { ok: false; error: { code: string; message: string } }> {
+): Promise<
+  | { ok: true; value: unknown; session: 'view' | 'ephemeral' }
+  | { ok: false; error: { code: string; message: string }; session: 'view' | 'ephemeral' }
+> {
+  const views = options.viewSessions
+  const hadView = views !== undefined && views.hasView(appId)
+  const session: 'view' | 'ephemeral' = hadView ? 'view' : 'ephemeral'
+  if (views !== undefined && !hadView) views.beginEphemeral(appId as AppId)
   try {
     const app = await ensureLive(options, live, appId)
     const brain = await bindBrain({
@@ -845,13 +924,15 @@ async function oneCall(
       },
     })
     try {
-      const value = await runCall(capabilitiesFor(options, app, brain), app.api, method, args, publish)
-      return { ok: true, value }
+      const value = await runCall(capabilitiesFor(options, app, brain, 'app'), app.api, method, args, publish)
+      return { ok: true, value, session }
     } finally {
       await brain.stop()
     }
   } catch (error) {
-    return { ok: false, error: errorOf(error) }
+    return { ok: false, error: errorOf(error), session }
+  } finally {
+    if (views !== undefined && !hadView) await views.endEphemeral(appId as AppId)
   }
 }
 
@@ -868,7 +949,12 @@ function storageNotice(
 }
 
 async function ensureLive(
-  options: { registry: Registry; hostEvents: ReturnType<typeof createHostEvents>; storageNoticeBytes?: number },
+  options: {
+    registry: Registry
+    hostEvents: ReturnType<typeof createHostEvents>
+    storageNoticeBytes?: number
+    env?: NodeJS.ProcessEnv
+  },
   live: Map<string, LiveApp>,
   appId: string,
 ): Promise<LiveApp> {
@@ -877,11 +963,24 @@ async function ensureLive(
   if (cached !== undefined && cached.directory === summary.directory) {
     return withKind(cached, summary.kind, summary.url)
   }
+  const previous = live.get(summary.id)
   const storage = await openStorage(summary.directory, storageNotice(options, summary.id))
   try {
     const loaded = await loadBackend(summary.directory)
-    const next = withKind(liveRecord(loaded, storage, summary.directory, summary.id), summary.kind, summary.url)
+    const spawns = previous?.spawns ?? spawnRegistryFor(options, summary)
+    if (previous !== undefined && previous.spawns !== spawns) {
+      await previous.spawns.disposeAll().catch(() => undefined)
+    }
+    if (previous !== undefined && previous.directory !== summary.directory) {
+      previous.storage.close()
+    }
+    const next = withKind(
+      liveRecord(loaded, storage, summary.directory, summary.id, spawns),
+      summary.kind,
+      summary.url,
+    )
     live.set(summary.id, next)
+    if (previous !== undefined && previous.storage !== storage) previous.storage.close()
     return next
   } catch (error) {
     storage.close()
@@ -893,6 +992,7 @@ function capabilitiesFor(
   options: { mcp: McpClient; ports: AuthorCallPorts; appEvents: AppEvents },
   app: LiveApp,
   brain: CallCapabilities['brain'],
+  spawnTag: 'app' | 'website' = 'app',
 ): CallCapabilities {
   const ports = options.ports
   return {
@@ -912,19 +1012,42 @@ function capabilitiesFor(
     metrics: ports.metrics,
     mcp: (serverId, toolName, args) => options.mcp.call(serverId, toolName, args ?? {}),
     brain,
+    spawn: (file, args, spawnOptions) => {
+      if (spawnTag === 'website') return app.spawns.spawnWebsite(file, args, spawnOptions)
+      return app.spawns.spawnApp(file, args, spawnOptions)
+    },
     ...app.kind === 'workbench' && ports.workbench !== undefined ? { workbench: ports.workbench } : {},
   }
 }
 
-function liveRecord(loaded: LoadedBackend, storage: StorageFile, directory: string, id: AppId): LiveApp {
+function liveRecord(
+  loaded: LoadedBackend,
+  storage: StorageFile,
+  directory: string,
+  id: AppId,
+  spawns: AppSpawnRegistry,
+): LiveApp {
   return {
     id,
     api: loaded.api,
     storage,
     directory,
+    spawns,
     ...loaded.onHostEvents === undefined ? {} : { onHostEvents: loaded.onHostEvents },
     ...loaded.website === undefined ? {} : { website: loaded.website },
   }
+}
+
+function spawnRegistryFor(
+  options: { registry: Registry; env?: NodeJS.ProcessEnv },
+  app: { id: AppId; directory: string },
+): AppSpawnRegistry {
+  return createSpawnRegistry({
+    cwd: app.directory,
+    runtimeRoot: options.registry.runtimeRoot,
+    appId: app.id,
+    ...options.env === undefined ? {} : { env: options.env },
+  })
 }
 
 function isHostNotice(event: HostEvent): event is HostNotice {

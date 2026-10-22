@@ -70,7 +70,7 @@ describe('home layout', () => {
       const compiled = await host.owner.runnerDocument('com.example.app')
       expect(compiled).toContain('/api/app/com.example.app/ui/entry.js')
       expect(compiled).not.toContain('function%20Card')
-      expect(await host.author.invoke('mini_app_call', { appId: 'com.example.app', method: 'note' })).toEqual({ ok: true, value: 'ok' })
+      expect(await host.author.invoke('mini_app_call', { appId: 'com.example.app', method: 'note' })).toEqual({ ok: true, value: 'ok', session: 'ephemeral' })
       expect(host.log.read('com.example.app')).toEqual(['kept {"n":1}'])
     } finally {
       await host.dispose()

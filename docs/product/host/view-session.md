@@ -1,6 +1,6 @@
 ---
 status: shape-locked
-progress: open
+progress: settled
 updated: 2026-10-22
 ---
 

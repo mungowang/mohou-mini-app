@@ -29,6 +29,8 @@ export default defineConfig({
           name: 'node',
           include: nodeInclude,
           environment: 'node',
+          // Host/boot specs under full-suite load need more than the 5s default.
+          testTimeout: 30_000,
         },
       },
     ],

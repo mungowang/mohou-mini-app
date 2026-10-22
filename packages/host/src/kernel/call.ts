@@ -8,6 +8,8 @@ import type {
   AppHttpResponse,
   AppId,
   AppLlmEvent,
+  AppSpawnHandle,
+  AppSpawnOptions,
   AppStorage,
   AppSystemMetrics,
   AppWorkbench,
@@ -37,6 +39,7 @@ export interface CallCapabilities<State extends object = Record<string, never>> 
   readonly mcp: (serverId: string, toolName: string, args?: Record<string, unknown>) => Promise<unknown>
   readonly brain: BoundBrain
   readonly workbench?: AppWorkbench
+  readonly spawn: (file: string, args?: readonly string[], options?: AppSpawnOptions) => Promise<AppSpawnHandle>
 }
 
 /**
@@ -124,6 +127,7 @@ export function contextFor<State extends object>(capabilities: CallCapabilities<
       }))
     }) as AppContext<State>['agent'],
     mcp: capabilities.mcp,
+    spawn: capabilities.spawn,
     ...capabilities.workbench === undefined ? {} : { workbench: capabilities.workbench },
   }
 }

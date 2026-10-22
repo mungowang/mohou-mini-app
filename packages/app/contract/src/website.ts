@@ -15,6 +15,11 @@ export type WebsitePhase =
 export interface WebsiteError {
   readonly code: string
   readonly message: string
+  /**
+   * Optional diagnostics (e.g. recent child stdout/stderr).
+   * UI may show this under expand detail; not a stable machine protocol.
+   */
+  readonly detail?: string
 }
 
 /** Session projection the UI reads. */
@@ -73,6 +78,11 @@ export interface AppSpawnHandle {
    * Timeout and non-network failure throw; the session path records failing.
    */
   ready(options: { readonly url: string; readonly timeoutMs?: number }): Promise<void>
+  /**
+   * Recent combined stdout/stderr (bounded ring). For failure analysis, not a live stream.
+   * Empty string when the child wrote nothing yet.
+   */
+  output(): string
 }
 
 /** Options for `ctx.spawn`. */

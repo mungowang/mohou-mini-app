@@ -73,7 +73,7 @@ describe('ctx.push', () => {
     author.appEvents.subscribe('com.example.app', 0, (item) => {
       if ('seq' in item) seen.push(item.name)
     })
-    expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'tick' })).toEqual({ ok: true, value: 'ok' })
+    expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'tick' })).toEqual({ ok: true, value: 'ok', session: 'ephemeral' })
     expect(seen).toEqual(['tick'])
     await author.dispose()
   })

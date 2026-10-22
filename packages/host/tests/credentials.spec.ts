@@ -100,6 +100,13 @@ describe('file credentials', () => {
       pwsh: () => Promise.reject(new Error('unused')),
       metrics: () => Promise.reject(new Error('unused')),
       mcp: () => Promise.reject(new Error('unused')),
+      spawn: async () => ({
+        pid: undefined,
+        exited: Promise.resolve({ exitCode: 0 }),
+        kill: async () => undefined,
+        ready: async () => undefined,
+        output: () => '',
+      }),
       brain,
     }, {
       read: async ctx => ({

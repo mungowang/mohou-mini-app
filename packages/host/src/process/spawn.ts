@@ -3,7 +3,8 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import type { AppSpawnHandle, AppSpawnOptions } from '@mohou/contract'
 
 import { scrubShellEnv, stopChild } from '../shell/command.ts'
-import { trackAppSpawn, untrackAppSpawn, type SpawnTag } from './spawn-ledger.ts'
+import { captureChildOutput } from './output-ring.ts'
+import { forceKillTree, trackAppSpawn, untrackAppSpawn, type SpawnTag } from './spawn-ledger.ts'
 
 /** Default poll budget for `child.ready`. Host policy, not locked. */
 export const DEFAULT_SPAWN_READY_MS = 30_000
@@ -16,11 +17,19 @@ export const DEFAULT_SPAWN_KILL_GRACE_MS = 3_000
 
 export class SpawnError extends Error {
   readonly code: 'spawn-failed' | 'spawn-ready-timeout'
+  /** Recent child output when available. */
+  readonly detail?: string
 
-  constructor(code: 'spawn-failed' | 'spawn-ready-timeout', message: string, options?: { cause?: unknown }) {
-    super(message, options)
+  constructor(
+    code: 'spawn-failed' | 'spawn-ready-timeout',
+    message: string,
+    options?: { cause?: unknown; detail?: string },
+  ) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause })
     this.name = 'SpawnError'
     this.code = code
+    const detail = options?.detail?.trim() ?? ''
+    if (detail.length > 0) this.detail = detail
   }
 }
 
@@ -29,6 +38,7 @@ interface TrackedChild {
   readonly handle: AppSpawnHandle
   readonly tag: SpawnTag
   readonly appId: string
+  readonly output: () => string
   killed: boolean
 }
 
@@ -60,6 +70,8 @@ export function createSpawnRegistry(defaults: {
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
     })
+    const captured = captureChildOutput(child)
+    const readOutput = () => captured.output()
     const exited = new Promise<{ readonly exitCode: number | null }>((resolve) => {
       child.once('exit', (code) => {
         resolve({ exitCode: code })
@@ -72,19 +84,30 @@ export function createSpawnRegistry(defaults: {
       child,
       tag,
       appId: defaults.appId,
+      output: readOutput,
       killed: false,
       handle: {
         get pid() {
           return child.pid
         },
         exited,
+        output: readOutput,
         kill: async () => {
           if (entry.killed) return
           entry.killed = true
           await endChild(child)
         },
         ready: async (readyOptions) => {
-          await waitReady(readyOptions.url, readyOptions.timeoutMs ?? DEFAULT_SPAWN_READY_MS)
+          try {
+            await waitReady(readyOptions.url, readyOptions.timeoutMs ?? DEFAULT_SPAWN_READY_MS)
+          } catch (error) {
+            if (!(error instanceof SpawnError)) throw error
+            const detail = readOutput()
+            throw new SpawnError(error.code, error.message, {
+              cause: error.cause,
+              detail,
+            })
+          }
         },
       },
     }
@@ -102,7 +125,10 @@ export function createSpawnRegistry(defaults: {
           resolve()
         })
         child.once('error', (error) => {
-          reject(new SpawnError('spawn-failed', error.message, { cause: error }))
+          reject(new SpawnError('spawn-failed', error.message, {
+            cause: error,
+            ...readOutput().length > 0 ? { detail: readOutput() } : {},
+          }))
         })
       })
     } catch (error) {
@@ -125,10 +151,24 @@ export function createSpawnRegistry(defaults: {
     const list = [...tracked].filter(entry => tag === undefined || entry.tag === tag)
     for (const entry of list) tracked.delete(entry)
     await Promise.all(list.map(async (entry) => {
-      if (entry.killed) return
+      const pid = entry.child.pid
       entry.killed = true
       await endChild(entry.child)
+      // Detached trees (pi-web → next) can outlive a soft stop; always force the group.
+      if (pid !== undefined) forceKillTree(pid)
     }))
+  }
+
+  /** Recent output from live children (and still-tracked). For website fail snapshots. */
+  function collectedOutput(tag?: SpawnTag): string {
+    const parts: string[] = []
+    for (const entry of tracked) {
+      if (tag !== undefined && entry.tag !== tag) continue
+      const text = entry.output()
+      if (text.length === 0) continue
+      parts.push(text)
+    }
+    return parts.join('\n\n')
   }
 
   return {
@@ -141,6 +181,7 @@ export function createSpawnRegistry(defaults: {
     disposeAll: () => dispose(),
     disposeAppTagged: () => dispose('app'),
     disposeWebsiteTagged: () => dispose('website'),
+    collectedOutput,
   }
 }
 
@@ -153,21 +194,13 @@ async function endChild(child: ChildProcess): Promise<void> {
       resolve()
     })
   })
+  const pid = child.pid
   stopChild(child)
+  /* c8 ignore start */
   const grace = setTimeout(() => {
-    const pid = child.pid
-    if (pid !== undefined && process.platform !== 'win32') {
-      try {
-        process.kill(-pid, 'SIGKILL')
-      } catch {
-        try {
-          child.kill('SIGKILL')
-        } catch {
-          // already gone
-        }
-      }
-    } else {
-      stopChild(child)
+    // After a short grace, force the process group (pi-web → next).
+    if (pid !== undefined) forceKillTree(pid)
+    else {
       try {
         child.kill('SIGKILL')
       } catch {
@@ -177,6 +210,9 @@ async function endChild(child: ChildProcess): Promise<void> {
   }, DEFAULT_SPAWN_KILL_GRACE_MS)
   await Promise.race([done, delay(DEFAULT_SPAWN_KILL_GRACE_MS + 500)])
   clearTimeout(grace)
+  // Final sweep — dispose path also force-kills; this covers handle.kill alone.
+  if (pid !== undefined) forceKillTree(pid)
+  /* c8 ignore stop */
 }
 
 async function waitReady(url: string, timeoutMs: number): Promise<void> {

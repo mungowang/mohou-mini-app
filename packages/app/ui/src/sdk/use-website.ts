@@ -107,7 +107,17 @@ function asSnapshot(value: unknown): WebsiteSnapshot | undefined {
     phase: record.phase,
     generation: record.generation,
     ...typeof record.url === 'string' ? { url: record.url } : {},
-    ...isError(record.error) ? { error: record.error } : {},
+    ...isError(record.error)
+      ? {
+          error: {
+            code: record.error.code,
+            message: record.error.message,
+            ...record.error.detail === undefined || record.error.detail.length === 0
+              ? {}
+              : { detail: record.error.detail },
+          },
+        }
+      : {},
   }
 }
 
@@ -119,9 +129,10 @@ function isPhase(value: unknown): value is WebsitePhase {
     || value === 'disposing'
 }
 
-function isError(value: unknown): value is { code: string; message: string } {
-  return typeof value === 'object'
-    && value !== null
-    && typeof (value as { code?: unknown }).code === 'string'
-    && typeof (value as { message?: unknown }).message === 'string'
+function isError(value: unknown): value is { code: string; message: string; detail?: string } {
+  if (typeof value !== 'object' || value === null) return false
+  const row = value as { code?: unknown; message?: unknown; detail?: unknown }
+  if (typeof row.code !== 'string' || typeof row.message !== 'string') return false
+  if (row.detail !== undefined && typeof row.detail !== 'string') return false
+  return true
 }

@@ -137,12 +137,15 @@ describe('author tools', () => {
     const watched = await author.invoke('mini_app_reload', { appId: 'com.example.app' })
     stop()
     expect(watched).toMatchObject({ ok: true, caches: { views: 'refetch' } })
-    expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'ping' })).toEqual({ ok: true, value: 'pong' })
+    // Hold a view so a failed reload keeps the last good live module (ephemeral alone unloads).
+    await author.enterView('com.example.app')
+    expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'ping' })).toEqual({ ok: true, value: 'pong', session: 'view' })
     const batch = await author.invoke('mini_app_call', {
       appId: 'com.example.app',
       calls: [{ method: 'ping' }, { method: 'missing' }],
-    }) as { results: Array<{ ok: boolean }> }
+    }) as { results: Array<{ ok: boolean; session?: string }> }
     expect(batch.results.map(item => item.ok)).toEqual([true, false])
+    expect(batch.results.every(item => item.session === 'view')).toBe(true)
     expect(await author.invoke('mini_app_mcp_list', {})).toEqual({ servers: [] })
     await expect(author.invoke('mini_app_mcp_tools', {})).rejects.toMatchObject({ code: 'tool-args' })
     await expect(author.invoke('mini_app_mcp_add', { id: 'x' })).rejects.toMatchObject({ code: 'tool-args' })
@@ -158,7 +161,7 @@ describe('author tools', () => {
     const failed = await author.invoke('mini_app_reload', { appId: 'com.example.app' }) as { ok: boolean; errors: Array<{ message: string }> }
     expect(failed.ok).toBe(false)
     expect(failed.errors[0]?.message).toContain('defineApp')
-    expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'ping' })).toEqual({ ok: true, value: 'pong' })
+    expect(await author.invoke('mini_app_call', { appId: 'com.example.app', method: 'ping' })).toEqual({ ok: true, value: 'pong', session: 'view' })
     await author.dispose()
   })
 

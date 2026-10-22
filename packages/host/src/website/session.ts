@@ -9,11 +9,16 @@ import {
 
 import type { CallCapabilities } from '../kernel/call.ts'
 import { contextFor } from '../kernel/call.ts'
-import { createSpawnRegistry, SpawnError, type AppSpawnRegistry } from '../process/spawn.ts'
+import { SpawnError } from '../process/spawn.ts'
 
 export interface WebsiteSessionPorts {
   readonly runtimeRoot: string
+  /** Capabilities already carry website-tagged `spawn` from the live app registry. */
   readonly buildCapabilities: (appId: AppId) => Promise<CallCapabilities> | CallCapabilities
+  /** Kill website-tagged children on ensure retry / ensure failure. Host owns the registry. */
+  readonly disposeWebsiteSpawns?: (appId: AppId) => Promise<void>
+  /** Recent website-tag spawn output for failing snapshots. */
+  readonly websiteOutput?: (appId: AppId) => string
   readonly pushSnapshot: (appId: AppId, snapshot: WebsiteSnapshot) => void
   readonly log: (appId: string, message: string) => void
 }
@@ -26,13 +31,12 @@ interface SessionRecord {
   url?: string
   error?: WebsiteSnapshot['error']
   generation: number
-  readonly spawn: AppSpawnRegistry
   chain: Promise<void>
 }
 
 /**
- * One SiteSession per website app id while a tab (or owner open) holds it.
- * Spawn children are registered here and killed on dispose.
+ * One SiteSession per website app id while a view holds it.
+ * Spawns live on the app process registry (website tag); session end kills via Host.
  */
 export function createWebsiteSessions(ports: WebsiteSessionPorts) {
   const sessions = new Map<string, SessionRecord>()
@@ -61,11 +65,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
   ): Promise<T> {
     const capabilities = await ports.buildCapabilities(session.appId)
     const controller = new AbortController()
-    const base = contextFor(capabilities, controller.signal)
-    const ctx: AppContext = {
-      ...base,
-      spawn: (file, args, options) => session.spawn.spawnWebsite(file, args, options),
-    }
+    const ctx = contextFor(capabilities, controller.signal)
     try {
       return await work(ctx)
     } finally {
@@ -91,6 +91,11 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
     }
   }
 
+  async function killWebsite(appId: AppId): Promise<void> {
+    if (ports.disposeWebsiteSpawns === undefined) return
+    await ports.disposeWebsiteSpawns(appId).catch(() => undefined)
+  }
+
   async function ensure(input: {
     readonly appId: AppId
     readonly defaultUrl: string
@@ -108,11 +113,6 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
       driver: input.driver,
       phase: 'ensuring',
       generation: 0,
-      spawn: createSpawnRegistry({
-        cwd: input.appDir,
-        runtimeRoot: ports.runtimeRoot,
-        appId: input.appId,
-      }),
       chain: Promise.resolve(),
     }
     sessions.set(input.appId, session)
@@ -131,9 +131,11 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
         session.error = undefined
         publish(session)
       } catch (error) {
-        await session.spawn.disposeAll().catch(() => undefined)
+        // Capture output before dispose clears the registry rings.
+        const output = ports.websiteOutput?.(session.appId)
+        await killWebsite(session.appId)
         if (!sessions.has(session.appId)) return
-        fail(session, error, 'website-ensure-failed')
+        fail(session, error, 'website-ensure-failed', output)
       }
     })
     return snapshotOf(session)
@@ -178,7 +180,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
       session.error = undefined
       publish(session)
       try {
-        await session.spawn.disposeAll().catch(() => undefined)
+        await killWebsite(session.appId)
         const result = await withCtx(session, ctx => session.driver.ensure(ctx))
         if (!sessions.has(session.appId)) return
         session.url = pickUrl(result, session.defaultUrl, session.url)
@@ -187,34 +189,32 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
         session.error = undefined
         publish(session)
       } catch (error) {
-        await session.spawn.disposeAll().catch(() => undefined)
+        const output = ports.websiteOutput?.(session.appId)
+        await killWebsite(session.appId)
         if (!sessions.has(session.appId)) return
-        fail(session, error, 'website-ensure-failed')
+        fail(session, error, 'website-ensure-failed', output)
       }
     })
     return snapshotOf(session)
   }
 
+  /**
+   * End the driver session. Runs `dispose` hook only — Host kills remaining spawns after.
+   */
   async function dispose(appId: AppId): Promise<void> {
     const session = sessions.get(appId)
     if (session === undefined) return
-    // Remove first so concurrent ensure/refresh exit cleanly.
     sessions.delete(appId)
     await enqueue(session, async () => {
       session.phase = 'disposing'
       publish(session)
-      try {
-        if (session.driver.dispose !== undefined) {
-          await withCtx(session, (ctx) => {
-            if (session.driver.dispose === undefined) return undefined
-            return session.driver.dispose(ctx)
-          }).catch((error: unknown) => {
-            ports.log(session.appId, `website dispose failed: ${errorMessage(error)}`)
-          })
-        }
-      } finally {
-        await session.spawn.disposeAll().catch(() => undefined)
-      }
+      if (session.driver.dispose === undefined) return
+      await withCtx(session, (ctx) => {
+        if (session.driver.dispose === undefined) return undefined
+        return session.driver.dispose(ctx)
+      }).catch((error: unknown) => {
+        ports.log(session.appId, `website dispose failed: ${errorMessage(error)}`)
+      })
     })
   }
 
@@ -261,9 +261,13 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
     await Promise.all(ids.map(id => dispose(id)))
   }
 
-  function fail(session: SessionRecord, error: unknown, code: string): void {
+  function fail(session: SessionRecord, error: unknown, code: string, output?: string): void {
     session.phase = 'failing'
-    const failed = toError(error, code)
+    const failed = toError(
+      error,
+      code,
+      output ?? ports.websiteOutput?.(session.appId),
+    )
     session.error = failed
     publish(session)
     ports.log(session.appId, `website ${code}: ${failed.message}`)
@@ -288,13 +292,28 @@ function pickUrl(
   return previous ?? defaultUrl
 }
 
-function toError(error: unknown, fallbackCode: string): NonNullable<WebsiteSnapshot['error']> {
-  if (error instanceof SpawnError) return { code: error.code, message: error.message }
+function nonEmptyDetail(value: string | undefined): string | undefined {
+  if (value === undefined || value.length === 0) return undefined
+  return value
+}
+
+function toError(
+  error: unknown,
+  fallbackCode: string,
+  registryOutput?: string,
+): NonNullable<WebsiteSnapshot['error']> {
+  const detail = error instanceof SpawnError
+    ? nonEmptyDetail(error.detail) ?? nonEmptyDetail(registryOutput)
+    : nonEmptyDetail(registryOutput)
+  const withDetail = detail === undefined ? {} : { detail }
+  if (error instanceof SpawnError) {
+    return { code: error.code, message: error.message, ...withDetail }
+  }
   if (error instanceof Error) {
     const code = 'code' in error && typeof error.code === 'string' ? error.code : fallbackCode
-    return { code, message: error.message }
+    return { code, message: error.message, ...withDetail }
   }
-  return { code: fallbackCode, message: errorMessage(error) }
+  return { code: fallbackCode, message: errorMessage(error), ...withDetail }
 }
 
 function errorMessage(error: unknown): string {

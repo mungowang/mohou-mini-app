@@ -70,10 +70,16 @@ export function PanelGallery(props: {
     void loadGallery(props.client, dispatch)
     void loadTrash(props.client, dispatch)
   }, [props.client, props.libraryTick])
+  const tabsRef = useRef(state.tabs)
+  tabsRef.current = state.tabs
   useEffect(() => {
     if (props.focus === undefined) return
-    dispatch({ type: 'open', appId: props.focus.appId, ...props.focus.title === undefined ? {} : { title: props.focus.title } })
-  }, [props.focus])
+    const appId = props.focus.appId
+    const already = tabsRef.current.tabs.some(tab => tab.kind === 'app' && tab.appId === appId)
+    dispatch({ type: 'open', appId, ...props.focus.title === undefined ? {} : { title: props.focus.title } })
+    // Host mini_app_open only publishes app:open; take a view ref when the tab is new.
+    if (!already && props.client.enterView !== undefined) void props.client.enterView(appId)
+  }, [props.focus, props.client, dispatch])
   useEffect(() => {
     if (props.renamed === undefined) return
     dispatch({ type: 'rename-app', from: props.renamed.from, to: props.renamed.to })
@@ -138,6 +144,16 @@ export function GalleryBody(props: {
     if (activeAppId === undefined) props.onActiveApp?.(undefined)
     else props.onActiveApp?.(activeAppId, activeTitle)
   }, [props.onActiveApp, activeAppId, activeTitle])
+  // Home slot holds one view-session ref for the pinned workbench (in addition to any tab).
+  const deskViewId = desk?.id
+  useEffect(() => {
+    if (deskViewId === undefined) return
+    if (client.enterView === undefined) return
+    void client.enterView(deskViewId)
+    return () => {
+      if (client.releaseView !== undefined) void client.releaseView(deskViewId)
+    }
+  }, [client, deskViewId])
   const [refreshing, setRefreshing] = useState(false)
   /** Bumped to make an open market tab read the catalog again. */
   const [marketTick, setMarketTick] = useState(0)

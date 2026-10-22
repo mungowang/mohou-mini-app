@@ -72,9 +72,16 @@ export default defineApp({
   api: {},
   website: {
     async ensure(ctx) {
-      if (ctx.spawn === undefined) throw new Error("spawn missing")
       const child = await ctx.spawn("pi-web", ["--no-open", "--port", "30141"])
-      await child.ready({ url: "http://127.0.0.1:30141" })
+      try {
+        await child.ready({ url: "http://127.0.0.1:30141", timeoutMs: 30_000 })
+      } catch (error) {
+        // Failure analysis — Host also surfaces output on snapshot error.detail
+        const tail = child.output()
+        if (tail.length > 0) ctx.log("pi-web output:\n", tail)
+        await child.kill().catch(() => undefined)
+        throw error
+      }
       return { url: "http://127.0.0.1:30141" }
     },
   },
@@ -89,4 +96,4 @@ export default function App() {
 }
 ```
 
-`website.ensure` is required. Optional `refresh`, `dispose`, and `content` (`onLoad` / `onLoadFailed` / `onDocumentIdle`). Long-lived processes: `ctx.spawn` only — Host kills them on tab close and Host dispose. Do not `ctx.bash("… &")`.
+`website.ensure` is required. Optional `refresh`, `dispose`, and `content` (`onLoad` / `onLoadFailed` / `onDocumentIdle`). Long-lived processes: `ctx.spawn` only — Host tags website-hook spawns and kills every tag when the view session ends. Panel refresh does not kill website-tag by default. On spawn/`ready` failure, call `child.output()` (and/or read website `error.detail` in the frame) for analysis — not a live log stream. Do not `ctx.bash("… &")`.

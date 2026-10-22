@@ -56,6 +56,31 @@ describe('website spawn ledger', () => {
     expect((await readAppSpawnLedger(root)).entries.map(e => e.pid)).toEqual([7])
   })
 
+  it('reclaims legacy website-spawns.json pids and normalizes odd shapes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-legacy-ledger-'))
+    roots.push(root)
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(join(root, 'website-spawns.json'), JSON.stringify({ pids: [0, 'x', 12.5, 888_888_888] }))
+    await writeFile(join(root, 'app-spawns.json'), JSON.stringify({
+      entries: [
+        null,
+        { pid: 1 },
+        { pid: 2, appId: '', tag: 'app' },
+        { pid: 3, appId: 'a', tag: 'nope' },
+        { pid: 3, appId: 'a', tag: 'website' },
+      ],
+      pids: [9],
+    }))
+    const reaped = await reclaimAppSpawns(root)
+    expect(reaped.reaped).toEqual(expect.arrayContaining([888_888_888, 3]))
+    expect((await readAppSpawnLedger(root)).entries).toEqual([])
+    // Non-object ledger body
+    await writeFile(join(root, 'app-spawns.json'), '[]')
+    expect((await readAppSpawnLedger(root)).entries).toEqual([])
+    await writeFile(join(root, 'app-spawns.json'), JSON.stringify({ pids: [5, 5, 0] }))
+    expect((await readAppSpawnLedger(root)).entries.map(e => e.pid)).toEqual([5])
+  })
+
   it('reclaims a leftover live process from a prior run', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-reap-'))
     roots.push(root)

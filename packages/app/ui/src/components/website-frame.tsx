@@ -76,9 +76,11 @@ export function WebsiteFrame(props: WebsiteFrameProps) {
 
   const detailText = site.error === undefined
     ? ''
-    : site.error.code.length > 0
-      ? `${site.error.code}\n${site.error.message}`
-      : site.error.message
+    : [
+        site.error.code.length > 0 ? site.error.code : undefined,
+        site.error.message,
+        site.error.detail,
+      ].filter((part): part is string => typeof part === 'string' && part.length > 0).join('\n\n')
 
   return (
     <div

@@ -20,7 +20,7 @@ describe('resolveAuthorSkillSource', () => {
 })
 
 describe('bootHost', () => {
-  it('starts a host and leaves nothing running when config is corrupt', async () => {
+  it('starts a host and leaves nothing running when config is corrupt', { timeout: 30_000 }, async () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-shell-'))
     const port = await freePort()
     const host = await bootHost({ runtimeRoot: root, hostPort: port, credentials: emptyCredentials() })

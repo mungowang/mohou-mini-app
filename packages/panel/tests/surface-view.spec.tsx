@@ -86,7 +86,7 @@ describe('PanelSurface', () => {
         })
         expect(host.textContent).toContain('0.0.0')
         expect(host.textContent).toContain('Mohou')
-        expect(host.textContent).toContain('grind ink')
+        expect(host.textContent).toContain('manages and runs')
       }
     }
     await act(async () => {

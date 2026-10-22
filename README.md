@@ -10,8 +10,8 @@ English | [中文](README.zh.md)
 
 Mohou. Your own place to make mini-apps, and to run them.
 
-- It lays out the desk, so the agent you already use can build your library of programs and a workbench to go with it.
-- The shelves are steady. You invent. It runs them and looks after them. Open it and start.
+- It provides the creation tools and the guiding skill. You bring the idea, and the AI agent you already use builds the mini-app.
+- The platform manages and runs them. A steady runtime, ready out of the box.
 - Make the front page of your day however you like. A different situation gets a different workbench.
 
 ![A stage board in the panel](docs/images/board.png)

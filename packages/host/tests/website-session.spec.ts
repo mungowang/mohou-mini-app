@@ -289,6 +289,54 @@ describe('website sessions', () => {
       })
     }
   })
+  it('content hooks fire per event and missing hooks are skipped', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-website-content-'))
+    roots.push(root)
+    const appDir = join(root, 'app')
+    await mkdir(appDir)
+    const appId = 'com.example.content' as AppId
+    const fired: string[] = []
+    const sessions = createWebsiteSessions({
+      runtimeRoot: root,
+      buildCapabilities: () => fakeCapabilities(appDir),
+      pushSnapshot: () => undefined,
+      log: () => undefined,
+    })
+    try {
+      await sessions.ensure({
+        appId,
+        defaultUrl: 'http://example.test/',
+        appDir,
+        driver: {
+          async ensure() {
+            return { url: 'http://example.test/' }
+          },
+          content: {
+            async onLoad() { fired.push('load') },
+            async onLoadFailed() { fired.push('load-failed') },
+            async onDocumentIdle() { fired.push('idle') },
+          },
+        },
+      })
+      await sessions.content(appId, 'load')
+      await sessions.content(appId, 'load-failed', 'boom')
+      await sessions.content(appId, 'document-idle')
+      expect(fired).toEqual(['load', 'load-failed', 'idle'])
+      // A driver with no content hooks is a no-op on every event.
+      const quiet = 'com.example.quiet' as AppId
+      await sessions.ensure({
+        appId: quiet,
+        defaultUrl: 'http://example.test/',
+        appDir,
+        driver: { async ensure() { return undefined } },
+      })
+      await sessions.content(quiet, 'load')
+      await sessions.content(quiet, 'document-idle')
+    } finally {
+      await sessions.disposeAll()
+    }
+  })
+
   it('attaches spawn output as error.detail on ensure failure', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mma-website-detail-'))
     roots.push(root)

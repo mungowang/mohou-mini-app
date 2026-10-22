@@ -162,6 +162,33 @@ const query = {
 }
 
 describe('view bridge', () => {
+  it('an eval without a return answers undefined, not a bridge crash', async () => {
+    const posts: Array<{ url: string; body: string }> = []
+    const harness = boot(posts)
+    const previous = (globalThis as { window?: unknown }).window
+    ;(globalThis as { window?: unknown }).window = harness.win
+    try {
+      installViewBridge({ appId: 'com.example.app', evalUrl: '/eval' })
+      harness.send('http://parent', {
+        type: 'app:eval',
+        appId: 'com.example.app',
+        requestId: 'view-1',
+        code: '2 + 3',
+        budgetMs: 50,
+        maxBytes: 1000,
+        maxNodes: 10,
+        maxDepth: 4,
+      })
+      await new Promise((resolve) => { setTimeout(resolve, 10) })
+      expect(posts).toHaveLength(1)
+      const body = JSON.parse(posts[0]?.body ?? '{}') as { result: string; error?: string }
+      expect(body.error).toBeUndefined()
+      expect(body.result).toBe('undefined')
+    } finally {
+      ;(globalThis as { window?: unknown }).window = previous
+    }
+  })
+
   it('answers from the parent origin and keeps the helper set closed', async () => {
     const posts: Array<{ url: string; body: string }> = []
     const harness = boot(posts)

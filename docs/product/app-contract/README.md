@@ -14,6 +14,7 @@ The app contract is what an author writes and what a running mini-app may call. 
 - [Import allowlists](imports.md)
 - [defineApp and call](define-app.md)
 - [Website kind](website.md)
+- [Website content injection](website-inject.md) — deferred
 - [Identity, storage, state, credentials, config, log, signal](identity.md)
 - [ctx.http](ctx-http.md)
 - [ctx.bash](ctx-bash.md)

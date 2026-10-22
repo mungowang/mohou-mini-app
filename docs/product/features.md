@@ -18,7 +18,7 @@ Adapters that embed this platform in another agent product are out of scope.
 | App contract | [App assets](app-contract/assets.md) |
 | App contract | [Import allowlists](app-contract/imports.md) |
 | App contract | [defineApp and call](app-contract/define-app.md) |
-| App contract | [Website kind](app-contract/website.md) |
+| App contract | [Website kind](app-contract/website.md), [Website content injection](app-contract/website-inject.md) (deferred) |
 | App contract | [Identity, storage, state, credentials, config, log, signal](app-contract/identity.md) |
 | App contract | [ctx.http](app-contract/ctx-http.md) |
 | App contract | [ctx.bash](app-contract/ctx-bash.md) |

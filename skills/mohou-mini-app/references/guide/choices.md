@@ -9,6 +9,7 @@ Do not call `mini_app_register` in the same turn while a core choice is still op
 - **One loop.** One screen, one interaction.
 - **Several regions.** One app, more than one desk. Lift one facade per region. Do not paste a whole template.
 - **A workbench.** A homepage this person designed. `kind: "workbench"`. It shows what they want first, and it arranges how other apps are entered. The sample rail is one sketch.
+- **A website.** Embed a local CLI web UI or a remote tool page. `kind: "website"` plus `url`. Backend `website.ensure` (and `ctx.spawn` for local servers). UI `WebsiteFrame`.
 
 Several independent products: say so, and build the first one only. Do not design the rest in the same app.
 
@@ -20,7 +21,7 @@ Ask these when you cannot see the answer. Each line is the recommendation first.
 |---|---|---|---|
 | First screen | Name the one job that screen does | A different job | The facade you lift follows this job |
 | Records | Rows you filter go in `schema/NNN_*.sql` (DDL, seed, and data rewrite live there too) | `kv()` for a setting, one snapshot, or a short list | One `kv` array cannot be queried. An applied schema file is not edited; the next change is a new file. Do not bulk-seed or migrate with a TypeScript `run` loop |
-| Shape | An ordinary app when the tool is one screen of its own | `kind: "workbench"` when this page is the homepage: first facts, plus entry points to other apps in a layout the person wants | `ctx.workbench` exists only on a workbench. `openApp` opens a panel tab. The homepage layout is free, including using no kit |
+| Shape | An ordinary app when the tool is one screen of its own | `kind: "workbench"` when this page is the homepage; `kind: "website"` when embedding a URL or local service | Workbench: `ctx.workbench`. Website: `url` + `defineApp({ website })` + `WebsiteFrame` / `useWebsite`. Do not fake a website with a bare iframe and `ctx.bash` |
 | External system | An MCP server already in `mini_app_mcp_list` | HTTP, a local CLI, or `mini_app_install` | See below. Do not invent a server id or a tool name |
 
 Status unions and `ctx.push` event names go in `shared/`. The same literal on both sides without that file is `event-undeclared`.

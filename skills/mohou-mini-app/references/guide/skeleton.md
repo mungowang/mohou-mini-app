@@ -2,7 +2,7 @@
 
 This is one `kv()` list. Do not put several filterable entities in this array. Settings and one snapshot stay in `kv()`. Rows you filter get `schema/001_name.sql` plus `query` / `run`. Seed data and one-shot row rewrites also go in the next numbered schema file, not a TypeScript migration. See [ctx.md](ctx.md).
 
-`acronym` is optional: two letters or digits in any script. `tags` are lowercase tokens matching `^[a-z][a-z0-9-]*$`. A repeated token is one tag. Omit `tags` when the app is not classified. `kind` is omitted, or `"app"`, for an ordinary app. `"workbench"` is a homepage. There is no theme block.
+`acronym` is optional: two letters or digits in any script. `tags` are lowercase tokens matching `^[a-z][a-z0-9-]*$`. A repeated token is one tag. Omit `tags` when the app is not classified. `kind` is omitted, or `"app"`, for an ordinary app. `"workbench"` is a homepage. `"website"` embeds a URL or local service and requires `url` (http or https). There is no theme block.
 
 `manifest.json`:
 
@@ -47,3 +47,46 @@ export default defineApp({
 ```
 
 `onHostEvents(ctx, event)` is an optional sibling of `api`, on any app. It is not a method the UI `call`s. Use it when this loaded instance must react to a host notice (library change, reload, market install, and the rest). Push a name this app owns; the view listens with `useApp().on`. Details: [ctx.md](ctx.md#host-notices). Worked example: `templates/workbench/`.
+
+### Website
+
+```json
+{
+  "id": "com.example.pi-web",
+  "name": "Pi Web",
+  "description": "Local Pi Web UI",
+  "version": "0.1.0",
+  "entry": "ui.tsx",
+  "kind": "website",
+  "url": "http://127.0.0.1:30141"
+}
+```
+
+```ts
+// main.api.ts
+import { defineApp } from "@mohou/contract"
+
+export default defineApp({
+  name: "Pi Web",
+  description: "Local Pi Web UI",
+  api: {},
+  website: {
+    async ensure(ctx) {
+      if (ctx.spawn === undefined) throw new Error("spawn missing")
+      const child = await ctx.spawn("pi-web", ["--no-open", "--port", "30141"])
+      await child.ready({ url: "http://127.0.0.1:30141" })
+      return { url: "http://127.0.0.1:30141" }
+    },
+  },
+})
+```
+
+```tsx
+// ui.tsx
+import { WebsiteFrame } from "@mohou/ui"
+export default function App() {
+  return <WebsiteFrame name="Pi Web" localService />
+}
+```
+
+`website.ensure` is required. Optional `refresh`, `dispose`, and `content` (`onLoad` / `onLoadFailed` / `onDocumentIdle`). Long-lived processes: `ctx.spawn` only — Host kills them on tab close and Host dispose. Do not `ctx.bash("… &")`.

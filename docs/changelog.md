@@ -7,6 +7,10 @@ updated: 2026-10-21
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.85
+
+Website spawn ledger (`website-spawns.json`): reaped on Host boot after crash/force-quit. Author skill documents website kind, `ctx.spawn`, and `WebsiteFrame`.
+
 ## 1.0.84
 
 WebsiteFrame product chrome: starting (slow hint), connecting veil with url, live, refresh bar, and trouble with expand-detail + copy icon. EN/ZH kit strings.

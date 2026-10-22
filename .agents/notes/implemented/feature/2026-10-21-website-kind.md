@@ -27,3 +27,4 @@ Wrap tool sites and local CLIs (`pi-web --no-open`, etc.) as installable mini-ap
 - Author `ctx.bash('… &')` is not session-scoped; skill must prefer `ctx.spawn`.
 - Cross-origin content only reliably gets `onLoad`, not true document-idle DOM access, until a later proxy/inject surface.
 - Coverage stays on `packages/host/src/website/**` (no gate exclude). Unit + author + HTTP + live `pi-web` smoke cover the surface.
+- Spawn pids land in `runtime/website-spawns.json`. Graceful dispose kills them; the next Host boot reaps leftovers after crash/force-quit.

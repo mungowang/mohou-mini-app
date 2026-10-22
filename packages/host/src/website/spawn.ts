@@ -3,6 +3,7 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import type { AppSpawnHandle, AppSpawnOptions } from '@mohou/contract'
 
 import { scrubShellEnv, stopChild } from '../shell/command.ts'
+import { trackWebsiteSpawn, untrackWebsiteSpawn } from './spawn-ledger.ts'
 
 /** Default poll budget for `child.ready`. Host policy, not locked. */
 export const DEFAULT_SPAWN_READY_MS = 30_000
@@ -35,6 +36,8 @@ interface TrackedChild {
  */
 export function createSpawnRegistry(defaults: {
   readonly cwd: string
+  /** Runtime root for the durable pid ledger (crash reclaim). */
+  readonly runtimeRoot: string
   readonly env?: NodeJS.ProcessEnv
 }) {
   const tracked = new Set<TrackedChild>()
@@ -102,6 +105,15 @@ export function createSpawnRegistry(defaults: {
     } catch (error) {
       tracked.delete(entry)
       throw error
+    }
+    const pid = child.pid
+    if (pid !== undefined) {
+      await trackWebsiteSpawn(defaults.runtimeRoot, pid)
+      const drop = () => {
+        void untrackWebsiteSpawn(defaults.runtimeRoot, pid).catch(() => undefined)
+      }
+      child.once('exit', drop)
+      child.once('error', drop)
     }
     return entry.handle
   }

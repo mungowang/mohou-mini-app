@@ -11,7 +11,7 @@ describe('website spawn registry', () => {
   })
 
   it('kills a registered child on dispose', async () => {
-    const registry = createSpawnRegistry({ cwd: process.cwd() })
+    const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd() })
     registries.push(registry)
     const child = await registry.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
     expect(child.pid).toEqual(expect.any(Number))
@@ -21,7 +21,7 @@ describe('website spawn registry', () => {
   })
 
   it('rejects an empty spawn file, missing binary, and times out ready', async () => {
-    const registry = createSpawnRegistry({ cwd: process.cwd() })
+    const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd() })
     registries.push(registry)
     await expect(registry.spawn('')).rejects.toMatchObject({ code: 'spawn-failed' })
     await expect(registry.spawn('/no/such/website-binary-xyz')).rejects.toMatchObject({ code: 'spawn-failed' })
@@ -47,7 +47,7 @@ describe('website spawn registry', () => {
     if (address === null || typeof address === 'string') throw new Error('no port')
     const url = `http://127.0.0.1:${address.port}`
     try {
-      const registry = createSpawnRegistry({ cwd: process.cwd() })
+      const registry = createSpawnRegistry({ cwd: process.cwd(), runtimeRoot: process.cwd() })
       registries.push(registry)
       const child = await registry.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
       await child.ready({ url, timeoutMs: 5_000 })

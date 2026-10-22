@@ -1,7 +1,7 @@
 ---
 name: mohou-mini-app
 description: Create or edit local mini-apps (ui.tsx + main.api.ts) that run in the mini-app panel. Confirm the core choices before mini_app_register when the ask is vague. Then write source with your file tools, compile with mini_app_reload, smoke-test with mini_app_call, and reveal with mini_app_open. Triggers include 做个小程序 / 小工具 / 面板 / 仪表盘 / dashboard / 看板 / 工作台 / mini-app. Not for editing Host, Panel, or Shell source.
-version: 1.0.84
+version: 1.0.85
 ---
 
 # Mini-app authoring
@@ -28,12 +28,13 @@ Classify the ask in that reply. Detail and red flags: [references/guide/choices.
 - **One loop.** One screen, one interaction. Two sentences of intent, then register, when no core choice below is open.
 - **Several regions.** One app, more than one desk. Lift one facade per region. Do not paste a whole template.
 - **A workbench.** A custom homepage. `kind: "workbench"`. Opening it shows what this person wants first, and the page designs how other apps are arranged and entered. The sample rail is one layout, not the type.
+- **A website.** Embed a local service or a remote page. `kind: "website"` plus required `url`. Backend `defineApp({ website: { ensure, refresh?, dispose?, content? } })`. UI uses `WebsiteFrame` / `useWebsite`. Long-lived processes use `ctx.spawn` (not `ctx.bash`).
 
 One message asks only what you cannot see. Recommend one option and name the consequence of the others:
 
 - What the first screen is for.
 - Where the records come from, when you cannot see the source.
-- An ordinary app, or a workbench homepage. Several independent products: say so, and build the first one only.
+- An ordinary app, a workbench homepage, or a website embed. Several independent products: say so, and build the first one only.
 - How a named external system is reached. List connected servers with `mini_app_mcp_list` first.
 - Look, in that same message. The user may skip it.
 
@@ -100,12 +101,12 @@ When `mini_app_*` fails or is unavailable, run `node bin/diagnose.mjs` from this
 `@mohou/ui` is the UI package. `@mohou/contract` is the backend package. The host injects `defineApp`. Layout, imports, and allowlists: [references/guide/loader.md](references/guide/loader.md).
 
 - UI: `const { call, on, resolveAssetUrl } = useApp()` from `@mohou/ui`.
-- Backend: `export default defineApp({ name, description, api, onHostEvents? })`.
+- Backend: `export default defineApp({ name, description, api, onHostEvents?, website? })`. `website` is required when `kind` is `website`.
 - `call("foo")` must be a key of `api.foo`.
 - `onHostEvents(ctx, event)` is optional and is not an `api` method. The host calls it on a loaded instance when a host notice is published. Any app may define it; a workbench is not required. `useApp().on` does not receive the notice. The hook may `ctx.push` a name this app owns so the view can react. Notices, payload, and skip rules: [guide/ctx.md](references/guide/ctx.md).
 - `ctx.llm` / `ctx.agent` return **string**. MCP args are the tool's own object.
 - `shared/` is pure. Event names both sides use are declared once there.
-- `acronym` is two letters or digits. `tags` match `^[a-z][a-z0-9-]*$`. `kind` is omitted, `"app"`, or `"workbench"`.
+- `acronym` is two letters or digits. `tags` match `^[a-z][a-z0-9-]*$`. `kind` is omitted, `"app"`, `"workbench"`, or `"website"`. Website requires `url` (http/https).
 - A short `kv()` list: [references/guide/skeleton.md](references/guide/skeleton.md). Filterable rows, table DDL, seeds, and one-shot data rewrites use `schema/NNN_*.sql`, not that list and not a TypeScript `run` loop.
 
 Full `ctx`: [references/guide/ctx.md](references/guide/ctx.md).
@@ -160,12 +161,14 @@ Lift one loop per region. Do not paste a whole file. [templates/README.md](templ
 
 A workbench is a homepage the author designs. `manifest.json` has `"kind": "workbench"`. `ctx.workbench` exists only then. The page shows what this person wants to know first, and it lays out other apps and their entry points however that design needs: a rail, a grid, tiles, or something with no kit. `listApps` and `openApp` supply the apps and the open. They do not require the sample aside. `openApp` asks the panel to add a tab. It does not navigate inside this homepage. The sample tickets and the sample rail are one sketch. Replace the rows from `ctx.http`, `ctx.mcp`, or this app's own storage, and replace the arrangement. The app keeps every ordinary capability. `setDefaultWorkbench` makes this homepage the panel's first screen instead of the builtin library. The sample uses `onHostEvents` so a library change refreshes the rail and the trash; that hook is available on any loaded app, not only a workbench. See Files and [guide/ctx.md](references/guide/ctx.md).
 
+A **website** embeds a local service or a remote page. `manifest.json` has `"kind": "website"` and a required `url` (http or https). Register with `kind: "website"` and `url`. Backend: `defineApp({ website: { ensure, refresh?, dispose?, content? }, api })` — `ensure` is required. Long-lived processes use `ctx.spawn` (session-scoped; Host kills them on tab close and on Host dispose). Do not background with `ctx.bash('… &')`. UI: default `<WebsiteFrame name="…" />` from `@mohou/ui`, or compose with `useWebsite()`. Open is async: the tab shows starting chrome while ensure runs. Details: [guide/ctx.md](references/guide/ctx.md#website), [guide/skeleton.md](references/guide/skeleton.md).
+
 Looks are asked once, in the confirm message, and may be skipped. Named looks: `glass-island`, `aurora-bento`, `desk-split`, `editorial`, `tape`, `void`, `signage`, `terminal`. If the user skips or says you decide, say the pairing you will use: `today`/`glass-island`, `board`/`aurora-bento`, `sheets`/`desk-split`, `radar`/`editorial`, `watch`/`tape`, `runner`/`terminal`, `chores`/`terminal`. `void` and `signage` are opt-in. `minimal` has no preset Look. A workbench has no preset Look either: design that homepage, including with no kit. There is no `data-look` attribute.
 
 ## Checklist
 
 - [ ] Confirm sent; core choices answered or stated as assumptions; then `mini_app_register`
-- [ ] One facade per region; a workbench when the page is a designed homepage, including how other apps are entered
+- [ ] One facade per region; a workbench when the page is a designed homepage; a website when embedding a URL or local service (`kind` + `url` + `website.ensure` + `WebsiteFrame`)
 - [ ] `mini_app_reload` compiles; `notices[]` read
 - [ ] `mini_app_call` smoke test (batch with `calls`)
 - [ ] `mini_app_open`, then `mini_app_errors`, then `mini_app_view_eval`

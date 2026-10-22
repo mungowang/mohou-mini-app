@@ -14,7 +14,7 @@ describe('website sessions', () => {
   const roots: string[] = []
 
   afterEach(async () => {
-    await Promise.all(roots.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
+    await Promise.all(roots.splice(0).map(dir => rm(dir, { recursive: true, force: true }).catch(() => undefined)))
   })
 
   it('refresh failure and dispose hook errors stay contained', async () => {
@@ -25,6 +25,7 @@ describe('website sessions', () => {
     const appId = 'com.example.rf' as AppId
     const logs: string[] = []
     const sessions = createWebsiteSessions({
+      runtimeRoot: root,
       buildCapabilities: () => fakeCapabilities(appDir),
       pushSnapshot: () => undefined,
       log: (_id, message) => {
@@ -74,6 +75,7 @@ describe('website sessions', () => {
     await mkdir(appDir)
     const appId = 'com.example.plain' as AppId
     const sessions = createWebsiteSessions({
+      runtimeRoot: root,
       buildCapabilities: () => fakeCapabilities(appDir),
       pushSnapshot: () => undefined,
       log: () => undefined,
@@ -109,6 +111,7 @@ describe('website sessions', () => {
     await mkdir(appDir)
     const appId = 'com.example.codes' as AppId
     const sessions = createWebsiteSessions({
+      runtimeRoot: root,
       buildCapabilities: () => fakeCapabilities(appDir),
       pushSnapshot: () => undefined,
       log: () => undefined,
@@ -153,6 +156,7 @@ describe('website sessions', () => {
     await mkdir(appDir)
     const appId = 'com.example.fail' as AppId
     const sessions = createWebsiteSessions({
+      runtimeRoot: root,
       buildCapabilities: () => fakeCapabilities(appDir),
       pushSnapshot: () => undefined,
       log: () => undefined,
@@ -202,6 +206,7 @@ describe('website sessions', () => {
     const appEvents = createAppEvents({ tailLength: 20 })
     const appId = 'com.example.site' as AppId
     const sessions = createWebsiteSessions({
+      runtimeRoot: root,
       buildCapabilities: () => fakeCapabilities(appDir),
       pushSnapshot: (_id, snapshot) => {
         appEvents.push(appId, sessions.snapshotEvent, snapshot)

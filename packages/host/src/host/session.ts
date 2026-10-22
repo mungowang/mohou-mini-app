@@ -37,6 +37,7 @@ import { homeThemesDir, hostAppsDir, hostTrashDir } from './layout.ts'
 import { createHostLog, type HostLog } from './log.ts'
 import { loadMcpServers, mcpReferenceSources, type McpLoadFailure } from './mcp.ts'
 import { createAppWorkbench } from './workbench.ts'
+import { reclaimWebsiteSpawns } from '../website/spawn-ledger.ts'
 
 /** Command and HTTP bounds for a booted host. Not locked numbers. */
 const commandPolicy: CommandPolicy = { timeoutMs: 30_000, maxOutputBytes: 1_000_000 }
@@ -98,6 +99,12 @@ export async function createHost(options: {
 }): Promise<HostSession> {
   await mkdir(options.runtimeRoot, { recursive: true })
   ensureAuthoringToken(options.runtimeRoot)
+  // Reap website children left by a previous crash or force-quit (detached process groups).
+  const reaped = await reclaimWebsiteSpawns(options.runtimeRoot)
+  if (reaped.reaped.length > 0) {
+    // Host log may not exist yet; stderr is enough for operators.
+    console.warn(`website spawn reclaim: stopped ${reaped.reaped.length} leftover process(es)`)
+  }
   let policy = await resolveHostConfig(options.runtimeRoot, options.seed)
   if (options.seedStartup !== false) {
     await ensureRuntimeAppsLayout(options.runtimeRoot, options.authorSkill?.source)

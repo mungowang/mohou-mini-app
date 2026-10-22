@@ -116,6 +116,10 @@ Match `code`. The message is for a person. Full table: [loader.md](loader.md).
 | `defineApp requires name and description` | One of them is missing | Provide both |
 | `defineApp.api must be an object` | `api` written as a function or array | `api: { async list(ctx) {…} }` |
 | `defineApp.onHostEvents must be a function` | `onHostEvents` is present but not a function | Pass a function, or omit the field |
+| `defineApp.website.ensure must be a function` | website kind without a valid `website` driver | `website: { async ensure(ctx) { … } }` |
+| website stuck on Starting… | Host snapshot not read / ensure failed | Reload after packing UI; check `mini_app_errors` and Host log for spawn failures |
+| website blank + system browser opens | Old window policy blocked iframe embeds | Need window build ≥ navigation Stay for same-window http(s) |
+| leftover `pi-web` after crash | Detached child survived force-quit | Next Host boot reaps `website-spawns.json`; prefer tab close / clean restart |
 | `backend cannot import '<spec>'. Install it first: mini_app_install(...)` | The app needs that library but it is not in its own `node_modules` | Run `mini_app_install({ appId, packages: [{ name: "<spec>" }] })`, then `mini_app_reload`. Do **not** move the import into `ui.tsx` |
 | `backend cannot import '<spec>' (no package.json)` | Same, and nothing has ever been installed for this app | `mini_app_install` creates the manifest — never hand-write `package.json` |
 | `backend cannot import '<spec>': it resolves outside this app's node_modules` | The app is reaching the plugin's/repo's dependency tree | Reinstall the package into the app; a host dependency is not an app dependency |

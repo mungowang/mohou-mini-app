@@ -15,7 +15,7 @@ describe('pi-web website app', () => {
   const roots: string[] = []
 
   afterEach(async () => {
-    await Promise.all(roots.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
+    await Promise.all(roots.splice(0).map(dir => rm(dir, { recursive: true, force: true, maxRetries: 5 }).catch(() => undefined)))
   })
 
   it('opens ensure, reaches ready, and closes the session', async () => {

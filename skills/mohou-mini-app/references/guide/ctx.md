@@ -19,8 +19,9 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.signal` | `AbortSignal` or absent | Aborts when this call settles, and when the user stops. Long jobs must check it |
 | `ctx.push(name, params)` | void | Fire-and-forget to this app's views. JSON-serialisable |
 | `ctx.http(url, opts?)` | `{ ok, status, headers, text, json }` | 4xx/5xx do not throw. `json` is set only when the content type contains json and parsing succeeds |
-| `ctx.bash(command)` | `{ stdout, stderr, exitCode }` | This machine. Do not curl through bash |
+| `ctx.bash(command)` | `{ stdout, stderr, exitCode }` | This machine. One-shot only. Do not curl through bash. Do not background long-lived servers (`&`) |
 | `ctx.pwsh(command)` | `{ stdout, stderr, exitCode }` | Windows path of the same idea |
+| `ctx.spawn?(file, args?, opts?)` | `AppSpawnHandle` | **Website session only** (while Host runs `website.*` hooks). Long-lived child; Host kills it on tab close / Host dispose. `ready({ url })` polls until HTTP answers |
 | `ctx.system.metrics()` | OS snapshot | `loadavg` is `null` where the OS has none |
 | `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime. `images` is inline base64 or a file path the host reads |
 | `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm`. Same `images` field |
@@ -77,6 +78,21 @@ const rows = await ctx.storage.query("SELECT id, title FROM notes WHERE done = ?
 | `storage-backup-too-large` | pending migration backup over the host cap |
 
 Restore is a panel action. The app does not restore backups.
+
+## Website
+
+When `manifest.json` has `"kind": "website"` and a required `url`, Host runs a site session per open tab:
+
+| Hook | When |
+|---|---|
+| `website.ensure(ctx)` | After open (async). May `ctx.spawn` and `return { url }` to override the manifest default |
+| `website.refresh?(ctx, { url })` | Panel reload / `useWebsite().refresh` — do not kill the process |
+| `website.dispose?(ctx)` | Tab close — Host still kills registered spawns |
+| `website.content?.onLoad` / `onLoadFailed` / `onDocumentIdle` | Content-frame moments (path C) |
+
+UI: `<WebsiteFrame />` or `useWebsite()` from `@mohou/ui`. Snapshot phases: `ensuring`, `ready`, `refreshing`, `failing`, `disposing`.
+
+Register with `kind: "website"` and `url`. Do not hand-roll a naked foreign iframe without the session hooks when a local process must start.
 
 ## Workbench
 

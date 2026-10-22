@@ -206,6 +206,7 @@ export function createAuthorTools(options: {
     websiteSessions: null as unknown as ReturnType<typeof createWebsiteSessions>,
   }
   const websiteSessions = createWebsiteSessions({
+    runtimeRoot: options.registry.runtimeRoot,
     buildCapabilities: async (appId) => {
       const app = await ensureLive(bound, live, appId)
       const brain = lazyBrain(bound, app, app.id)

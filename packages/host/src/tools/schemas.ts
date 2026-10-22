@@ -91,7 +91,7 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
     inputSchema: { type: 'object', properties: { appId, path, commit }, required: ['appId', 'path'] },
   },
   mini_app_register: {
-    description: 'Create a mini-app directory from manifest fields. Write ui.tsx and main.api.ts with file tools.',
+    description: 'Create a mini-app directory from manifest fields. Write ui.tsx and main.api.ts with file tools. kind may be app, workbench, or website. website requires url (http/https).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -101,7 +101,8 @@ export const authorToolInputs: Record<AuthorToolName, ToolInput> = {
         version: { type: 'string' },
         acronym: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
-        kind: { type: 'string' },
+        kind: { type: 'string', enum: ['app', 'workbench', 'website'] },
+        url: { type: 'string', description: 'Default content URL when kind is website (http or https).' },
       },
       required: ['appId', 'name', 'description', 'version'],
     },

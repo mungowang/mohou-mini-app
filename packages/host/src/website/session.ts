@@ -12,6 +12,7 @@ import { contextFor } from '../kernel/call.ts'
 import { createSpawnRegistry, SpawnError } from './spawn.ts'
 
 export interface WebsiteSessionPorts {
+  readonly runtimeRoot: string
   readonly buildCapabilities: (appId: AppId) => Promise<CallCapabilities> | CallCapabilities
   readonly pushSnapshot: (appId: AppId, snapshot: WebsiteSnapshot) => void
   readonly log: (appId: string, message: string) => void
@@ -107,7 +108,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
       driver: input.driver,
       phase: 'ensuring',
       generation: 0,
-      spawn: createSpawnRegistry({ cwd: input.appDir }),
+      spawn: createSpawnRegistry({ cwd: input.appDir, runtimeRoot: ports.runtimeRoot }),
       chain: Promise.resolve(),
     }
     sessions.set(input.appId, session)

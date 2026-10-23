@@ -165,7 +165,7 @@ Match `code`. The message is for a person. Full table: [loader.md](loader.md).
 | Rich text editor looks plain | `RichTextEditor` | It is a local contentEditable editor — no CDN, no dependency |
 | `ctx.http` times out | `http: timeout` / `http: only http/https` / `http: response too large` | Pass `timeout`; http/https only; page or sample large payloads |
 | `ctx.llm` says no model service / stream empty | Model not configured | A human configures it in settings or `POST /api/llm-config`; app code stays `await ctx.llm(...)` |
-| `mcp-not-connected` | Unknown server id | `mini_app_mcp_list` → `mini_app_mcp_tools({ serverId })` → `ctx.mcp(serverId, toolName, args)` |
+| `mcp-not-connected` | Unknown server id | `mini_app_mcp_list` / `ctx.mcpServers(true)` → `mini_app_mcp_tools({ serverId })` → `ctx.mcp(serverId, toolName, args)` |
 | `mcp-start-failed` | That server did not start | Read `cause`; try another server. Do not curl Host |
 | MCP does nothing | Args wrapped as `{ input }` unless that is the tool schema | Pass the tool's own object |
 

@@ -7,7 +7,7 @@ The confirm message picks among these after `mini_app_mcp_list`. Lead with a con
 Order when no server is connected:
 
 1. `ctx.http`, then `ctx.bash` / `ctx.pwsh`, then `ctx.llm` / `ctx.agent`
-2. `ctx.mcp(serverId, toolName, args?)` only when that server is in the host `mcp.json`. A missing server fails that call; the app still opens.
+2. `ctx.mcp(serverId, toolName, args?)` only when that server is in the host `mcp.json`. `ctx.mcpServers(includeAll?)` lists them at runtime, alive by default. A missing server fails that call; the app still opens.
 3. `mini_app_install` when the backend must import a library the platform does not ship.
 
 `args` is the tool's own object. Never wrap it as `{ input: "..." }` unless that field is the tool's schema.

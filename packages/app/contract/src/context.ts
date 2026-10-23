@@ -133,6 +133,16 @@ export interface AppConfig {
 }
 
 /** One OS snapshot. `loadavg` is null where the OS does not provide it. */
+/** One external MCP server for `ctx.mcpServers`. Names only: no descriptions, no schemas, no env. */
+export interface AppMcpServer {
+  readonly id: string
+  readonly status: 'alive' | 'failed'
+  /** Tool names. Set when the status is `alive`. */
+  readonly tools?: readonly string[]
+  /** Failure code, and the human message when there is one. Set when the status is `failed`. */
+  readonly error?: { readonly code: string; readonly message?: string }
+}
+
 export interface AppSystemMetrics {
   platform: string
   arch: string
@@ -169,6 +179,8 @@ export interface AppContext<State extends object = Record<string, never>> {
   agent(goal: string, opts: AppAgentOptions & { stream: true }): AsyncIterable<AppAgentEvent> & Promise<string>
   agent(goal: string, opts?: AppAgentOptions): Promise<string>
   mcp(serverId: string, toolName: string, args?: Record<string, unknown>): Promise<unknown>
+  /** List the host's external MCP servers. Default is the alive ones; `includeAll` also returns the failed. */
+  mcpServers(includeAll?: boolean): Promise<{ servers: readonly AppMcpServer[] }>
   /** Present only when the manifest kind is `workbench`. */
   workbench?: AppWorkbench
   /**

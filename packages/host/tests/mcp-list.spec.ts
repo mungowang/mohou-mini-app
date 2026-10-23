@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { McpClient, McpError } from '@mohou/mcp-client'
 
-import { listMcpForAuthor, toolsMcpForAuthor } from '../src/index.ts'
+import { listMcpForAuthor, listMcpServersForApp, toolsMcpForAuthor } from '../src/index.ts'
 
 describe('listMcpForAuthor', () => {
   it('lists tool names only and keeps a missing server from dropping the rest', async () => {
@@ -75,5 +75,48 @@ describe('toolsMcpForAuthor', () => {
       id: 'gone',
       error: { code: 'mcp-not-connected' },
     })
+  })
+})
+
+describe('listMcpServersForApp', () => {
+  const client = {
+    serverIds: () => ['ok', 'missing', 'broken'],
+    listTools: async (id: string) => {
+      if (id === 'ok') return [{ name: 'ping', description: 'says hi', inputSchema: { type: 'object' } }]
+      if (id === 'missing') throw new McpError('mcp-not-connected', 'gone')
+      throw new Error('boom')
+    },
+  }
+  const failures = [{ id: 'boot-out', code: 'mcp-reference-unknown', message: 'no such reference' }]
+
+  it('lists the alive only by default, with statuses and tool names', async () => {
+    expect(await listMcpServersForApp(client as never, failures)).toEqual({
+      servers: [{ id: 'ok', status: 'alive', tools: ['ping'] }],
+    })
+  })
+
+  it('includes the failed and the boot-left-out under includeAll', async () => {
+    expect(await listMcpServersForApp(client as never, failures, true)).toEqual({
+      servers: [
+        { id: 'boot-out', status: 'failed', error: { code: 'mcp-reference-unknown', message: 'no such reference' } },
+        { id: 'ok', status: 'alive', tools: ['ping'] },
+        { id: 'missing', status: 'failed', error: { code: 'mcp-not-connected', message: 'gone' } },
+        { id: 'broken', status: 'failed', error: { code: 'mcp-start-failed' } },
+      ],
+    })
+  })
+
+  it('lists tool names of a live stdio server end to end', async () => {
+    const live = new McpClient({
+      echo: { command: 'node', args: ['packages/mcp/client/tests/fixture-server.ts'] },
+    })
+    try {
+      const listed = await listMcpServersForApp(live)
+      expect(listed.servers).toHaveLength(1)
+      expect(listed.servers[0]?.status).toBe('alive')
+      expect(listed.servers[0]?.tools?.slice().sort()).toEqual(['blank', 'die', 'echo', 'exit', 'fail', 'image', 'pid', 'struct'])
+    } finally {
+      await live.dispose()
+    }
   })
 })

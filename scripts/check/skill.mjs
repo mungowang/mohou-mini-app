@@ -112,6 +112,7 @@ const members = [
   "llm",
   "agent",
   "mcp",
+  "mcpServers",
 ]
 for (const name of members) {
   if (!contextSrc.includes(`${name}`) || !ctxText.includes(`ctx.${name}`) && name !== "system") {

@@ -496,6 +496,7 @@ function fakeCapabilities(appDir: string): CallCapabilities {
       collectedAt: new Date().toISOString(),
     }),
     mcp: async () => undefined,
+    mcpServers: async () => ({ servers: [] }),
     brain: {
       llm: async () => '',
       agent: async () => '',

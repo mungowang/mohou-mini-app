@@ -8,6 +8,7 @@ import type {
   AppHttpResponse,
   AppId,
   AppLlmEvent,
+  AppMcpServer,
   AppSpawnHandle,
   AppSpawnOptions,
   AppStorage,
@@ -38,6 +39,7 @@ export interface CallCapabilities<State extends object = Record<string, never>> 
   readonly pwsh: (command: string) => Promise<{ stdout: string; stderr: string; exitCode: number }>
   readonly metrics: () => Promise<AppSystemMetrics>
   readonly mcp: (serverId: string, toolName: string, args?: Record<string, unknown>) => Promise<unknown>
+  readonly mcpServers: (includeAll?: boolean) => Promise<{ servers: readonly AppMcpServer[] }>
   readonly brain: BoundBrain
   readonly workbench?: AppWorkbench
   readonly spawn: (file: string, args?: readonly string[], options?: AppSpawnOptions) => Promise<AppSpawnHandle>
@@ -129,6 +131,7 @@ export function contextFor<State extends object>(capabilities: CallCapabilities<
       }))
     }) as AppContext<State>['agent'],
     mcp: capabilities.mcp,
+    mcpServers: capabilities.mcpServers,
     spawn: capabilities.spawn,
     ...capabilities.website === undefined ? {} : { website: capabilities.website },
     ...capabilities.workbench === undefined ? {} : { workbench: capabilities.workbench },

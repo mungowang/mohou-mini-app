@@ -67,6 +67,7 @@ export { FileToolError, fileToolCodes, type FileToolCode } from './files/codes.t
 export { createFileTools, resolveAppPath, type FileCommit, type FileRead } from './files/tools.ts'
 export {
   listMcpForAuthor,
+  listMcpServersForApp,
   toolsMcpForAuthor,
   type AuthorMcpServerNames,
   type AuthorMcpServerTools,

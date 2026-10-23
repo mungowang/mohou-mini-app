@@ -31,6 +31,7 @@ There is no `ctx.tool` and no `listTools`. Timeouts, caps, and retry counts are 
 | `ctx.llm` | `string` | [ctx.llm](runtime/ctx-llm.md) |
 | `ctx.agent` | `string` | [ctx.agent](runtime/ctx-agent.md) |
 | `ctx.mcp(serverId, toolName, args?)` | external tool result | [ctx.mcp](mcp-client/ctx-mcp.md) |
+| `ctx.mcpServers(includeAll?)` | the host's MCP servers with statuses | [ctx.mcp](mcp-client/ctx-mcp.md) |
 | `useApp().call(method, args?)` | keys of `defineApp` `api` | [defineApp](app-contract/define-app.md) |
 | `useApp().on` / `onAny` | this app's push stream | [ctx.push](app-contract/ctx-push.md) |
 | `useApp().resolveAssetUrl(path)` | URL for a file under `assets/` | [assets](app-contract/assets.md) |

@@ -59,6 +59,7 @@ async function capabilities(): Promise<CallCapabilities<{ count: number }>> {
       collectedAt: '2026-09-16T00:00:00.000Z',
     }),
     mcp: () => Promise.resolve('tool'),
+    mcpServers: () => Promise.resolve({ servers: [] }),
     spawn: async () => ({
       pid: undefined,
       exited: Promise.resolve({ exitCode: 0 }),
@@ -90,6 +91,15 @@ describe('runCall', () => {
 
   it('rejects an unknown method by code', async () => {
     await expect(runCall(await capabilities(), {}, 'missing', {})).rejects.toBeInstanceOf(HostError)
+  })
+
+  it('lists mcp servers through ctx.mcpServers', async () => {
+    const result = await runCall(await capabilities(), {
+      async list(ctx, args: unknown) {
+        return ctx.mcpServers(args === true)
+      },
+    }, 'list', [true])
+    expect(result).toEqual({ servers: [] })
   })
 
   it('gives llm and agent the call signal when the app omits one', async () => {

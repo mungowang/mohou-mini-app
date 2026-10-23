@@ -1,5 +1,7 @@
 import { McpClient, McpError, type McpCode } from '@mohou/mcp-client'
 
+import type { AppMcpServer } from '@mohou/contract'
+
 import type { McpLoadFailure } from '../host/mcp.ts'
 import { AuthorError } from './codes.ts'
 
@@ -81,6 +83,46 @@ export async function toolsMcpForAuthor(
     if (error instanceof AuthorError) throw error
     return { id: serverId, error: { code: listFailure(error) } }
   }
+}
+
+/**
+ * Runtime list for `ctx.mcpServers`. Alive only by default; `includeAll` also returns the failed
+ * with their status, so an app can explain why a server is missing. Listing opens each session,
+ * the same first call `ctx.mcp` makes. Names only: no descriptions, no schemas, no env.
+ * @param client - host-held MCP client
+ * @param failures - servers boot left out
+ * @param includeAll - also return the failed
+ */
+export async function listMcpServersForApp(
+  client: McpClient,
+  failures: readonly McpLoadFailure[] = [],
+  includeAll = false,
+): Promise<{ servers: AppMcpServer[] }> {
+  const servers: AppMcpServer[] = []
+  if (includeAll) {
+    for (const failure of failures) {
+      servers.push({ id: failure.id, status: 'failed', error: { code: failure.code, message: failure.message } })
+    }
+  }
+  for (const id of client.serverIds()) {
+    try {
+      const tools = await client.listTools(id)
+      servers.push({ id, status: 'alive', tools: tools.map(tool => tool.name) })
+    } catch (error) {
+      if (includeAll) {
+        const known = error instanceof McpError
+        servers.push({
+          id,
+          status: 'failed',
+          error: {
+            code: known ? error.code : 'mcp-start-failed',
+            ...known && error.message.length > 0 ? { message: error.message } : {},
+          },
+        })
+      }
+    }
+  }
+  return { servers }
 }
 
 function listFailure(error: unknown): 'mcp-not-connected' | 'mcp-start-failed' {

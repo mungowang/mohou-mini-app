@@ -26,6 +26,7 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime. `images` is inline base64 or a file path the host reads |
 | `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm`. Same `images` field |
 | `ctx.mcp(serverId, toolName, args?)` | tool result | Args are the tool's own object |
+| `ctx.mcpServers(includeAll?)` | `{ servers: [{ id, status, tools?, error? }] }` | Host MCP servers. Default lists the alive; `includeAll` also returns the failed with their status. Tool names only |
 
 ## Storage
 

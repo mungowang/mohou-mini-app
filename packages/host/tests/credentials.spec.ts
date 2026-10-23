@@ -100,6 +100,7 @@ describe('file credentials', () => {
       pwsh: () => Promise.reject(new Error('unused')),
       metrics: () => Promise.reject(new Error('unused')),
       mcp: () => Promise.reject(new Error('unused')),
+      mcpServers: () => Promise.resolve({ servers: [] }),
       spawn: async () => ({
         pid: undefined,
         exited: Promise.resolve({ exitCode: 0 }),

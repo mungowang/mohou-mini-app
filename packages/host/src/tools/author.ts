@@ -38,7 +38,7 @@ import { openStorage, type StorageFile } from '../storage/open.ts'
 import { createWebsiteSessions } from '../website/session.ts'
 import { createViewSessions } from '../process/view-session.ts'
 import { createSpawnRegistry, type AppSpawnRegistry } from '../process/spawn.ts'
-import { listMcpForAuthor, toolsMcpForAuthor } from './mcp-list.ts'
+import { listMcpForAuthor, listMcpServersForApp, toolsMcpForAuthor } from './mcp-list.ts'
 import { AuthorError } from './codes.ts'
 
 /** Tools this implementation can run. The rest of the catalog is not mounted. */
@@ -898,6 +898,7 @@ async function oneCall(
     storageNoticeBytes?: number
     env?: NodeJS.ProcessEnv
     viewSessions?: ReturnType<typeof createViewSessions>
+    readMcpFailures?: () => readonly McpLoadFailure[]
   },
   live: Map<string, LiveApp>,
   appId: string,
@@ -989,7 +990,7 @@ async function ensureLive(
 }
 
 function capabilitiesFor(
-  options: { mcp: McpClient; ports: AuthorCallPorts; appEvents: AppEvents },
+  options: { mcp: McpClient; ports: AuthorCallPorts; appEvents: AppEvents; readMcpFailures?: () => readonly McpLoadFailure[] },
   app: LiveApp,
   brain: CallCapabilities['brain'],
   spawnTag: 'app' | 'website' = 'app',
@@ -1012,6 +1013,7 @@ function capabilitiesFor(
     pwsh: ports.pwsh,
     metrics: ports.metrics,
     mcp: (serverId, toolName, args) => options.mcp.call(serverId, toolName, args ?? {}),
+    mcpServers: includeAll => listMcpServersForApp(options.mcp, options.readMcpFailures?.() ?? [], includeAll === true),
     brain,
     spawn: (file, args, spawnOptions) => {
       if (spawnTag === 'website') return app.spawns.spawnWebsite(file, args, spawnOptions)

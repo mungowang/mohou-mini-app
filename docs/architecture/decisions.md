@@ -1,6 +1,6 @@
 ---
 status: locked
-updated: 2026-10-22
+updated: 2026-10-23
 ---
 
 # Product decisions
@@ -65,7 +65,7 @@ One fact per bullet. Feature pages under `docs/product/` rely on these sentences
 - Agent working-directory mode defaults to the host process directory. A path with no mode means custom. A path plus a non-custom mode fails the call.
 - Call shapes are the app contract. Timeouts, body caps, retry counts, token caps, buffer sizes, ping intervals, ports, and locale defaults are host policy. Host resolves them once at the boundary. An omitted caller option uses that resolved policy. A caller option outside the resolved bound fails that call. The contract does not embed the number. Previously copied numbers are not locked.
 - A caller that branches on a failure matches a closed code from [docs/product/implementation.md](../product/implementation.md). The message is for a person. A message prefix is not the contract.
-- One SQLite file per app. The directory and file names live in one layout module, not at each call site. The file is `storage/app.sqlite`. Host table `kv` holds JSON values. App tables come from `schema/`. There is no second storage file and no JSON table file.
+- One SQLite file per app. The directory and file names live in one layout module, not at each call site. The file is `storage/app.sqlite`. Host table `kv` holds JSON values. App tables come from `schema/`. A schema file may read and rewrite `kv` rows, but not change the host table structure; runtime SQL may not name `kv`. There is no second storage file and no JSON table file.
 - Layout presets take nodes. They do not fetch, store, or route. There is no `Stack`, `Text`, or `Box` component.
 - `RichTextEditor` is a local editor. `CodeEditor`, `CodeBlock`, and `DiffViewer` load their engine on demand and degrade when that fetch fails. Authors do not import those engines.
 - Illustration accent colour is `--primary-svg-color`, which resolves to `--primary`. Illustration assets contain no hard-coded hex.

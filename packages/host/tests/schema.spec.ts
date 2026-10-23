@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -156,5 +156,73 @@ describe('schema files', () => {
     expect(() => {
       restoreStorageBackup(none)
     }).toThrow(/no schema backup/)
+  })
+
+  it('moves kv rows into an app table from a schema file', async () => {
+    const root = dir()
+    write(root, '001_init.sql', 'CREATE TABLE settings (key TEXT PRIMARY KEY, a INTEGER)')
+    const first = await openStorage(root)
+    await first.connect().kv().set('one', { a: 1 })
+    first.close()
+    write(root, '002_move.sql', "INSERT INTO settings (key, a) SELECT key, json_extract(value, '$.a') FROM kv WHERE key = 'one'; DELETE FROM kv WHERE key = 'one'")
+    const second = await openStorage(root)
+    expect(await second.connect().query('SELECT key, a FROM settings')).toEqual([{ key: 'one', a: 1 }])
+    expect(await second.connect().kv().get('one')).toBeNull()
+    second.close()
+  })
+
+  it('refuses a schema file that changes or reaches the host tables', async () => {
+    const cases = [
+      'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT',
+      'DROP TABLE kv',
+      'ALTER TABLE kv ADD COLUMN extra TEXT',
+      'CREATE TABLE notes (id INTEGER PRIMARY KEY); ALTER TABLE notes RENAME TO kv',
+      'CREATE INDEX settings_key ON kv (key)',
+      'CREATE TRIGGER kv_log AFTER INSERT ON kv BEGIN INSERT INTO kv VALUES (1, 2); END',
+      'CREATE VIEW settings_view AS SELECT key FROM kv',
+      'CREATE TABLE notes (id INTEGER PRIMARY KEY); CREATE TRIGGER notes_log AFTER INSERT ON notes BEGIN INSERT INTO kv VALUES (1, 2); END',
+      'INSERT INTO schema_migrations (id, checksum) VALUES (9, 9)',
+      'SELECT * FROM schema_migrations',
+      "INSERT INTO kv VALUES ('bad', 'not json')",
+    ]
+    for (const [index, sql] of cases.entries()) {
+      const root = dir()
+      write(root, '001_init.sql', sql)
+      await expect(openStorage(root), `case ${index}: ${sql}`).rejects.toMatchObject({ code: 'storage-migration' })
+      const raw = new Database(storageDatabase(root))
+      expect(raw.prepare('SELECT key FROM kv').all(), `case ${index}: ${sql}`).toEqual([])
+      expect(raw.prepare('SELECT id FROM schema_migrations').all(), `case ${index}: ${sql}`).toEqual([])
+      expect(raw.prepare("SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name NOT IN ('kv', 'schema_migrations')").all(), `case ${index}: ${sql}`).toEqual([])
+      raw.close()
+    }
+  })
+
+  it('rebuilds a kv table from an older layout and quarantines a value that is not json', async () => {
+    const root = dir()
+    write(root, '001_init.sql', 'CREATE TABLE notes (id INTEGER PRIMARY KEY)')
+    const first = await openStorage(root)
+    first.close()
+    const raw = new Database(storageDatabase(root))
+    raw.exec('DROP TABLE kv')
+    raw.exec('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
+    raw.prepare('INSERT INTO kv (key, value) VALUES (?, ?)').run('one', JSON.stringify({ a: 1 }))
+    raw.close()
+    const second = await openStorage(root)
+    expect(await second.connect().kv().get('one')).toEqual({ a: 1 })
+    second.close()
+    const check = new Database(storageDatabase(root))
+    expect((check.prepare("SELECT sql FROM sqlite_master WHERE name = 'kv'").get() as { sql: string }).sql).toMatch(/json_valid/)
+    check.close()
+    const broken = dir()
+    write(broken, '001_init.sql', 'CREATE TABLE notes (id INTEGER PRIMARY KEY)')
+    const third = await openStorage(broken)
+    third.close()
+    const rawBroken = new Database(storageDatabase(broken))
+    rawBroken.exec('DROP TABLE kv')
+    rawBroken.exec('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
+    rawBroken.prepare("INSERT INTO kv (key, value) VALUES ('bad', 'not json')").run()
+    rawBroken.close()
+    await expect(openStorage(broken)).rejects.toMatchObject({ code: 'storage-corrupt' })
+    expect(existsSync(storageDatabase(broken))).toBe(false)
   })
 })

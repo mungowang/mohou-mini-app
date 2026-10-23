@@ -1,11 +1,15 @@
 ---
 status: locked
-updated: 2026-10-22
+updated: 2026-10-23
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.94
+
+Schema files may read and rewrite `kv` rows, so a move from `kv` to a table is one numbered file, not a TypeScript migration. `kv` gains a `json_valid(value)` check (older tables rebuild on open with their rows). `schema_migrations` and the `kv` structure stay host-only: table DDL on `kv` is rejected before the file runs, and a persisted view, trigger, or index that reaches `kv` fails the file that creates it.
 
 ## 1.0.91
 

@@ -8,7 +8,7 @@ import type { AppKeyValueTable, AppStorage, SqlParams, SqlRow, SqlValue } from '
 import { StorageError } from './codes.ts'
 import { storageDatabase, storageQuarantine } from './layout.ts'
 import { applySchema } from './schema.ts'
-import { assertRuntimeSql } from './sql.ts'
+import { KV_TABLE_SQL, MIGRATIONS_TABLE_SQL, assertRuntimeSql, canonicalTableSql } from './sql.ts'
 
 /** A bound SQLite file. `connect` is what a call receives. `close` is host-only. */
 export interface StorageFile {
@@ -220,11 +220,33 @@ function stampSchema(db: Database.Database): void {
   if (row.user_version !== 0 && row.user_version !== 1 && row.user_version !== SCHEMA_VERSION) {
     throw new StorageError('storage-version', `storage schema version ${row.user_version} is not ${SCHEMA_VERSION}`)
   }
-  if (row.user_version === 0) {
-    db.exec('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT')
-  }
-  db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, checksum TEXT NOT NULL) STRICT')
+  upgradeKv(db)
+  db.exec(MIGRATIONS_TABLE_SQL)
   if (row.user_version !== SCHEMA_VERSION) db.pragma(`user_version = ${SCHEMA_VERSION}`)
+}
+
+/**
+ * Keep `kv` on the host statement: rows written by an older layout are host-written json, so the copy holds.
+ * A row that is not json fails the check, and the file is quarantined, not repaired.
+ */
+function upgradeKv(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'kv'").get() as { sql: string } | undefined
+  if (row === undefined) {
+    db.exec(KV_TABLE_SQL)
+    return
+  }
+  if (canonicalTableSql(row.sql) === canonicalTableSql(KV_TABLE_SQL)) return
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.exec('CREATE TABLE kv_upgrade (key TEXT PRIMARY KEY, value TEXT NOT NULL CHECK (json_valid(value))) STRICT')
+    db.exec('INSERT INTO kv_upgrade (key, value) SELECT key, value FROM kv')
+    db.exec('DROP TABLE kv')
+    db.exec('ALTER TABLE kv_upgrade RENAME TO kv')
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw new StorageError('storage-corrupt', 'kv values must be json; the kv table was not upgraded', { cause: error })
+  }
 }
 
 function prepareKv(db: Database.Database): KvStatements {

@@ -8,7 +8,7 @@ import { appTrees } from '@mohou/contract'
 
 import { StorageError } from './codes.ts'
 import { storageBackup, storageBackupMeta, storageBlocked, storageDatabase, storageDir } from './layout.ts'
-import { assertMigrationSql } from './sql.ts'
+import { KV_TABLE_SQL, MIGRATIONS_TABLE_SQL, assertMigrationSql, canonicalTableSql, stripSql } from './sql.ts'
 
 interface SchemaFile {
   id: number
@@ -150,12 +150,34 @@ function runFile(db: Database.Database, file: SchemaFile): void {
   db.exec('BEGIN IMMEDIATE')
   try {
     db.exec(file.sql)
+    assertHostTablesIntact(db, file)
     db.prepare('INSERT INTO schema_migrations (id, checksum) VALUES (?, ?)').run(file.id, file.checksum)
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
     if (error instanceof StorageError) throw error
     throw new StorageError('storage-migration', `schema file failed: ${file.name}`, { cause: error })
+  }
+}
+
+/**
+ * A view, trigger, or virtual table that names a host table would reach it at runtime, where the runtime guard
+ * cannot see the indirection. Check after the file runs, inside the transaction, so a hit rolls the file back.
+ */
+function assertHostTablesIntact(db: Database.Database, file: SchemaFile): void {
+  for (const [name, ddl] of [['kv', KV_TABLE_SQL], ['schema_migrations', MIGRATIONS_TABLE_SQL]] as const) {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) as { sql: string } | undefined
+    if (row === undefined || canonicalTableSql(row.sql) !== canonicalTableSql(ddl)) {
+      throw new StorageError('storage-migration', `schema file must not change the host table: ${name} (${file.name})`)
+    }
+  }
+  const objects = db.prepare('SELECT name, type, sql FROM sqlite_master WHERE sql IS NOT NULL').all() as Array<{ name: string; type: string; sql: string }>
+  for (const object of objects) {
+    if (object.name === 'kv' || object.name === 'schema_migrations') continue
+    if (object.type === 'table' && !/^CREATE\s+VIRTUAL\s+TABLE/i.test(object.sql)) continue
+    if (/\b(?:kv|schema_migrations)\b/i.test(stripSql(object.sql))) {
+      throw new StorageError('storage-migration', `schema file must not add ${object.type} ${object.name} over a host table (${file.name})`)
+    }
   }
 }
 

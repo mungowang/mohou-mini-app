@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-01
+updated: 2026-10-23
 ---
 
 # Write loop
@@ -12,7 +12,7 @@ Layer: [Author skill](README.md). Index: [features.md](../features.md).
 - Input: a user ask for a local tool, dashboard, board, report, or similar. The agent reads this skill, not a live app directory, as the contract.
 - Before register, the skill classifies the ask as one loop, several regions in one app, or a workbench homepage, and says which. One message asks only the core choices the agent cannot see: what the first screen is for, where the records come from, one app versus a workbench, and how a named external system is reached. Each option carries a consequence and one recommendation. A skip, or "you decide", is a stated assumption, not a second round. `mini_app_register` does not run in that same turn while a core choice is still open. A one-loop ask whose source and shape are already clear is two sentences of intent, then register. Several independent products are named, and only the first is built. Familiarity with an app shape does not skip the confirm. The option table and the red flags live in the skill's `references/guide/choices.md`.
 - A workbench is `kind: "workbench"`. It is a homepage the author designs: what this person wants to see first, and how other apps are arranged and entered. The layout is free. The sample rail is one sketch, not the type. `ctx.workbench` exists only on this kind. `listApps` and `openApp` supply the apps and the open. `openApp` asks the panel to add a tab and does not navigate inside the homepage. The app keeps every ordinary capability. Sample rows are replaced from `ctx.http`, `ctx.mcp`, or this app's own storage. `setDefaultWorkbench` makes this homepage the panel's first screen instead of the builtin library.
-- One app may lift one facade per region. The skill does not paste a whole facade file. Filterable entities do not share one `kv` array. Settings, one snapshot, and a short list use `kv()`. Rows that are filtered get `schema/NNN_*.sql` plus `query` / `run`. A schema file may also seed or rewrite those rows. Do not run a one-shot TypeScript migration through `ctx.storage.run`. An applied schema file is not edited. Status unions and `ctx.push` event names live in `shared/`.
+- One app may lift one facade per region. The skill does not paste a whole facade file. Filterable entities do not share one `kv` array. Settings, one snapshot, and a short list use `kv()`. Rows that are filtered get `schema/NNN_*.sql` plus `query` / `run`. A schema file may also seed or rewrite those rows, and may read or rewrite `kv` rows. Do not run a one-shot TypeScript migration through `ctx.storage.run`. An applied schema file is not edited. Status unions and `ctx.push` event names live in `shared/`.
 - The UI kit is a shortcut for SaaS-shaped screens. It is not required for a valid app or for a beautiful one. Native elements and Tailwind, kit parts, or both are allowed. Using no kit component is valid.
 - Steps the skill locks:
 

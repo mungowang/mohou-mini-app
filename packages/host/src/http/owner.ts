@@ -62,6 +62,13 @@ export function mountOwner(app: Hono<HostEnv>, ports: LoopbackPorts): void {
     const confirm = isRecord(body) && body.confirm === true
     return ok(c, () => ports.installMarket(id, confirm))
   })
+  app.post(httpLayout.marketUninstall, async (c) => {
+    const body = await readBody(c)
+    const id = isRecord(body) && typeof body.id === 'string' ? body.id : ''
+    const kind = isRecord(body) && body.kind === 'theme' ? 'theme' : 'app'
+    const confirm = isRecord(body) && body.confirm === true
+    return ok(c, () => ports.uninstallMarket(id, kind, confirm))
+  })
   app.get(httpLayout.updates, async (c) => {
     return c.json({ ok: true, ...await ports.checkUpdate() })
   })

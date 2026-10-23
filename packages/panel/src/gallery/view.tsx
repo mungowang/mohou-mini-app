@@ -59,6 +59,8 @@ export function PanelGallery(props: {
   readonly overlay?: (chrome: GalleryChrome) => ReactNode
   readonly defaultWorkbenchId?: string
   readonly onSetDefaultWorkbench?: (id: string) => void
+  /** Apply one palette id as the host palette. The market theme card's Apply. */
+  readonly onApplyPalette?: (id: string) => void
   /** Active app tab changed. Surface updates focus so history / storage keep using focus. */
   readonly onActiveApp?: (appId: string | undefined, title?: string) => void
 }): ReactNode {
@@ -100,6 +102,7 @@ export function PanelGallery(props: {
       {...props.onToggleSettings === undefined ? {} : { onToggleSettings: props.onToggleSettings }}
       {...props.defaultWorkbenchId === undefined ? {} : { defaultWorkbenchId: props.defaultWorkbenchId }}
       {...props.onSetDefaultWorkbench === undefined ? {} : { onSetDefaultWorkbench: props.onSetDefaultWorkbench }}
+      {...props.onApplyPalette === undefined ? {} : { onApplyPalette: props.onApplyPalette }}
       {...props.onActiveApp === undefined ? {} : { onActiveApp: props.onActiveApp }}
       {...props.overlay === undefined ? {} : { overlay: props.overlay({ cardStyle: state.cardStyle, setCard: (style) => { writeCardStyle(style); dispatch({ type: 'card', cardStyle: style }) } }) }}
     />
@@ -123,6 +126,8 @@ export function GalleryBody(props: {
   readonly overlay?: ReactNode
   readonly defaultWorkbenchId?: string
   readonly onSetDefaultWorkbench?: (id: string) => void
+  /** Apply one palette id as the host palette. The market theme card's Apply. */
+  readonly onApplyPalette?: (id: string) => void
   readonly onActiveApp?: (appId: string | undefined, title?: string) => void
 }): ReactNode {
   const { state, dispatch, client } = props
@@ -352,6 +357,13 @@ export function GalleryBody(props: {
                 mode={props.mode}
                 list={props.client.listMarket}
                 install={props.client.installMarket}
+                uninstall={props.client.uninstallMarket}
+                open={(id, title) => {
+                  const already = state.tabs.tabs.some(tab => tab.kind === 'app' && tab.appId === id)
+                  const kind = state.apps.find(app => app.id === id)?.kind
+                  openApp(props.client, id, title, dispatch, already, kind)
+                }}
+                apply={props.onApplyPalette}
                 refreshTick={marketTick}
                 onCatalogSettled={() => {
                   const settle = marketRefreshSettle.current

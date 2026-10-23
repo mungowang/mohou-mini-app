@@ -237,7 +237,182 @@ describe('market view', () => {
   it('shows installed for an equal version', async () => {
     const { host } = mount([{ ...appRow, installedVersion: appRow.version, tracked: true }])
     await act(async () => { await Promise.resolve() })
-    expect([...host.querySelectorAll('button')].some(item => item.textContent?.includes('已安装'))).toBe(true)
+    expect(host.querySelector('[data-market-installed="com.example.desk"]')?.textContent).toContain('已安装')
+    expect([...host.querySelectorAll('button')].some(item => item.disabled && item.textContent?.includes('已安装'))).toBe(false)
+  })
+
+  it('opens an installed app and confirms an uninstall', async () => {
+    const opened: { id: string; title: string }[] = []
+    const removed: { id: string; kind: string; confirm: boolean }[] = []
+    let releaseUninstall: () => void = () => undefined
+    const uninstalling = new Promise<void>((resolve) => { releaseUninstall = resolve })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(
+        <MarketView
+          locale="zh-CN"
+          mode="production"
+          list={async (): Promise<MarketList> => ({ rows: [{ ...appRow, installedVersion: appRow.version, tracked: true }], packs: [] })}
+          install={async () => undefined}
+          uninstall={async (id, kind, confirm) => { removed.push({ id, kind, confirm }); await uninstalling }}
+          open={(id, title) => { opened.push({ id, title }) }}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    await act(async () => { await Promise.resolve() })
+    const card = host.querySelector('[data-market-card="com.example.desk"]') as HTMLElement
+    expect(card.querySelector('[data-market-installed="com.example.desk"]')).not.toBeNull()
+    act(() => { card.querySelector<HTMLButtonElement>('[data-market-open="com.example.desk"]')?.click() })
+    expect(opened).toEqual([{ id: 'com.example.desk', title: 'Desk' }])
+    const uninstall = card.querySelector<HTMLButtonElement>('[data-market-uninstall="com.example.desk"]')
+    expect(uninstall?.getAttribute('aria-label')).toBe('卸载')
+    act(() => { uninstall?.click() })
+    const cancel = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('取消'))
+    act(() => { cancel?.click() })
+    expect(card.querySelector('[data-market-remove="com.example.desk"]')).toBeNull()
+    act(() => { card.querySelector<HTMLButtonElement>('[data-market-uninstall="com.example.desk"]')?.click() })
+    const confirm = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('确认卸载'))
+    act(() => { confirm?.click() })
+    expect([...card.querySelectorAll('button')].some(item => item.textContent?.includes('卸载中'))).toBe(true)
+    await act(async () => { releaseUninstall(); await uninstalling; await Promise.resolve() })
+    expect(removed).toEqual([{ id: 'com.example.desk', kind: 'app', confirm: true }])
+  })
+
+  it('tolerates missing clients and a rejection that is not an error', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(
+        <MarketView
+          locale="zh-CN"
+          mode="production"
+          list={async (): Promise<MarketList> => ({
+            rows: [
+              { ...appRow, installedVersion: appRow.version, tracked: true },
+              { ...appRow, id: 'com.example.bare', name: 'Bare' },
+              { ...themeRow, installedVersion: themeRow.version, tracked: true },
+            ],
+            packs: [],
+          })}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    await act(async () => { await Promise.resolve() })
+    clickText(host, '主题')
+    // No apply channel: an installed theme shows the status, not the Apply button.
+    const themeCard = host.querySelector('[data-market-card="forest"]') as HTMLElement
+    expect(themeCard.querySelector('[data-market-installed="forest"]')).not.toBeNull()
+    expect(themeCard.querySelector('[data-market-apply="forest"]')).toBeNull()
+    clickText(host, '应用')
+    // No install channel: the install click is a no-op.
+    const bareCard = host.querySelector('[data-market-card="com.example.bare"]') as HTMLElement
+    const installBare = [...bareCard.querySelectorAll('button')].find(item => item.textContent?.includes('安装'))
+    await act(async () => { installBare?.click(); await Promise.resolve() })
+    // No install channel: nothing starts, and the action stays as it was.
+    expect([...bareCard.querySelectorAll('button')].some(item => item.textContent?.includes('安装中'))).toBe(false)
+    expect([...bareCard.querySelectorAll('button')].some(item => item.textContent?.includes('安装'))).toBe(true)
+    const card = host.querySelector('[data-market-card="com.example.desk"]') as HTMLElement
+    // No uninstall channel: the click is a no-op, the confirm stays, and no busy state starts.
+    act(() => { card.querySelector<HTMLButtonElement>('[data-market-uninstall="com.example.desk"]')?.click() })
+    const confirm = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('确认卸载'))
+    await act(async () => { confirm?.click(); await Promise.resolve() })
+    expect(card.querySelector('[data-market-remove="com.example.desk"]')).not.toBeNull()
+    expect([...card.querySelectorAll('button')].some(item => item.textContent?.includes('卸载中'))).toBe(false)
+
+    const other = document.createElement('div')
+    document.body.append(other)
+    const second = createRoot(other)
+    act(() => {
+      second.render(
+        <MarketView
+          locale="zh-CN"
+          mode="production"
+          list={async (): Promise<MarketList> => ({ rows: [{ ...appRow, installedVersion: appRow.version, tracked: true }], packs: [] })}
+          install={async () => { throw 'not an error' }}
+          uninstall={async () => { throw 'not an error' }}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    await act(async () => { await Promise.resolve() })
+    const otherCard = other.querySelector('[data-market-card="com.example.desk"]') as HTMLElement
+    await act(async () => { otherCard.querySelector<HTMLButtonElement>('[data-market-uninstall="com.example.desk"]')?.click(); await Promise.resolve() })
+    const confirmRemove = [...otherCard.querySelectorAll('button')].find(item => item.textContent?.includes('确认卸载'))
+    await act(async () => { confirmRemove?.click(); await Promise.resolve(); await Promise.resolve() })
+    expect(other.textContent).toContain('市场加载失败')
+  })
+
+  it('keeps the post-install done mark while the next catalog read is in flight', async () => {
+    let reads = 0
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    act(() => {
+      root.render(
+        <MarketView
+          locale="zh-CN"
+          mode="production"
+          list={async (): Promise<MarketList> => {
+            reads += 1
+            // The second read stays in flight, so the optimistic done mark owns the card.
+            if (reads === 1) return { rows: [appRow], packs: [] }
+            return new Promise<MarketList>(() => undefined)
+          }}
+          install={async () => undefined}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    await act(async () => { await Promise.resolve() })
+    const card = host.querySelector('[data-market-card="com.example.desk"]') as HTMLElement
+    const replace = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('替换'))
+    act(() => { replace?.click() })
+    const confirm = [...card.querySelectorAll('button')].find(item => item.textContent?.includes('确认'))
+    await act(async () => { confirm?.click(); await Promise.resolve() })
+    // Untracked row + done mark: the status falls back to nothing, and no install action returns.
+    expect([...card.querySelectorAll('button')].some(item => item.textContent?.includes('替换'))).toBe(false)
+    expect(card.querySelector('[data-market-installed="com.example.desk"]')).toBeNull()
+  })
+
+  it('applies an installed theme and keeps uninstall available on an update', async () => {
+    const applied: string[] = []
+    const removed: { id: string; kind: string; confirm: boolean }[] = []
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    const rows: MarketRow[] = [
+      { ...themeRow, installedVersion: '1.0.0', tracked: true },
+      { ...themeRow, id: 'dusk', name: 'Dusk', version: '2.0.0', installedVersion: '1.4.0', tracked: true },
+    ]
+    act(() => {
+      root.render(
+        <MarketView
+          locale="zh-CN"
+          mode="production"
+          list={async (): Promise<MarketList> => ({ rows, packs: [] })}
+          install={async () => undefined}
+          uninstall={async (id, kind, confirm) => { removed.push({ id, kind, confirm }) }}
+          apply={id => applied.push(id)}
+          onInstalled={() => undefined}
+        />,
+      )
+    })
+    await act(async () => { await Promise.resolve() })
+    const forest = host.querySelector('[data-market-card="forest"]') as HTMLElement
+    act(() => { forest.querySelector<HTMLButtonElement>('[data-market-apply="forest"]')?.click() })
+    expect(applied).toEqual(['forest'])
+    expect(forest.querySelector('[data-market-open="forest"]')).toBeNull()
+    const dusk = host.querySelector('[data-market-card="dusk"]') as HTMLElement
+    expect(dusk.querySelector('[data-market-update="dusk"]')?.textContent).toContain('可更新')
+    expect(dusk.querySelector('[data-market-uninstall="dusk"]')).not.toBeNull()
+    const update = [...dusk.querySelectorAll('button')].find(item => item.textContent?.includes('更新'))
+    await act(async () => { update?.click(); await Promise.resolve() })
+    expect(removed).toEqual([])
   })
 
   it('shows a fetch error and update with confirm for modified rows', async () => {
@@ -287,6 +462,14 @@ describe('market view', () => {
     clickText(host, '未安装')
     expect(host.querySelector('[data-market-card="com.example.new"]')).not.toBeNull()
     expect(host.querySelector('[data-market-card="com.example.desk"]')).toBeNull()
+    clickText(host, '所有')
+    expect(host.querySelector('[data-market-card="com.example.desk"]')).not.toBeNull()
+    expect(host.querySelector('[data-market-card="com.example.new"]')).not.toBeNull()
+    clickText(host, 'notes')
+    expect(host.querySelector('[data-market-card="com.example.desk"]')).not.toBeNull()
+    clickText(host, 'notes')
+    clickText(host, '小程序')
+    expect(host.querySelector('[data-market-card="com.example.desk"]')).not.toBeNull()
   })
 
   it('renders themes only when the catalog has no apps', async () => {

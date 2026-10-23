@@ -1061,6 +1061,7 @@ function isHostNotice(event: HostEvent): event is HostNotice {
     case 'app:reload':
     case 'storage-size':
     case 'market:install':
+    case 'market:uninstall':
       return true
     case 'app:eval':
       return false

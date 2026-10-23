@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-11
+updated: 2026-10-23
 ---
 
 # Market card
@@ -17,9 +17,10 @@ Layer: [Market](README.md). Index: [features.md](../features.md). The tab is [ta
 - Meta: a footer pinned to the bottom edge. Version is `v` plus the version, as text. Requirement is a tag, not brackets and not a second version. The tag reads `mohou ≥ x.y.z`. It disables the action when the running product is outside that range. Official is not repeated here. Source is not repeated here. Sources are `npm` and `local`. `local` is a tarball. Each source has its own icon beside the name. Official does not imply `npm`. A later source, such as a cloud disk or GitHub, is another icon. It is not a second official. Downloads sit at the end, with a download icon. A missing optional fact is omitted.
 - Notice: `modified` when the local sum differs from the lock. The zh-CN label is 更新后会覆盖本地改动. `untracked` when the local id has a directory and no market lock. The notice says the app is already on this machine and that replace overwrites source while records stay. When the local manifest has a version, the notice also names that version. Confirm before that write remains on the action.
 - Action: install, update, replace, or none. Install is a clean first install and carries a download icon. Replace is the action when the id is already on this machine without a market lock. None means a market lock version equals the catalog version. Update means the lock version is less than the catalog. A local sum that differs from the lock does not change the action. A directory without a lock is never none.
-- Click: a clean install or update starts on the first click. The button reads 安装中, then 已安装. `modified` or `untracked` does not start the write on the first click. That click replaces the action with 取消 and 确认. Cancel restores the previous action. Confirm starts the same 安装中 state. The confirm stays on the card. It does not open another layer. Installed does not accept a click. A failed write restores the previous action and leaves the library unchanged. App and theme use this same click.
+- Installed controls: none is a status, not an action: a check mark and 已安装. An update keeps the update action beside that status; the status reads 可更新 {a} → {b} with the lock version and the catalog version. An installed app card also offers 打开 / Open, a bordered action that opens the library's tab for that app. An installed theme card offers 应用 / Apply, which writes the host palette — the same write the Settings appearance card makes. An installed card of either kind offers 卸载 / Uninstall, an icon-only action that takes the danger color on hover. An untracked row offers neither.
+- Click: a clean install or update starts on the first click. The button reads 安装中, then 已安装. `modified` or `untracked` does not start the write on the first click. That click replaces the action with 取消 and 确认. Cancel restores the previous action. Confirm starts the same 安装中 state. The confirm stays on the card. It does not open another layer. Installed does not accept a click. A failed write restores the previous action and leaves the library unchanged. App and theme use this same click. Uninstall uses the same two-step confirm: the first click replaces the action with 取消 and 确认卸载, confirm reads 卸载中, and the card becomes a first install again. Open and Apply are one click each, and never leave the card's row.
 - `official` and `source` are separate fields. Omitted `source` means `npm`. This page does not accept an upload, and it does not show the path by which a package reached that source.
-- Non-goals: a chip for every fact; a star; a comment thread; a second action.
+- Non-goals: a chip for every fact; a star; a comment thread; a second install action.
 
 ## Implementation
 

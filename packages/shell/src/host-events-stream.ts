@@ -8,6 +8,7 @@ export type HostStreamControls = {
   setWorkbench(appId: string): void
   renameApp(from: string, to: string): void
   marketInstalled(kind: 'app' | 'theme', id: string): void
+  marketUninstalled(kind: 'app' | 'theme', id: string): void
   appChanged(event: {
     readonly appId: string
     readonly change: 'created' | 'updated' | 'deleted' | 'restored' | 'renamed'
@@ -33,6 +34,7 @@ type Pending =
   | { readonly kind: 'setWorkbench'; readonly appId: string }
   | { readonly kind: 'renameApp'; readonly from: string; readonly to: string }
   | { readonly kind: 'marketInstalled'; readonly marketKind: 'app' | 'theme'; readonly id: string }
+  | { readonly kind: 'marketUninstalled'; readonly marketKind: 'app' | 'theme'; readonly id: string }
   | {
     readonly kind: 'appChanged'
     readonly appId: string
@@ -113,6 +115,10 @@ export function openHostEventsStream(
       enqueue({ kind: 'marketInstalled', marketKind: data.kind, id: data.id })
       return
     }
+    if (type === 'market:uninstall' && (data.kind === 'app' || data.kind === 'theme') && typeof data.id === 'string') {
+      enqueue({ kind: 'marketUninstalled', marketKind: data.kind, id: data.id })
+      return
+    }
     if (type === 'app:changed' && typeof data.appId === 'string' && typeof data.change === 'string' && appChanges.has(data.change)) {
       enqueue({
         kind: 'appChanged',
@@ -182,6 +188,9 @@ function applyPending(controls: HostStreamControls, item: Pending): void {
       return
     case 'marketInstalled':
       controls.marketInstalled(item.marketKind, item.id)
+      return
+    case 'marketUninstalled':
+      controls.marketUninstalled(item.marketKind, item.id)
       return
     case 'appChanged':
       controls.appChanged({

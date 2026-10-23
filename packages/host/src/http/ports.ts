@@ -86,6 +86,7 @@ export interface LoopbackPorts {
   subscribeApp(appId: string, since: number, listener: (event: unknown) => void): () => void
   listMarket(): Promise<unknown>
   installMarket(id: string, confirm: boolean): Promise<void>
+  uninstallMarket(id: string, kind: 'app' | 'theme', confirm: boolean): Promise<void>
   checkUpdate(): Promise<UpdateCheck>
   /** Where an update would come from. Reads the prefix; no network. */
   updateSource(): Promise<UpdateSource>

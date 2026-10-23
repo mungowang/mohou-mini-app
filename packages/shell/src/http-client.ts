@@ -56,6 +56,7 @@ export function httpPanelClients(origin: string): PanelClient & PanelSettingsCli
       }
     },
     installMarket: (id, confirm) => postOk(origin, httpLayout.marketInstall, { id, confirm }),
+    uninstallMarket: (id, kind, confirm) => postOk(origin, httpLayout.marketUninstall, { id, kind, confirm }),
     readPolicy: async () => publicPolicy((await getJson(origin, httpLayout.hostConfig)).policy),
     writePolicy: async (policy) => {
       const body = await sendJson(origin, 'POST', httpLayout.hostConfig, policy, true)

@@ -16,6 +16,7 @@ describe('frame bridge', () => {
     applyHostEvent({ type: 'storage-size', appId: 'com.example.app', table: 'kv', keys: ['a'] }, panel, frame)
     applyHostEvent({ type: 'market:install', kind: 'theme', id: 'forest' }, panel, frame)
     applyHostEvent({ type: 'market:install', kind: 'app', id: 'com.example.app' }, panel, frame)
+    applyHostEvent({ type: 'market:uninstall', kind: 'theme', id: 'forest' }, panel, frame)
     applyHostEvent({ type: 'app:changed', appId: 'com.example.app', change: 'renamed', from: 'com.example.old' }, panel, frame)
     applyHostEvent({
       type: 'app:eval',
@@ -33,6 +34,7 @@ describe('frame bridge', () => {
       { kind: 'theme', id: 'forest' },
       { kind: 'app', id: 'com.example.app' },
     ])
+    expect(panel.marketGone).toEqual([{ kind: 'theme', id: 'forest' }])
     expect(panel.changed).toEqual([{ appId: 'com.example.app', change: 'renamed', from: 'com.example.old' }])
     expect(panel.missing).toEqual(['com.example.app'])
     expect(posted[0]).toEqual({ message: { type: 'theme', variables: { '--background': 'black' } }, origin: 'http://127.0.0.1:9743' })
@@ -40,16 +42,25 @@ describe('frame bridge', () => {
   })
 })
 
-function recorder(): PanelBridge & { shown: unknown[]; notices: unknown[]; market: unknown[]; changed: unknown[]; missing: string[] } {
+function recorder(): PanelBridge & {
+  shown: unknown[]
+  notices: unknown[]
+  market: unknown[]
+  marketGone: unknown[]
+  changed: unknown[]
+  missing: string[]
+} {
   const shown: unknown[] = []
   const notices: unknown[] = []
   const market: unknown[] = []
+  const marketGone: unknown[] = []
   const changed: unknown[] = []
   const missing: string[] = []
   return {
     shown,
     notices,
     market,
+    marketGone,
     changed,
     missing,
     showApp: (appId, title) => shown.push({ appId, title }),
@@ -58,6 +69,7 @@ function recorder(): PanelBridge & { shown: unknown[]; notices: unknown[]; marke
     setWorkbench: () => undefined,
     renameApp: () => undefined,
     marketInstalled: (kind, id) => market.push({ kind, id }),
+    marketUninstalled: (kind, id) => marketGone.push({ kind, id }),
     appChanged: event => changed.push(event),
   }
 }

@@ -67,6 +67,7 @@ describe('openHostEventsStream', () => {
     src?.emit({ type: 'app:rename', from: 'com.example.old', to: 'com.example.new' })
     src?.emit({ type: 'storage-size', appId: 'com.example.app', table: 'kv' })
     src?.emit({ type: 'market:install', kind: 'theme', id: 'forest' })
+    src?.emit({ type: 'market:uninstall', kind: 'theme', id: 'forest' })
     src?.emit({ type: 'app:changed', appId: 'com.example.app', change: 'updated' })
     src?.emit({ type: 'app:changed', appId: 'com.example.app', change: 'renamed', from: 'com.example.old' })
     src?.emit({ type: 'app:reload', appId: 'com.example.app' })
@@ -81,6 +82,7 @@ describe('openHostEventsStream', () => {
     expect(panel.renames).toEqual([{ from: 'com.example.old', to: 'com.example.new' }])
     expect(panel.notices).toEqual([{ appId: 'com.example.app', table: 'kv' }])
     expect(panel.market).toEqual([{ kind: 'theme', id: 'forest' }])
+    expect(panel.marketGone).toEqual([{ kind: 'theme', id: 'forest' }])
     expect(panel.changed).toEqual([
       { appId: 'com.example.app', change: 'updated' },
       { appId: 'com.example.app', change: 'renamed', from: 'com.example.old' },
@@ -125,6 +127,7 @@ function recorder(): HostStreamControls & {
   workbenches: string[]
   renames: unknown[]
   market: unknown[]
+  marketGone: unknown[]
   changed: unknown[]
 } {
   const shown: unknown[] = []
@@ -132,6 +135,7 @@ function recorder(): HostStreamControls & {
   const workbenches: string[] = []
   const renames: unknown[] = []
   const market: unknown[] = []
+  const marketGone: unknown[] = []
   const changed: unknown[] = []
   return {
     shown,
@@ -139,12 +143,14 @@ function recorder(): HostStreamControls & {
     workbenches,
     renames,
     market,
+    marketGone,
     changed,
     showApp: (appId, title) => shown.push(title === undefined ? { appId } : { appId, title }),
     showNotice: (appId, table) => notices.push({ appId, table }),
     setWorkbench: appId => workbenches.push(appId),
     renameApp: (from, to) => renames.push({ from, to }),
     marketInstalled: (kind, id) => market.push({ kind, id }),
+    marketUninstalled: (kind, id) => marketGone.push({ kind, id }),
     appChanged: event => changed.push(event),
   }
 }

@@ -18,7 +18,7 @@ import { authoringTokenMatches } from './guard.ts'
 import { probeBrain, type HostPolicy } from '../host/config.ts'
 import { installStartupSamples } from '../apps/startup-seed.ts'
 import { checkPackageUpdate, discardUpdateResult, readUpdateResult, readUpdateSource, stagePackageUpdate, tarballChannel, updateEnv } from './updates.ts'
-import { installMarket, listMarket } from '../market/service.ts'
+import { installMarket, listMarket, uninstallMarket } from '../market/service.ts'
 import { McpError } from '@mohou/mcp-client'
 
 import { admitMcpText } from '../host/mcp-import.ts'
@@ -188,6 +188,16 @@ export function bindLoopback(input: {
           change: confirm ? 'updated' : 'created',
         })
       }
+    },
+    uninstallMarket: async (id, kind, confirm) => {
+      await uninstallMarket({
+        runtimeRoot: input.runtimeRoot,
+        id,
+        kind,
+        confirm,
+        trashApp: appId => input.author.deleteApp(appId),
+      })
+      input.author.hostEvents.publish({ type: 'market:uninstall', kind, id })
     },
     updateSource: () => Promise.resolve(readUpdateSource(updateEnv(input.policy()))),
     checkUpdate: async () => {

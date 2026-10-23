@@ -98,13 +98,17 @@ describe('mountOwner', () => {
     expect(refused.status).toBe(400)
   })
 
-  it('lists and installs market rows through the owner routes', async () => {
+  it('lists, installs, and uninstalls market rows through the owner routes', async () => {
     const app = new Hono<HostEnv>()
     const installed: { id: string; confirm: boolean }[] = []
+    const removed: { id: string; kind: string; confirm: boolean }[] = []
     mountOwner(app, basePorts({
       listMarket: async () => [{ id: 'com.example.desk', kind: 'app', name: 'Desk' }],
       installMarket: async (id: string, confirm: boolean) => {
         installed.push({ id, confirm })
+      },
+      uninstallMarket: async (id: string, kind: 'app' | 'theme', confirm: boolean) => {
+        removed.push({ id, kind, confirm })
       },
     }))
     const listed = await request(app, httpLayout.market)
@@ -120,6 +124,13 @@ describe('mountOwner', () => {
     })
     expect(install.status).toBe(200)
     expect(installed).toEqual([{ id: 'com.example.desk', confirm: true }])
+    const uninstall = await request(app, httpLayout.marketUninstall, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'forest', kind: 'theme', confirm: true }),
+    })
+    expect(uninstall.status).toBe(200)
+    expect(removed).toEqual([{ id: 'forest', kind: 'theme', confirm: true }])
   })
 
   it('lists, writes, and removes a credential, and refuses a half row', async () => {

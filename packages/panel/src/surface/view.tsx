@@ -25,6 +25,7 @@ export interface PanelControls {
   setWorkbench(appId: string): void
   renameApp(from: string, to: string): void
   marketInstalled(kind: 'app' | 'theme', id: string): void
+  marketUninstalled(kind: 'app' | 'theme', id: string): void
   appChanged(event: { readonly appId: string; readonly change: 'created' | 'updated' | 'deleted' | 'restored' | 'renamed'; readonly from?: string }): void
 }
 
@@ -92,6 +93,10 @@ export function PanelSurface(props: {
         if (kind === 'app') bumpLibrary()
         if (kind === 'theme') setPaletteTick(value => value + 1)
       },
+      marketUninstalled: (kind) => {
+        if (kind === 'app') bumpLibrary()
+        if (kind === 'theme') setPaletteTick(value => value + 1)
+      },
       appChanged: () => bumpLibrary(),
     })
   }, [props.onControls])
@@ -139,6 +144,10 @@ export function PanelSurface(props: {
       onActiveApp={onActiveApp}
       {...desk === undefined ? {} : { defaultWorkbenchId: desk }}
       {...props.settings === undefined ? {} : { onSetDefaultWorkbench: (id: string) => { void writeDefault(props.settings, id, setDesk) } }}
+      {...props.settings === undefined ? {} : { onApplyPalette: (id: string) => {
+        const settings = props.settings
+        if (settings !== undefined) void applyPalette(settings, id, setHostPolicy)
+      } }}
       {...props.theme === undefined ? {} : {
         themeOpen: state.themeOpen,
         onToggleTheme: () => dispatch({ type: 'toggle-theme' }),
@@ -268,6 +277,17 @@ async function writeDefault(
   const next: PanelPolicy = { ...rest, defaultWorkbenchId: id }
   const written = await settings.writePolicy(next)
   setDesk(written.policy.defaultWorkbenchId)
+}
+
+/** Apply one palette id as the host palette. The market theme card's Apply. */
+async function applyPalette(
+  settings: PanelSettingsClient,
+  id: string,
+  setHostPolicy: (policy: PanelPolicy) => void,
+): Promise<void> {
+  const current = await settings.readPolicy()
+  const written = await settings.writePolicy({ ...current, palette: id })
+  setHostPolicy(written.policy)
 }
 
 /** An offer the owner put away stays away for this window. */

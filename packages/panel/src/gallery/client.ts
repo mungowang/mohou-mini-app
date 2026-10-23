@@ -16,6 +16,7 @@ export interface PanelClient {
   undeleteApp?(appId: string): Promise<void>
   listMarket?(): Promise<MarketList>
   installMarket?(id: string, confirm: boolean): Promise<void>
+  uninstallMarket?(id: string, kind: 'app' | 'theme', confirm: boolean): Promise<void>
 }
 
 /** One market read: rows with local state, plus the bundles that still have a row. */

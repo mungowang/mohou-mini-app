@@ -1,4 +1,4 @@
-import { Download, Hash, Loader2, Package, PackageSearch, Store, Tag, User } from 'lucide-react'
+import { Download, ExternalLink, Hash, Loader2, Package, PackageSearch, Store, Tag, Trash2, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { MarketList, MarketPack, MarketRow } from '../gallery/client.ts'
@@ -8,11 +8,17 @@ import type { ThemeDualTokens } from '../theme/preview.tsx'
 
 /**
  * Market tab. Apps and themes are separate grids. The card click confirms before a replace.
+ * An installed card shows a status, open / apply, and uninstall with its own confirm.
  * @param props - catalog client and chrome locale
  */
 export function MarketView(props: {
   readonly list?: (() => Promise<MarketList>) | undefined
   readonly install?: ((id: string, confirm: boolean) => Promise<void>) | undefined
+  readonly uninstall?: ((id: string, kind: 'app' | 'theme', confirm: boolean) => Promise<void>) | undefined
+  /** Open one installed app in a tab. The library's open path. */
+  readonly open?: ((id: string, title: string) => void) | undefined
+  /** Apply one installed theme id as the host palette. */
+  readonly apply?: ((id: string) => void) | undefined
   readonly locale: PanelLocale
   readonly mode: PanelLabelMode
   /** Bumped when chrome asks for a refresh, so the catalog is read again. */
@@ -31,9 +37,10 @@ export function MarketView(props: {
   const [tag, setTag] = useState<string>()
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState<string>()
-  const [busy, setBusy] = useState<string>()
   // Optimistic mark until a catalog read lands. A later read clears it so a new catalog version can show Update.
   const [done, setDone] = useState<string>()
+  const [busy, setBusy] = useState<{ readonly id: string; readonly op: 'install' | 'uninstall' }>()
+  const [removing, setRemoving] = useState<string>()
   const [loading, setLoading] = useState(false)
   const loadGeneration = useRef(0)
 
@@ -140,13 +147,30 @@ export function MarketView(props: {
 
   async function run(row: MarketRow, confirm: boolean) {
     if (props.install === undefined) return
-    setBusy(row.id)
+    setBusy({ id: row.id, op: 'install' })
     setPending(undefined)
     setError(undefined)
     try {
       await props.install(row.id, confirm)
       setDone(row.id)
       // The lock is on disk now, so the rows and the filter counts are read again.
+      load()
+      props.onInstalled()
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : label('market-failed'))
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  async function remove(row: MarketRow, confirm: boolean) {
+    if (props.uninstall === undefined) return
+    setBusy({ id: row.id, op: 'uninstall' })
+    setRemoving(undefined)
+    setError(undefined)
+    try {
+      await props.uninstall(row.id, row.kind, confirm)
+      setDone(undefined)
       load()
       props.onInstalled()
     } catch (failure) {
@@ -246,12 +270,18 @@ export function MarketView(props: {
               row={row}
               locale={props.locale}
               pending={pending === row.id}
-              busy={busy === row.id}
+              busy={busy?.id === row.id ? busy.op : undefined}
               done={done === row.id}
+              removing={removing === row.id}
               label={label}
               onAsk={() => setPending(row.id)}
               onCancel={() => setPending(undefined)}
               onRun={confirm => void run(row, confirm)}
+              onAskRemove={() => setRemoving(row.id)}
+              onCancelRemove={() => setRemoving(undefined)}
+              onRemove={confirm => void remove(row, confirm)}
+              onOpen={props.open === undefined ? undefined : () => props.open?.(row.id, rowLabel(props.locale, row, 'name'))}
+              onApply={props.apply === undefined || row.kind !== 'theme' ? undefined : () => props.apply?.(row.id)}
             />
           ))}
         </div>
@@ -295,12 +325,18 @@ function Card(props: {
   readonly row: MarketRow
   readonly locale: PanelLocale
   readonly pending: boolean
-  readonly busy: boolean
+  readonly busy: 'install' | 'uninstall' | undefined
   readonly done: boolean
+  readonly removing: boolean
   readonly label: (key: string) => string
   readonly onAsk: () => void
   readonly onCancel: () => void
   readonly onRun: (confirm: boolean) => void
+  readonly onAskRemove: () => void
+  readonly onCancelRemove: () => void
+  readonly onRemove: (confirm: boolean) => void
+  readonly onOpen: (() => void) | undefined
+  readonly onApply: (() => void) | undefined
 }): ReactNode {
   const row = props.row
   const notice = row.modified === true
@@ -426,31 +462,82 @@ function Card(props: {
   )
 }
 
+/** Status chip, not a button. A card with a lock is installed; a newer catalog row is updatable. */
+function installedStatus(row: MarketRow): 'installed' | 'update' | undefined {
+  if (row.tracked !== true || row.installedVersion === undefined) return undefined
+  return row.installedVersion === row.version && row.modified !== true ? 'installed' : 'update'
+}
+
+function StatusChip(props: {
+  readonly row: MarketRow
+  readonly label: (key: string) => string
+}): ReactNode {
+  const state = installedStatus(props.row)
+  if (state === 'installed') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
+        data-market-installed={props.row.id}
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+        {props.label('market-installed')}
+      </span>
+    )
+  }
+  if (state === 'update') {
+    const from = props.row.installedVersion ?? ''
+    return (
+      <span
+        className="inline-flex max-w-44 items-center truncate rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
+        title={props.label('market-updatable').replaceAll('{a}', from).replaceAll('{b}', props.row.version)}
+        data-market-update={props.row.id}
+      >
+        {props.label('market-updatable').replaceAll('{a}', from).replaceAll('{b}', props.row.version)}
+      </span>
+    )
+  }
+  return null
+}
+
 function Action(props: {
   readonly row: MarketRow
   readonly pending: boolean
-  readonly busy: boolean
+  readonly busy: 'install' | 'uninstall' | undefined
   readonly done: boolean
+  readonly removing: boolean
   readonly label: (key: string) => string
   readonly onAsk: () => void
   readonly onCancel: () => void
   readonly onRun: (confirm: boolean) => void
+  readonly onAskRemove: () => void
+  readonly onCancelRemove: () => void
+  readonly onRemove: (confirm: boolean) => void
+  readonly onOpen: (() => void) | undefined
+  readonly onApply: (() => void) | undefined
 }): ReactNode {
-  if (props.busy) {
-    return <button type="button" className="rounded-full bg-foreground px-3 py-1.5 text-sm text-background" disabled>{props.label('market-installing')}</button>
+  if (props.busy !== undefined) {
+    const busyLabel = props.busy === 'install' ? props.label('market-installing') : props.label('market-uninstalling')
+    return <button type="button" className="rounded-full bg-foreground px-3 py-1.5 text-sm text-background" disabled>{busyLabel}</button>
   }
-  // Market lock equal to catalog version. A directory without a lock is not "installed" here.
-  if (props.done || (props.row.tracked === true && props.row.installedVersion === props.row.version && props.row.modified !== true)) {
-    return <button type="button" className="rounded-full border px-3 py-1.5 text-sm text-muted-foreground" disabled>{props.label('market-installed')}</button>
+  if (props.removing) {
+    return (
+      <span className="flex items-center gap-2" data-market-remove={props.row.id}>
+        <button type="button" className="text-sm text-muted-foreground" onClick={props.onCancelRemove}>{props.label('market-cancel')}</button>
+        <button
+          type="button"
+          className="rounded-full bg-destructive px-3 py-1.5 text-sm text-destructive-foreground"
+          onClick={() => props.onRemove(true)}
+        >
+          {props.label('market-uninstall-confirm')}
+        </button>
+      </span>
+    )
   }
-  if (props.row.installable === false) {
-    return <button type="button" className="rounded-full border px-3 py-1.5 text-sm text-muted-foreground" disabled>{props.label('market-requires')}</button>
-  }
-  const needsConfirm = props.row.modified === true || props.row.tracked === false
-  const update = props.row.tracked === true && props.row.installedVersion !== undefined
   if (props.pending) {
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2" data-market-confirm={props.row.id}>
         <button type="button" className="text-sm text-muted-foreground" onClick={props.onCancel}>{props.label('market-cancel')}</button>
         <button type="button" className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1.5 text-sm text-background" onClick={() => props.onRun(true)}>
           <Download size={14} />
@@ -459,6 +546,65 @@ function Action(props: {
       </span>
     )
   }
+  const installed = installedStatus(props.row)
+  if (installed !== undefined) {
+    return (
+      <span className="flex items-center gap-2">
+        <StatusChip row={props.row} label={props.label} />
+        {props.row.kind === 'theme' ? (
+          props.onApply === undefined ? null : (
+            <button
+              type="button"
+              className="rounded-full border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+              data-market-apply={props.row.id}
+              onClick={props.onApply}
+            >
+              {props.label('market-apply')}
+            </button>
+          )
+        ) : (
+          props.onOpen === undefined ? null : (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+              data-market-open={props.row.id}
+              onClick={props.onOpen}
+            >
+              <ExternalLink size={13} />
+              {props.label('market-open')}
+            </button>
+          )
+        )}
+        {installed === 'update' ? (
+          <button
+            type="button"
+            className="rounded-full bg-foreground px-3 py-1.5 text-sm text-background"
+            onClick={() => props.row.modified === true ? props.onAsk() : props.onRun(false)}
+          >
+            {props.label('market-update')}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex size-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+          title={props.label('market-uninstall')}
+          aria-label={props.label('market-uninstall')}
+          data-market-uninstall={props.row.id}
+          onClick={props.onAskRemove}
+        >
+          <Trash2 size={14} />
+        </button>
+      </span>
+    )
+  }
+  if (props.done) {
+    return <StatusChip row={props.row} label={props.label} />
+  }
+  if (props.row.installable === false) {
+    return <button type="button" className="rounded-full border px-3 py-1.5 text-sm text-muted-foreground" disabled>{props.label('market-requires')}</button>
+  }
+  const needsConfirm = props.row.modified === true || props.row.tracked === false
+  const update = props.row.tracked === true && props.row.installedVersion !== undefined
   return (
     <button
       type="button"

@@ -19,3 +19,4 @@ export type HostNotice =
   | { type: 'app:reload'; appId: string }
   | { type: 'storage-size'; appId: string; table: string; keys: string[] }
   | { type: 'market:install'; kind: 'app' | 'theme'; id: string }
+  | { type: 'market:uninstall'; kind: 'app' | 'theme'; id: string }

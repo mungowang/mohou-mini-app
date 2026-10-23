@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-14
+updated: 2026-10-23
 ---
 
 # Install an app
@@ -16,7 +16,7 @@ Layer: [Market](README.md). Index: [features.md](../features.md). The tab is [ta
 - Files: replace source, including `theme.css` and a shipped `package.json` and lockfile. Delete source files the package no longer ships. Keep `storage/`, `logs/`, `theme.json`, and `.git`. Commit a dirty tree first, then commit `Update <id> to <version>`. Remove `.autogen`. Reinstall dependencies only when the lockfile changed. Package scripts do not run.
 - Schema: an applied `schema/` file whose checksum would change, or whose file would disappear, is refused before any write. A new numbered file is source and is applied on the next open.
 - Failure: a sum mismatch, an id mismatch, a schema refusal, a missing tarball, or a failed dependency install writes nothing and leaves the previous tree. A failed dependency install restores the previous app `package.json` and lockfile, as [install dependencies](../host/install.md) already does. A replace without confirm is `market-confirm` and writes nothing. The message says records stay. Keeping the edits means backing up this app's history first and replaying them after the update, or renaming this app, installing the official id, and merging one into the other.
-- Uninstall: author tool `mini_app_market_uninstall`. An app moves to trash the same way panel delete does; `storage/` stays with the trash copy. A theme deletes `theme-<id>.css` and its market lock. `confirm` defaults to false. Local source changes, or a tree/file without a market lock, need `confirm: true`. A missing install is `market-catalog`.
+- Uninstall: author tool `mini_app_market_uninstall`, or the market card's 卸载. An app moves to trash the same way panel delete does; `storage/` stays with the trash copy. A theme deletes `theme-<id>.css` and its market lock. `confirm` defaults to false. Local source changes, or a tree/file without a market lock, need `confirm: true`. A missing install is `market-catalog`.
 - Non-goals: installing every app in the catalog; cloning the author repo; putting the publisher's git history in the user's app. A `theme` row is [install a theme](theme.md).
 
 ## Implementation

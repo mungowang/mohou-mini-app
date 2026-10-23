@@ -7,6 +7,10 @@ updated: 2026-10-23
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.96
+
+An installed market row acts on the card: the disabled 已安装 button is a status mark (可更新 v → v when a lock is behind), an installed app offers 打开, an installed theme offers 应用, and both offer 卸载 with the same 取消 / 确认卸载 confirm install uses. Uninstall is also a host route and a `market:uninstall` notice, so every open panel refreshes.
+
 ## 1.0.95
 
 Website driver hooks receive `ctx.website.state`: one author bag per site session, kept across a reload that swaps the driver module, so a spawn handle stored in it survives where a module variable does not. The session end disposes it; `api` methods and non-website apps do not see it.

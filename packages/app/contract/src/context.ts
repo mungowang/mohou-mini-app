@@ -1,5 +1,5 @@
 import type { AppId } from './app-id.ts'
-import type { AppSpawnHandle, AppSpawnOptions } from './website.ts'
+import type { AppSpawnHandle, AppSpawnOptions, WebsiteSessionApi } from './website.ts'
 import type { AppWorkbench } from './workbench.ts'
 
 import { agentEventType, llmEventType } from './event-type.ts'
@@ -177,4 +177,12 @@ export interface AppContext<State extends object = Record<string, never>> {
    * Session end kills every spawn. Not a one-shot shell.
    */
   spawn(file: string, args?: readonly string[], options?: AppSpawnOptions): Promise<AppSpawnHandle>
+  /**
+   * Present only when the manifest kind is `website`, in driver hooks
+   * (`website.ensure` / `refresh` / `dispose` / `content`). `state` is the
+   * session-scoped author bag: Host creates it when the site session starts,
+   * passes the same object to every hook, and keeps it across a reload that
+   * swaps the driver module. The session end disposes it.
+   */
+  website?: WebsiteSessionApi
 }

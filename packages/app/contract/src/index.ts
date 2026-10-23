@@ -24,6 +24,7 @@ export {
   type WebsiteContentDriver,
   type WebsiteContentInfo,
   type WebsiteDriver,
+  type WebsiteSessionApi,
   type WebsiteError,
   type WebsiteHandle,
   type WebsitePhase,

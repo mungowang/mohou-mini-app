@@ -21,6 +21,14 @@ Layer: [App contract](README.md). Index: [features.md](../features.md).
 - Non-goals: shelling out with `ctx.bash('… &')` as a long-lived server; a public lifetime flag on spawn; Host guessing which website child is “primary.”
 
 ```ts
+interface AppSpawnOptions {
+  readonly cwd?: string
+  readonly env?: Readonly<Record<string, string>>
+}
+
+// ctx
+spawn(file, args?, options?): Promise<AppSpawnHandle>
+
 interface AppSpawnHandle {
   readonly pid: number | undefined
   kill(): Promise<void>

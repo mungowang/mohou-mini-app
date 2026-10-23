@@ -14,6 +14,7 @@ import type {
   AppSystemMetrics,
   AppWorkbench,
   HostNotice,
+  WebsiteSessionApi,
 } from '@mohou/contract'
 
 import type { CredentialProvider } from '../credentials/provider.ts'
@@ -40,6 +41,7 @@ export interface CallCapabilities<State extends object = Record<string, never>> 
   readonly brain: BoundBrain
   readonly workbench?: AppWorkbench
   readonly spawn: (file: string, args?: readonly string[], options?: AppSpawnOptions) => Promise<AppSpawnHandle>
+  readonly website?: WebsiteSessionApi
 }
 
 /**
@@ -128,6 +130,7 @@ export function contextFor<State extends object>(capabilities: CallCapabilities<
     }) as AppContext<State>['agent'],
     mcp: capabilities.mcp,
     spawn: capabilities.spawn,
+    ...capabilities.website === undefined ? {} : { website: capabilities.website },
     ...capabilities.workbench === undefined ? {} : { workbench: capabilities.workbench },
   }
 }

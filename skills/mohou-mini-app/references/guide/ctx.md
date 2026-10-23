@@ -90,6 +90,7 @@ When `manifest.json` has `"kind": "website"` and a required `url`:
 | `website.ensure(ctx)` | When the view session starts (open tab). May `ctx.spawn` (website-tag) and `return { url }` |
 | `website.refresh?(ctx, { url })` | Panel reload / `useWebsite().refresh` while the view stays. Host does **not** kill website-tag spawns; kill+respawn yourself if needed |
 | `website.dispose?(ctx)` | View session end — Host still kills remaining spawns after |
+| `ctx.website.state` | The session bag inside every driver hook. One object per site session; **kept across a reload** (a module variable is not). Store the spawn handle here; `refresh` reads it back to restart the server. Absent in `api` methods |
 | `website.content?.onLoad` / `onLoadFailed` / `onDocumentIdle` | Content-frame moments (path C) |
 
 `api` methods may also `ctx.spawn` (app-tag). Those die on ordinary reload like any app worker.

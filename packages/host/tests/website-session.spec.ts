@@ -9,6 +9,7 @@ import type { AppId } from '@mohou/contract'
 import { createAppEvents } from '../src/events/app-events.ts'
 import type { CallCapabilities } from '../src/kernel/call.ts'
 import { createWebsiteSessions } from '../src/website/session.ts'
+import type { WebsiteDriver } from '@mohou/contract'
 
 describe('website sessions', () => {
   const roots: string[] = []
@@ -332,6 +333,64 @@ describe('website sessions', () => {
       })
       await sessions.content(quiet, 'load')
       await sessions.content(quiet, 'document-idle')
+    } finally {
+      await sessions.disposeAll()
+    }
+  })
+
+  it('website state bag: one object per session, kept across a driver swap, renewed after dispose', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'mma-website-state-'))
+    roots.push(root)
+    const appDir = join(root, 'app')
+    await mkdir(appDir)
+    const appId = 'com.example.wstate' as AppId
+    const seenBags: unknown[] = []
+    const sessions = createWebsiteSessions({
+      runtimeRoot: root,
+      buildCapabilities: (_id, state) => ({
+        ...fakeCapabilities(appDir),
+        website: { state },
+      }),
+      pushSnapshot: () => undefined,
+      log: () => undefined,
+    })
+    const driver: WebsiteDriver = {
+      async ensure(ctx) {
+        seenBags.push(ctx.website?.state)
+        if (ctx.website === undefined) throw new Error('ctx.website missing in driver hook')
+        ctx.website.state.count = Number(ctx.website.state.count ?? 0) + 1
+      },
+    }
+    try {
+      await sessions.ensure({ appId, defaultUrl: 'http://example.test/', appDir, driver })
+      // a driver swap (reload) keeps the same session and the same bag; the reload then refreshes
+      await sessions.ensure({
+        appId,
+        defaultUrl: 'http://example.test/',
+        appDir,
+        driver: {
+          async ensure() {
+            // kept from the first driver; a reload swaps without re-running ensure
+          },
+          async refresh(ctx) {
+            seenBags.push(ctx.website?.state)
+            if (ctx.website === undefined) throw new Error('ctx.website missing after swap')
+            ctx.website.state.count = Number(ctx.website.state.count ?? 0) + 10
+          },
+        } satisfies WebsiteDriver,
+      })
+      await sessions.refresh(appId)
+      const bag = seenBags[0]
+      expect(seenBags).toHaveLength(2)
+      expect(seenBags[1]).toBe(bag)
+      expect((bag as Record<string, unknown>).count).toBe(11)
+
+      // dispose ends the session; the next session gets a fresh bag
+      await sessions.dispose(appId)
+      await sessions.ensure({ appId, defaultUrl: 'http://example.test/', appDir, driver })
+      expect(seenBags).toHaveLength(3)
+      expect(seenBags[2]).not.toBe(bag)
+      expect((seenBags[2] as Record<string, unknown>).count).toBe(1)
     } finally {
       await sessions.disposeAll()
     }

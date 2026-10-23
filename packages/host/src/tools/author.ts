@@ -214,10 +214,10 @@ export function createAuthorTools(options: {
   }
   const websiteSessions = createWebsiteSessions({
     runtimeRoot: options.registry.runtimeRoot,
-    buildCapabilities: async (appId) => {
+    buildCapabilities: async (appId, state) => {
       const app = await ensureLive(bound, live, appId)
       const brain = lazyBrain(bound, app, app.id)
-      return capabilitiesFor(bound, app, brain, 'website')
+      return capabilitiesFor(bound, app, brain, 'website', state)
     },
     disposeWebsiteSpawns: async (appId) => {
       const app = live.get(appId)
@@ -993,6 +993,7 @@ function capabilitiesFor(
   app: LiveApp,
   brain: CallCapabilities['brain'],
   spawnTag: 'app' | 'website' = 'app',
+  websiteState?: Record<string, unknown>,
 ): CallCapabilities {
   const ports = options.ports
   return {
@@ -1017,6 +1018,7 @@ function capabilitiesFor(
       return app.spawns.spawnApp(file, args, spawnOptions)
     },
     ...app.kind === 'workbench' && ports.workbench !== undefined ? { workbench: ports.workbench } : {},
+    ...spawnTag === 'website' && websiteState !== undefined ? { website: { state: websiteState } } : {},
   }
 }
 

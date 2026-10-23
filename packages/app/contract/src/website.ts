@@ -91,6 +91,14 @@ export interface AppSpawnOptions {
   readonly env?: Readonly<Record<string, string>>
 }
 
+/**
+ * Session-scoped author bag on `ctx.website`, inside website driver hooks.
+ * One object per site session; Host keeps it across a driver reload.
+ */
+export interface WebsiteSessionApi {
+  readonly state: Record<string, unknown>
+}
+
 /** UI handle from `useWebsite()`. Snapshot fields are current; actions ask Host. */
 export interface WebsiteHandle extends WebsiteSnapshot {
   refresh(): Promise<void>

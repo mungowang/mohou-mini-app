@@ -13,8 +13,8 @@ import { SpawnError } from '../process/spawn.ts'
 
 export interface WebsiteSessionPorts {
   readonly runtimeRoot: string
-  /** Capabilities already carry website-tagged `spawn` from the live app registry. */
-  readonly buildCapabilities: (appId: AppId) => Promise<CallCapabilities> | CallCapabilities
+  /** Capabilities already carry website-tagged `spawn` from the live app registry. `state` lands on `ctx.website`. */
+  readonly buildCapabilities: (appId: AppId, state: Record<string, unknown>) => Promise<CallCapabilities> | CallCapabilities
   /** Kill website-tagged children on ensure retry / ensure failure. Host owns the registry. */
   readonly disposeWebsiteSpawns?: (appId: AppId) => Promise<void>
   /** Recent website-tag spawn output for failing snapshots. */
@@ -32,6 +32,8 @@ interface SessionRecord {
   error?: WebsiteSnapshot['error']
   generation: number
   chain: Promise<void>
+  /** Author bag for this site session. Survives a driver swap (reload); dies with the session. */
+  state: Record<string, unknown>
 }
 
 /**
@@ -63,7 +65,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
     session: SessionRecord,
     work: (ctx: AppContext) => Promise<T> | T,
   ): Promise<T> {
-    const capabilities = await ports.buildCapabilities(session.appId)
+    const capabilities = await ports.buildCapabilities(session.appId, session.state)
     const controller = new AbortController()
     const ctx = contextFor(capabilities, controller.signal)
     try {
@@ -104,6 +106,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
   }): Promise<WebsiteSnapshot> {
     const existing = sessions.get(input.appId)
     if (existing !== undefined) {
+      // Reload: swap the driver module, keep the session (and its state bag).
       existing.driver = input.driver
       return snapshotOf(existing)
     }
@@ -114,6 +117,7 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
       phase: 'ensuring',
       generation: 0,
       chain: Promise.resolve(),
+      state: {},
     }
     sessions.set(input.appId, session)
     publish(session)

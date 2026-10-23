@@ -19,6 +19,7 @@ import { assertLocalSource, installMarket, listMarket, uninstallMarket } from '.
 import { themePreview, readThemeCss } from '../src/market/install.ts'
 import { sourceSum } from '../src/market/sum.ts'
 import { searchMarket } from '../src/market/search.ts'
+import { openStorage } from '../src/storage/open.ts'
 
 const row = {
   id: 'com.example.desk',
@@ -675,7 +676,7 @@ describe('list and local theme install', () => {
     const packed = path.join(root, 'package')
     mkdirSync(path.join(packed, 'app', 'schema'), { recursive: true })
     writeFileSync(path.join(packed, 'app', 'manifest.json'), JSON.stringify({ id: row.id }))
-    writeFileSync(path.join(packed, 'app', 'schema', '1_init.sql'), 'SELECT 1;')
+    writeFileSync(path.join(packed, 'app', 'schema', '001_init.sql'), 'SELECT 1;')
     const sum = sourceSum(path.join(packed, 'app'))
     await expect(installAppTree({
       runtimeRoot: runtime,
@@ -684,6 +685,29 @@ describe('list and local theme install', () => {
       expectedSum: sum,
       confirm: true,
     })).rejects.toMatchObject({ code: 'market-schema' })
+  })
+
+  it('installs over applied zero-padded migrations and applies the new file on open', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mohou-market-schema-applied-'))
+    const runtime = path.join(root, 'runtime')
+    const app = path.join(runtime, 'apps', row.id)
+    mkdirSync(path.join(app, 'schema'), { recursive: true })
+    writeFileSync(path.join(app, 'schema', '001_tasks_init.sql'), 'CREATE TABLE tasks (id INTEGER PRIMARY KEY)')
+    const live = await openStorage(app)
+    live.close()
+    writeFileSync(path.join(app, 'ui.tsx'), 'old')
+    const packed = path.join(root, 'package')
+    mkdirSync(path.join(packed, 'app', 'schema'), { recursive: true })
+    writeFileSync(path.join(packed, 'app', 'schema', '001_tasks_init.sql'), 'CREATE TABLE tasks (id INTEGER PRIMARY KEY)')
+    writeFileSync(path.join(packed, 'app', 'schema', '002_seed.sql'), 'INSERT INTO tasks (id) VALUES (1)')
+    writeFileSync(path.join(packed, 'app', 'manifest.json'), JSON.stringify({ id: row.id }))
+    writeFileSync(path.join(packed, 'app', 'ui.tsx'), 'new')
+    const sum = sourceSum(path.join(packed, 'app'))
+    await installAppTree({ runtimeRoot: runtime, packageRoot: packed, row, expectedSum: sum, confirm: true })
+    expect(readFileSync(path.join(app, 'ui.tsx'), 'utf8')).toBe('new')
+    const again = await openStorage(app)
+    expect(await again.connect().query('SELECT id FROM tasks')).toEqual([{ id: 1 }])
+    again.close()
   })
 
   it('refuses a package id mismatch and a bad theme file', async () => {

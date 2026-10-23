@@ -93,15 +93,20 @@ export function restoreStorageBackup(appDir: string): void {
   copyFileSync(backupPath, live)
 }
 
+/** The leading number of a schema file name; `undefined` when the name is not a numbered migration. */
+export function schemaFileId(name: string): number | undefined {
+  const match = /^(\d+)_.+\.sql$/.exec(name)
+  return match === null ? undefined : Number(match[1])
+}
+
 function readSchema(appDir: string): SchemaFile[] {
   const dir = join(appDir, appTrees.schema)
   if (!existsSync(dir)) return []
   const files = readdirSync(dir).flatMap((name) => {
-    const match = /^(\d+)_.+\.sql$/.exec(name)
-    if (match === null) {
+    const id = schemaFileId(name)
+    if (id === undefined) {
       throw new StorageError('storage-migration', `schema file name is not a numbered migration: ${name}`)
     }
-    const id = Number(match[1])
     if (!Number.isSafeInteger(id) || id < 1) {
       throw new StorageError('storage-migration', `schema file id is invalid: ${name}`)
     }

@@ -7,6 +7,7 @@ import { commitApp } from '../history/store.ts'
 import { hostLayout } from '../host/layout.ts'
 import { runNpm, type NpmRun } from '../install/install.ts'
 import { storageDatabase } from '../storage/layout.ts'
+import { schemaFileId } from '../storage/schema.ts'
 import { parseThemeCss } from '../theme/parse.ts'
 import type { CatalogRow } from './catalog.ts'
 import { MarketError } from './error.ts'
@@ -197,7 +198,7 @@ function assertSchema(dest: string, source: string): void {
     const schemaDir = path.join(source, 'schema')
     const names = existsSync(schemaDir) ? readdirSync(schemaDir) : []
     for (const row of applied) {
-      const name = names.find(file => file.startsWith(`${row.id}_`))
+      const name = names.find(file => schemaFileId(file) === row.id)
       if (name === undefined) throw new MarketError('market-schema', `applied schema file is missing: ${row.id}`)
       const checksum = createHash('sha256').update(readFileSync(path.join(source, 'schema', name))).digest('hex')
       if (checksum !== row.checksum) throw new MarketError('market-schema', `applied schema file changed: ${name}`)

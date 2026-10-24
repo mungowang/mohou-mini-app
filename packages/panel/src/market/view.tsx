@@ -468,6 +468,15 @@ function installedStatus(row: MarketRow): 'installed' | 'update' | undefined {
   return row.installedVersion === row.version && row.modified !== true ? 'installed' : 'update'
 }
 
+/** Shared height for every control on the action row. */
+const pill = 'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm'
+const pillGhost = `${pill} text-foreground transition-colors hover:bg-muted`
+const pillMuted = `${pill} text-muted-foreground`
+const pillPrimary = 'inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-3 text-sm text-background'
+const pillDanger = 'inline-flex h-8 items-center gap-1.5 rounded-full bg-destructive px-3 text-sm text-destructive-foreground'
+const pillIcon = 'inline-flex size-8 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-destructive hover:text-destructive'
+const pillLink = 'inline-flex h-8 items-center px-2 text-sm text-muted-foreground hover:text-foreground'
+
 function StatusChip(props: {
   readonly row: MarketRow
   readonly label: (key: string) => string
@@ -476,10 +485,10 @@ function StatusChip(props: {
   if (state === 'installed') {
     return (
       <span
-        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
+        className={pillMuted}
         data-market-installed={props.row.id}
       >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
           <path d="M20 6 9 17l-5-5" />
         </svg>
         {props.label('market-installed')}
@@ -490,7 +499,7 @@ function StatusChip(props: {
     const from = props.row.installedVersion ?? ''
     return (
       <span
-        className="inline-flex max-w-44 items-center truncate rounded-full border px-2.5 py-1 text-xs text-muted-foreground"
+        className={`${pillMuted} max-w-44 truncate`}
         title={props.label('market-updatable').replaceAll('{a}', from).replaceAll('{b}', props.row.version)}
         data-market-update={props.row.id}
       >
@@ -519,15 +528,15 @@ function Action(props: {
 }): ReactNode {
   if (props.busy !== undefined) {
     const busyLabel = props.busy === 'install' ? props.label('market-installing') : props.label('market-uninstalling')
-    return <button type="button" className="rounded-full bg-foreground px-3 py-1.5 text-sm text-background" disabled>{busyLabel}</button>
+    return <button type="button" className={pillPrimary} disabled>{busyLabel}</button>
   }
   if (props.removing) {
     return (
-      <span className="flex items-center gap-2" data-market-remove={props.row.id}>
-        <button type="button" className="text-sm text-muted-foreground" onClick={props.onCancelRemove}>{props.label('market-cancel')}</button>
+      <span className="flex items-center gap-1.5" data-market-remove={props.row.id}>
+        <button type="button" className={pillLink} onClick={props.onCancelRemove}>{props.label('market-cancel')}</button>
         <button
           type="button"
-          className="rounded-full bg-destructive px-3 py-1.5 text-sm text-destructive-foreground"
+          className={pillDanger}
           onClick={() => props.onRemove(true)}
         >
           {props.label('market-uninstall-confirm')}
@@ -537,10 +546,10 @@ function Action(props: {
   }
   if (props.pending) {
     return (
-      <span className="flex items-center gap-2" data-market-confirm={props.row.id}>
-        <button type="button" className="text-sm text-muted-foreground" onClick={props.onCancel}>{props.label('market-cancel')}</button>
-        <button type="button" className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1.5 text-sm text-background" onClick={() => props.onRun(true)}>
-          <Download size={14} />
+      <span className="flex items-center gap-1.5" data-market-confirm={props.row.id}>
+        <button type="button" className={pillLink} onClick={props.onCancel}>{props.label('market-cancel')}</button>
+        <button type="button" className={pillPrimary} onClick={() => props.onRun(true)}>
+          <Download size={13} />
           {props.label('market-confirm')}
         </button>
       </span>
@@ -549,13 +558,13 @@ function Action(props: {
   const installed = installedStatus(props.row)
   if (installed !== undefined) {
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-1.5">
         <StatusChip row={props.row} label={props.label} />
         {props.row.kind === 'theme' ? (
           props.onApply === undefined ? null : (
             <button
               type="button"
-              className="rounded-full border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+              className={pillGhost}
               data-market-apply={props.row.id}
               onClick={props.onApply}
             >
@@ -566,7 +575,7 @@ function Action(props: {
           props.onOpen === undefined ? null : (
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+              className={pillGhost}
               data-market-open={props.row.id}
               onClick={props.onOpen}
             >
@@ -578,7 +587,7 @@ function Action(props: {
         {installed === 'update' ? (
           <button
             type="button"
-            className="rounded-full bg-foreground px-3 py-1.5 text-sm text-background"
+            className={pillPrimary}
             onClick={() => props.row.modified === true ? props.onAsk() : props.onRun(false)}
           >
             {props.label('market-update')}
@@ -586,13 +595,13 @@ function Action(props: {
         ) : null}
         <button
           type="button"
-          className="inline-flex size-8 items-center justify-center rounded-full border text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+          className={pillIcon}
           title={props.label('market-uninstall')}
           aria-label={props.label('market-uninstall')}
           data-market-uninstall={props.row.id}
           onClick={props.onAskRemove}
         >
-          <Trash2 size={14} />
+          <Trash2 size={13} />
         </button>
       </span>
     )
@@ -601,17 +610,17 @@ function Action(props: {
     return <StatusChip row={props.row} label={props.label} />
   }
   if (props.row.installable === false) {
-    return <button type="button" className="rounded-full border px-3 py-1.5 text-sm text-muted-foreground" disabled>{props.label('market-requires')}</button>
+    return <button type="button" className={pillMuted} disabled>{props.label('market-requires')}</button>
   }
   const needsConfirm = props.row.modified === true || props.row.tracked === false
   const update = props.row.tracked === true && props.row.installedVersion !== undefined
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1.5 text-sm text-background"
+      className={pillPrimary}
       onClick={() => needsConfirm ? props.onAsk() : props.onRun(false)}
     >
-      {update ? null : <Download size={14} />}
+      {update ? null : <Download size={13} />}
       {update ? props.label('market-update') : props.row.tracked === false ? props.label('market-replace') : props.label('market-install')}
     </button>
   )

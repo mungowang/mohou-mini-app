@@ -20,6 +20,7 @@ import { themePreview, readThemeCss } from '../src/market/install.ts'
 import { sourceSum } from '../src/market/sum.ts'
 import { searchMarket } from '../src/market/search.ts'
 import { openStorage } from '../src/storage/open.ts'
+import { registerWithFiles } from './author-seed.ts'
 
 const row = {
   id: 'com.example.desk',
@@ -414,6 +415,64 @@ describe('author market tools', () => {
     await expect(author.invoke('mini_app_market_uninstall', { appId: row.id, kind: 'nope' })).rejects.toMatchObject({ code: 'tool-args' })
     await author.invoke('mini_app_market_uninstall', { appId: row.id, kind: 'app', confirm: true })
     expect(uninstalls).toEqual([{ id: row.id, kind: 'app', confirm: true }])
+
+    // A live backend swaps and the open view is told to refetch; a not-yet-live install signals created.
+    const liveRoot = mkdtempSync(path.join(tmpdir(), 'mma-author-market-live-'))
+    const events: Array<{ type: string; change?: string }> = []
+    const live = createAuthorTools({
+      registry: createAppRegistry(liveRoot),
+      mcp: new McpClient({}),
+      ports: {
+        credentials: emptyCredentials(),
+        config: { theme: 'light', palette: 'default', locale: 'zh-CN', chatLanguage: 'zh-CN', hostPort: 0, llm: null },
+        log() {},
+        push() {},
+        http: () => Promise.reject(new Error('unused')),
+        bash: () => Promise.reject(new Error('unused')),
+        pwsh: () => Promise.reject(new Error('unused')),
+        metrics: () => Promise.reject(new Error('unused')),
+        processDirectory: liveRoot,
+        createTemp: () => liveRoot,
+        provider: createEchoProvider(),
+      },
+      env: {},
+      market: {
+        list: async () => ({ rows: [{ ...row, kind: 'app' as const }], packs: [] }),
+        install: async () => undefined,
+        uninstall: async () => undefined,
+      },
+    })
+    live.hostEvents.observe((event) => {
+      if (event.type === 'market:install' || event.type === 'app:changed' || event.type === 'app:reload') {
+        events.push(event.type === 'app:changed' ? { type: event.type, change: event.change } : { type: event.type })
+      }
+    })
+    await registerWithFiles(live, row.id, {
+      'manifest.json': JSON.stringify({ id: row.id, name: row.name, description: row.description, version: '1', entry: 'ui.tsx' }),
+      'ui.tsx': 'export {}',
+      'main.api.ts': `import { defineApp } from '@mohou/contract'
+export default defineApp({
+  name: 'Desk',
+  description: 'Today',
+  api: { ping() { return 'pong' } },
+})
+`,
+    })
+    events.length = 0
+    await live.invoke('mini_app_market_install', { appId: row.id, kind: 'app' })
+    expect(events).toEqual([
+      { type: 'market:install' },
+      { type: 'app:reload' },
+      { type: 'app:changed', change: 'created' },
+    ])
+    expect(await live.invoke('mini_app_call', { appId: row.id, method: 'ping' })).toMatchObject({ ok: true, value: 'pong' })
+    await live.invoke('mini_app_market_install', { appId: row.id, kind: 'app', overwrite: true })
+    expect(events.slice(-3)).toEqual([
+      { type: 'market:install' },
+      { type: 'app:reload' },
+      { type: 'app:changed', change: 'updated' },
+    ])
+    expect(await live.invoke('mini_app_call', { appId: row.id, method: 'ping' })).toMatchObject({ ok: true, value: 'pong' })
     const bare = createAuthorTools({
       registry: createAppRegistry(root),
       mcp: new McpClient({}),
@@ -432,6 +491,7 @@ describe('author market tools', () => {
       },
     })
     await expect(bare.invoke('mini_app_market_list', {})).rejects.toMatchObject({ code: 'market-catalog' })
+    await expect(bare.invoke('mini_app_market_install', { appId: row.id, kind: 'app' })).rejects.toMatchObject({ code: 'market-catalog' })
   })
 })
 

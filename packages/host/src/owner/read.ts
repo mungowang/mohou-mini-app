@@ -74,7 +74,11 @@ async function readCommit(registry: Registry, appId: string, commitId: string) {
   return readAppCommit(app.directory, commitId)
 }
 
-/** Owner refetch. Does not compile. A missing app throws before any event. */
+/**
+ * Owner view refetch signal. A missing app throws before any event.
+ * Backend invalidate is the caller's job (`author.invalidateLive`); this only
+ * publishes `app:reload` so the panel frame refetches UI.
+ */
 export async function reloadView(
   registry: Registry,
   publish: (event: HostEvent) => void,

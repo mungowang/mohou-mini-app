@@ -283,6 +283,12 @@ export function createAuthorTools(options: {
     undeleteApp: (appId: string) => track(restoreDeleted(bound, appId)),
     restoreStorage: (appId: string) => track(restoreAppStorage(bound, live, appId)),
     websiteSnapshot: (appId: string) => websiteSessions.get(appId),
+    /**
+     * Drop the in-memory backend module and load it again from disk. Keeps storage,
+     * spawns, and the website process. Used by panel reload and market install so
+     * API constants (e.g. recommended lists) pick up without a full Host restart.
+     */
+    invalidateLive: (appId: string) => track(invalidateLiveBackend(bound, live, appId)),
     websiteRefresh: (appId: string) => track((async () => {
       const app = live.get(appId)
       if (app !== undefined) await app.spawns.disposeAppTagged().catch(() => undefined)
@@ -409,7 +415,7 @@ async function invoke(
     case 'mini_app_market_list':
       return marketList(options, input)
     case 'mini_app_market_install':
-      return marketInstall(options, input)
+      return marketInstall(options, live, input)
     case 'mini_app_market_uninstall':
       return marketUninstall(options, input)
     case 'mini_app_rename':
@@ -809,24 +815,14 @@ async function reload(
     live.set(app.id, withKind(liveRecord(loaded, opened, app.directory, app.id, spawns), app.kind, app.url))
     if (previous !== undefined && previous.storage !== opened) previous.storage.close()
     if (app.kind === 'website' && loaded.website !== undefined && app.url !== undefined && options.websiteSessions !== undefined) {
-      const existing = options.websiteSessions.get(app.id)
-      if (existing === undefined) {
-        await options.websiteSessions.ensure({
-          appId: app.id,
-          defaultUrl: app.url,
-          driver: loaded.website,
-          appDir: app.directory,
-        })
-      } else {
-        // Swap driver; refresh keeps website-tagged processes (author may kill inside refresh).
-        await options.websiteSessions.ensure({
-          appId: app.id,
-          defaultUrl: app.url,
-          driver: loaded.website,
-          appDir: app.directory,
-        })
-        await options.websiteSessions.refresh(app.id)
-      }
+      // Swap or start the driver. Do not refresh the website process here — panel/chrome
+      // refresh is the only path that restarts a local server (author-controlled).
+      await options.websiteSessions.ensure({
+        appId: app.id,
+        defaultUrl: app.url,
+        driver: loaded.website,
+        appDir: app.directory,
+      })
     }
     const committed = await commitApp(app.directory, reloadMessage).catch((error: unknown) => ({
       status: 'failed' as const,
@@ -946,6 +942,48 @@ function storageNotice(
     onNotice: (notice) => {
       options.hostEvents.publish({ type: 'storage-size', appId, table: notice.table, keys: notice.keys })
     },
+  }
+}
+
+/**
+ * Re-transpile `main.api.ts` into the live map when the app is already loaded.
+ * No-op when nothing is live (next call/open will `ensureLive`). Does not restart
+ * website-tagged processes — only swaps the driver pointer when a site session exists.
+ */
+async function invalidateLiveBackend(
+  options: {
+    registry: Registry
+    hostEvents: ReturnType<typeof createHostEvents>
+    storageNoticeBytes?: number
+    env?: NodeJS.ProcessEnv
+    websiteSessions?: ReturnType<typeof createWebsiteSessions>
+  },
+  live: Map<string, LiveApp>,
+  appId: string,
+): Promise<void> {
+  const summary = await options.registry.get(appId)
+  const previous = live.get(summary.id)
+  if (previous === undefined) return
+  const loaded = await loadBackend(summary.directory)
+  const next = withKind(
+    liveRecord(loaded, previous.storage, previous.directory, summary.id, previous.spawns),
+    summary.kind,
+    summary.url,
+  )
+  live.set(summary.id, next)
+  if (
+    summary.kind === 'website'
+    && loaded.website !== undefined
+    && summary.url !== undefined
+    && options.websiteSessions !== undefined
+    && options.websiteSessions.get(summary.id) !== undefined
+  ) {
+    await options.websiteSessions.ensure({
+      appId: summary.id,
+      defaultUrl: summary.url,
+      driver: loaded.website,
+      appDir: summary.directory,
+    })
   }
 }
 
@@ -1177,13 +1215,18 @@ async function marketList(
 
 async function marketInstall(
   options: {
+    readonly registry: Registry
     readonly market?: {
       list: () => Promise<MarketList>
       install: (id: string, kind: MarketKind, overwrite: boolean) => Promise<void>
       uninstall: (id: string, kind: MarketKind, confirm: boolean) => Promise<void>
     }
     readonly hostEvents?: { publish: (event: HostEvent) => void }
+    readonly storageNoticeBytes?: number
+    readonly env?: NodeJS.ProcessEnv
+    readonly websiteSessions?: ReturnType<typeof createWebsiteSessions>
   },
+  live: Map<string, LiveApp>,
   input: Record<string, unknown>,
 ): Promise<{ id: string; kind: MarketKind }> {
   if (options.market === undefined) throw new MarketError('market-catalog', 'market is not available')
@@ -1199,6 +1242,10 @@ async function marketInstall(
   await options.market.install(id, kind, input.overwrite === true)
   options.hostEvents?.publish({ type: 'market:install', kind, id })
   if (kind === 'app') {
+    // Disk is new; swap the live backend (if any) so open tabs see the new API module,
+    // then soft-reload the view frame. Website processes stay up until chrome refresh.
+    await invalidateLiveBackend(options, live, id).catch(() => undefined)
+    options.hostEvents?.publish({ type: 'app:reload', appId: id })
     options.hostEvents?.publish({
       type: 'app:changed',
       appId: id,

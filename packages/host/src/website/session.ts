@@ -203,7 +203,8 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
   }
 
   /**
-   * End the driver session. Runs `dispose` hook only — Host kills remaining spawns after.
+   * End the driver session. Optional author `dispose` hook, then always reap website-tag
+   * spawns so a missing hook cannot leave the child running after the view leaves.
    */
   async function dispose(appId: AppId): Promise<void> {
     const session = sessions.get(appId)
@@ -212,13 +213,15 @@ export function createWebsiteSessions(ports: WebsiteSessionPorts) {
     await enqueue(session, async () => {
       session.phase = 'disposing'
       publish(session)
-      if (session.driver.dispose === undefined) return
-      await withCtx(session, (ctx) => {
-        if (session.driver.dispose === undefined) return undefined
-        return session.driver.dispose(ctx)
-      }).catch((error: unknown) => {
-        ports.log(session.appId, `website dispose failed: ${errorMessage(error)}`)
-      })
+      if (session.driver.dispose !== undefined) {
+        await withCtx(session, (ctx) => {
+          if (session.driver.dispose === undefined) return undefined
+          return session.driver.dispose(ctx)
+        }).catch((error: unknown) => {
+          ports.log(session.appId, `website dispose failed: ${errorMessage(error)}`)
+        })
+      }
+      await killWebsite(session.appId)
     })
   }
 

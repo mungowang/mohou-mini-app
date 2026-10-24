@@ -229,7 +229,9 @@ export async function createHost(options: {
     ...createOwnerReads(registry),
     themes,
     reloadView: async (appId: string) => {
-      if (author.websiteSnapshot(appId) !== undefined) await author.websiteRefresh(appId)
+      // Hard reload: re-load the live backend module from disk, then refetch the view.
+      // Website local processes are not restarted here — app chrome / websiteRefresh owns that.
+      await author.invalidateLive(appId).catch(() => undefined)
       await reloadView(registry, (event) => {
         author.hostEvents.publish(event)
       }, appId)

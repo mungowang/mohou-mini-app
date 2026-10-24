@@ -182,6 +182,9 @@ export function bindLoopback(input: {
       })
       input.author.hostEvents.publish({ type: 'market:install', kind: installed.kind, id: installed.id })
       if (installed.kind === 'app') {
+        // Same as author marketInstall: swap live backend then soft-reload the open view.
+        await input.author.invalidateLive(installed.id).catch(() => undefined)
+        input.author.hostEvents.publish({ type: 'app:reload', appId: installed.id })
         input.author.hostEvents.publish({
           type: 'app:changed',
           appId: installed.id,

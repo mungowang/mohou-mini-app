@@ -7,6 +7,10 @@ updated: 2026-10-23
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.98
+
+Market card action controls share one height and type size: status chip, open / apply, uninstall, and the install / update / confirm buttons all sit on the same `h-8` pill system.
+
 ## 1.0.97
 
 `ctx.mcpServers(includeAll?)` lists the host's MCP servers from an app: ids, statuses, and tool names — alive only by default, `includeAll` also returns the failed with an error. Names only, as before; no descriptions, no schemas, no env.

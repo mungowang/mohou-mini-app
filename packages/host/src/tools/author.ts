@@ -953,8 +953,6 @@ function storageNotice(
 async function invalidateLiveBackend(
   options: {
     registry: Registry
-    hostEvents: ReturnType<typeof createHostEvents>
-    storageNoticeBytes?: number
     env?: NodeJS.ProcessEnv
     websiteSessions?: ReturnType<typeof createWebsiteSessions>
   },
@@ -1244,7 +1242,15 @@ async function marketInstall(
   if (kind === 'app') {
     // Disk is new; swap the live backend (if any) so open tabs see the new API module,
     // then soft-reload the view frame. Website processes stay up until chrome refresh.
-    await invalidateLiveBackend(options, live, id).catch(() => undefined)
+    await invalidateLiveBackend(
+      {
+        registry: options.registry,
+        ...options.env === undefined ? {} : { env: options.env },
+        ...options.websiteSessions === undefined ? {} : { websiteSessions: options.websiteSessions },
+      },
+      live,
+      id,
+    ).catch(() => undefined)
     options.hostEvents?.publish({ type: 'app:reload', appId: id })
     options.hostEvents?.publish({
       type: 'app:changed',

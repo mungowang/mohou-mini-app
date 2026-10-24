@@ -7,6 +7,10 @@ updated: 2026-10-23
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
 
+## 1.0.99
+
+Panel reload and market app install invalidate the live backend module (re-import `main.api.ts`) then soft-reload the view, so API constants pick up without a Host restart. Website local processes are no longer restarted on panel reload or `mini_app_reload` — only app chrome / `website.refresh` does that. Website session dispose always reaps website-tag spawns after the author hook.
+
 ## 1.0.98
 
 Market card action controls share one height and type size: status chip, open / apply, uninstall, and the install / update / confirm buttons all sit on the same `h-8` pill system.

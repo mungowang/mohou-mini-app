@@ -21,7 +21,7 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.http(url, opts?)` | `{ ok, status, headers, text, json }` | 4xx/5xx do not throw. `json` is set only when the content type contains json and parsing succeeds |
 | `ctx.bash(command)` | `{ stdout, stderr, exitCode }` | This machine. One-shot only. Do not curl through bash. Do not background long-lived servers (`&`) |
 | `ctx.pwsh(command)` | `{ stdout, stderr, exitCode }` | Windows path of the same idea |
-| `ctx.spawn(file, args?, opts?)` | `AppSpawnHandle` | Long-lived child owned by Host. From `api` / notices Host tags **app**; from `website.*` hooks Host tags **website**. Session end (last tab/slot leave, or ephemeral call end) kills **every** tag. Ordinary reload kills app-tag (all on ordinary apps). Website panel refresh does **not** kill website-tag (author may `kill` inside `refresh`). `ready({ url })` polls until HTTP answers. `output()` is a bounded stdout/stderr tail for **failure analysis** (also may appear on website `error.detail`) — not a live stream |
+| `ctx.spawn(file, args?, opts?)` | `AppSpawnHandle` | Long-lived child owned by Host. From `api` / notices Host tags **app**; from `website.*` hooks Host tags **website**. Session end (last tab/slot leave, or ephemeral call end) kills **every** tag. `mini_app_reload` kills app-tag (websites keep website-tag). Panel reload invalidates the backend module only and does **not** kill website-tag. Author `website.refresh` may `kill` inside refresh. `ready({ url })` polls until HTTP answers. `output()` is a bounded stdout/stderr tail for **failure analysis** (also may appear on website `error.detail`) — not a live stream |
 | `ctx.system.metrics()` | OS snapshot | `loadavg` is `null` where the OS has none |
 | `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime. `images` is inline base64 or a file path the host reads |
 | `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm`. Same `images` field |
@@ -89,12 +89,12 @@ When `manifest.json` has `"kind": "website"` and a required `url`:
 | Hook | When |
 |---|---|
 | `website.ensure(ctx)` | When the view session starts (open tab). May `ctx.spawn` (website-tag) and `return { url }` |
-| `website.refresh?(ctx, { url })` | Panel reload / `useWebsite().refresh` while the view stays. Host does **not** kill website-tag spawns; kill+respawn yourself if needed |
-| `website.dispose?(ctx)` | View session end — Host still kills remaining spawns after |
-| `ctx.website.state` | The session bag inside every driver hook. One object per site session; **kept across a reload** (a module variable is not). Store the spawn handle here; `refresh` reads it back to restart the server. Absent in `api` methods |
+| `website.refresh?(ctx, { url })` | App chrome / `useWebsite().refresh` only. Host panel reload does **not** call this. Host does not kill website-tag spawns for you; kill+respawn yourself inside `refresh` if needed |
+| `website.dispose?(ctx)` | View session end. Optional. Host **always** reaps website-tag spawns after (with or without this hook) |
+| `ctx.website.state` | The session bag inside every driver hook. One object per site session; **kept across a backend invalidate** (a module variable is not). Store the spawn handle here; `refresh` reads it back to restart the server. Absent in `api` methods |
 | `website.content?.onLoad` / `onLoadFailed` / `onDocumentIdle` | Content-frame moments (path C) |
 
-`api` methods may also `ctx.spawn` (app-tag). Those die on ordinary reload like any app worker.
+Panel reload and market install **invalidate the live backend module** (re-import `main.api.ts`) then soft-reload the view. Website local processes stay up unless the app calls `refresh`. `api` methods may also `ctx.spawn` (app-tag). Those die on `mini_app_reload` like any app worker.
 
 UI: `<WebsiteFrame />` or `useWebsite()` from `@mohou/ui`. Snapshot phases: `ensuring`, `ready`, `refreshing`, `failing`, `disposing`.
 

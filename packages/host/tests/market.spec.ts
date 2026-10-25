@@ -473,6 +473,26 @@ export default defineApp({
       { type: 'app:changed', change: 'updated' },
     ])
     expect(await live.invoke('mini_app_call', { appId: row.id, method: 'ping' })).toMatchObject({ ok: true, value: 'pong' })
+    // An install over an open view re-imports `main.api.ts`, so a new API constant answers the
+    // next call without a Host restart.
+    await live.enterView(row.id)
+    expect(await live.invoke('mini_app_call', { appId: row.id, method: 'ping' }))
+      .toMatchObject({ ok: true, value: 'pong', session: 'view' })
+    await live.invoke('mini_app_write', {
+      appId: row.id,
+      path: 'main.api.ts',
+      commit: false,
+      content: `import { defineApp } from '@mohou/contract'
+export default defineApp({
+  name: 'Desk',
+  description: 'Today',
+  api: { ping() { return 'pong2' } },
+})
+`,
+    })
+    await live.invoke('mini_app_market_install', { appId: row.id, kind: 'app', overwrite: true })
+    expect(await live.invoke('mini_app_call', { appId: row.id, method: 'ping' }))
+      .toMatchObject({ ok: true, value: 'pong2', session: 'view' })
     const bare = createAuthorTools({
       registry: createAppRegistry(root),
       mcp: new McpClient({}),

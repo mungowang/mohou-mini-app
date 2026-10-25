@@ -60,6 +60,7 @@ async function capabilities(): Promise<CallCapabilities<{ count: number }>> {
     }),
     mcp: () => Promise.resolve('tool'),
     mcpServers: () => Promise.resolve({ servers: [] }),
+    mcpTools: () => Promise.resolve({ tools: [] }),
     spawn: async () => ({
       pid: undefined,
       exited: Promise.resolve({ exitCode: 0 }),
@@ -100,6 +101,24 @@ describe('runCall', () => {
       },
     }, 'list', [true])
     expect(result).toEqual({ servers: [] })
+  })
+
+  it("lists one server's tools through ctx.mcpTools", async () => {
+    let asked = ''
+    const caps = await capabilities()
+    const result = await runCall({
+      ...caps,
+      mcpTools: (serverId) => {
+        asked = serverId
+        return Promise.resolve({ tools: [{ name: 'ping', inputSchema: { type: 'object' } }] })
+      },
+    }, {
+      async tools(ctx, args: unknown) {
+        return ctx.mcpTools(String(args))
+      },
+    }, 'tools', 'echo')
+    expect(asked).toBe('echo')
+    expect(result).toEqual({ tools: [{ name: 'ping', inputSchema: { type: 'object' } }] })
   })
 
   it('gives llm and agent the call signal when the app omits one', async () => {

@@ -26,7 +26,8 @@ Every `defineApp({ api })` method receives the same `ctx`. Do not invent a membe
 | `ctx.llm(prompt, opts?)` | **string** | Omitted `provider`/`model` use the live runtime. `images` is inline base64 or a file path the host reads |
 | `ctx.agent(goal, opts?)` | **string** | Isolated run. Do not fake it with a loop of `ctx.llm`. Same `images` field |
 | `ctx.mcp(serverId, toolName, args?)` | tool result | Args are the tool's own object |
-| `ctx.mcpServers(includeAll?)` | `{ servers: [{ id, status, tools?, error? }] }` | Host MCP servers. Default lists the alive; `includeAll` also returns the failed with their status. Tool names only |
+| `ctx.mcpServers(includeAll?)` | `{ servers: [{ id, status, tools?, error? }] }` | Host MCP servers. Default lists the alive; `includeAll` also returns the failed with their status. Tool names only; use `ctx.mcpTools` for detail |
+| `ctx.mcpTools(serverId)` | `{ tools: [{ name, description?, inputSchema, outputSchema? }] }` | One server's tools with descriptions and JSON Schemas. Opens the server if needed. An unknown or failed server throws; it does not return an empty list |
 
 ## Storage
 
@@ -215,4 +216,9 @@ if (ctx.signal?.aborted) throw new Error("cancelled")
 const value = await ctx.mcp("calendar", "CalendarDates", { input: JSON.stringify({ year: 2026 }) })
 ```
 
-Unknown server: `mcp-not-connected`. Start failure: `mcp-start-failed`. Tool error: `mcp-tool-failed`. While authoring, list server and tool names with `mini_app_mcp_list`, then `mini_app_mcp_tools({ serverId, toolName? })` for descriptions and schemas. Not from `ctx`.
+Unknown server: `mcp-not-connected`. Start failure: `mcp-start-failed`. Tool error: `mcp-tool-failed`. At runtime, `ctx.mcpServers` lists ids, statuses, and tool names, and `ctx.mcpTools(serverId)` gives that server's descriptions and schemas. While authoring, `mini_app_mcp_list` and `mini_app_mcp_tools({ serverId, toolName? })` read the same catalog; neither is on `ctx`.
+
+```ts
+const { tools } = await ctx.mcpTools("calendar")
+const args = tools.find(tool => tool.name === "CalendarDates")?.inputSchema
+```

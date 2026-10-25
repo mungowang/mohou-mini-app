@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { McpClient, McpError } from '@mohou/mcp-client'
 
-import { listMcpForAuthor, listMcpServersForApp, toolsMcpForAuthor } from '../src/index.ts'
+import { listMcpForAuthor, listMcpServersForApp, listMcpToolsForApp, toolsMcpForAuthor } from '../src/index.ts'
 
 describe('listMcpForAuthor', () => {
   it('lists tool names only and keeps a missing server from dropping the rest', async () => {
@@ -115,6 +115,48 @@ describe('listMcpServersForApp', () => {
       expect(listed.servers).toHaveLength(1)
       expect(listed.servers[0]?.status).toBe('alive')
       expect(listed.servers[0]?.tools?.slice().sort()).toEqual(['blank', 'die', 'echo', 'exit', 'fail', 'image', 'pid', 'struct'])
+    } finally {
+      await live.dispose()
+    }
+  })
+})
+
+describe('listMcpToolsForApp', () => {
+  const names = ['blank', 'die', 'echo', 'exit', 'fail', 'image', 'pid', 'struct']
+
+  it('returns names, descriptions, and both schemas, omitting what the server did not declare', async () => {
+    const client = {
+      listTools: async () => [
+        { name: 'ping', description: 'says hi', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } },
+        { name: 'pong', inputSchema: { type: 'object', properties: {} } },
+      ],
+    }
+    expect(await listMcpToolsForApp(client as never, 'demo')).toEqual({
+      tools: [
+        { name: 'ping', description: 'says hi', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } },
+        { name: 'pong', inputSchema: { type: 'object', properties: {} } },
+      ],
+    })
+  })
+
+  it('throws the client code for an unknown server', async () => {
+    const client = {
+      listTools: async () => {
+        throw new McpError('mcp-not-connected', 'gone')
+      },
+    }
+    await expect(listMcpToolsForApp(client as never, 'gone')).rejects.toMatchObject({ code: 'mcp-not-connected' })
+  })
+
+  it('reads tool detail from a live stdio server end to end', async () => {
+    const live = new McpClient({
+      echo: { command: 'node', args: ['packages/mcp/client/tests/fixture-server.ts'] },
+    })
+    try {
+      const listed = await listMcpToolsForApp(live, 'echo')
+      expect(listed.tools.map(tool => tool.name).sort()).toEqual(names)
+      expect(listed.tools.every(tool => tool.inputSchema.type === 'object')).toBe(true)
+      expect(listed.tools.every(tool => tool.description === undefined)).toBe(true)
     } finally {
       await live.dispose()
     }

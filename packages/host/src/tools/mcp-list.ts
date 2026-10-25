@@ -1,6 +1,6 @@
 import { McpClient, McpError, type McpCode } from '@mohou/mcp-client'
 
-import type { AppMcpServer } from '@mohou/contract'
+import type { AppMcpServer, AppMcpTool } from '@mohou/contract'
 
 import type { McpLoadFailure } from '../host/mcp.ts'
 import { AuthorError } from './codes.ts'
@@ -123,6 +123,28 @@ export async function listMcpServersForApp(
     }
   }
   return { servers }
+}
+
+/**
+ * Runtime detail for `ctx.mcpTools`. Opens the session, the same first call `ctx.mcp` makes.
+ * Descriptions and both schemas are included, because the app builds arguments from them.
+ * A server that cannot be opened or listed throws the client's code; there is no partial list.
+ * @param client - host-held MCP client
+ * @param serverId - key in the resolved config
+ */
+export async function listMcpToolsForApp(
+  client: McpClient,
+  serverId: string,
+): Promise<{ tools: AppMcpTool[] }> {
+  const listed = await client.listTools(serverId)
+  return {
+    tools: listed.map(tool => ({
+      name: tool.name,
+      ...tool.description === undefined ? {} : { description: tool.description },
+      inputSchema: tool.inputSchema,
+      ...tool.outputSchema === undefined ? {} : { outputSchema: tool.outputSchema },
+    })),
+  }
 }
 
 function listFailure(error: unknown): 'mcp-not-connected' | 'mcp-start-failed' {

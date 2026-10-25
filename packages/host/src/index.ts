@@ -68,6 +68,7 @@ export { createFileTools, resolveAppPath, type FileCommit, type FileRead } from 
 export {
   listMcpForAuthor,
   listMcpServersForApp,
+  listMcpToolsForApp,
   toolsMcpForAuthor,
   type AuthorMcpServerNames,
   type AuthorMcpServerTools,

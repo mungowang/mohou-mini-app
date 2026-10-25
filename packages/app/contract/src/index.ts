@@ -49,6 +49,7 @@ export type {
   AppLlmOptions,
   AppModelOptions,
   AppMcpServer,
+  AppMcpTool,
   AppStorage,
   AppSystemMetrics,
   SqlParams,

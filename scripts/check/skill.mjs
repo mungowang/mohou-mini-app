@@ -113,6 +113,7 @@ const members = [
   "agent",
   "mcp",
   "mcpServers",
+  "mcpTools",
 ]
 for (const name of members) {
   if (!contextSrc.includes(`${name}`) || !ctxText.includes(`ctx.${name}`) && name !== "system") {

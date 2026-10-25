@@ -132,7 +132,6 @@ export interface AppConfig {
   llm: { provider: string; model: string } | null
 }
 
-/** One OS snapshot. `loadavg` is null where the OS does not provide it. */
 /** One external MCP server for `ctx.mcpServers`. Names only: no descriptions, no schemas, no env. */
 export interface AppMcpServer {
   readonly id: string
@@ -143,6 +142,17 @@ export interface AppMcpServer {
   readonly error?: { readonly code: string; readonly message?: string }
 }
 
+/** One tool on an external MCP server, for `ctx.mcpTools`. */
+export interface AppMcpTool {
+  readonly name: string
+  readonly description?: string
+  /** JSON Schema for the tool's arguments object. */
+  readonly inputSchema: Record<string, unknown>
+  /** JSON Schema for a structured result, when the server declares one. */
+  readonly outputSchema?: Record<string, unknown>
+}
+
+/** One OS snapshot. `loadavg` is null where the OS does not provide it. */
 export interface AppSystemMetrics {
   platform: string
   arch: string
@@ -181,6 +191,8 @@ export interface AppContext<State extends object = Record<string, never>> {
   mcp(serverId: string, toolName: string, args?: Record<string, unknown>): Promise<unknown>
   /** List the host's external MCP servers. Default is the alive ones; `includeAll` also returns the failed. */
   mcpServers(includeAll?: boolean): Promise<{ servers: readonly AppMcpServer[] }>
+  /** One server's tools, with descriptions and schemas. Opens the server if needed. */
+  mcpTools(serverId: string): Promise<{ tools: readonly AppMcpTool[] }>
   /** Present only when the manifest kind is `workbench`. */
   workbench?: AppWorkbench
   /**

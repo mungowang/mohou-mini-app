@@ -497,6 +497,7 @@ function fakeCapabilities(appDir: string): CallCapabilities {
     }),
     mcp: async () => undefined,
     mcpServers: async () => ({ servers: [] }),
+    mcpTools: async () => ({ tools: [] }),
     brain: {
       llm: async () => '',
       agent: async () => '',

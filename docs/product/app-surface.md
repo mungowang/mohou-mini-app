@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-11
+updated: 2026-10-25
 ---
 
 # App surface
@@ -10,7 +10,7 @@ The running mini-app uses this surface. It is `ctx` on the backend, and `useApp(
 
 The app does not see the [author surface](author-surface.md). It does not see the [owner surface](owner-surface.md). It does not reset history, delete itself, or write `host.json` or `mcp.json`.
 
-There is no `ctx.tool` and no `listTools`. Timeouts, caps, and retry counts are host policy and are not locked. Codes are in [implementation.md](implementation.md).
+There is no `ctx.tool` and no runtime `listTools`: the in-app agent's tool set is not on `ctx`. `ctx.mcpTools` reads one external MCP server's catalog and nothing more. Timeouts, caps, and retry counts are host policy and are not locked. Codes are in [implementation.md](implementation.md).
 
 ## Catalog
 
@@ -32,6 +32,7 @@ There is no `ctx.tool` and no `listTools`. Timeouts, caps, and retry counts are 
 | `ctx.agent` | `string` | [ctx.agent](runtime/ctx-agent.md) |
 | `ctx.mcp(serverId, toolName, args?)` | external tool result | [ctx.mcp](mcp-client/ctx-mcp.md) |
 | `ctx.mcpServers(includeAll?)` | the host's MCP servers with statuses | [ctx.mcp](mcp-client/ctx-mcp.md) |
+| `ctx.mcpTools(serverId)` | one server's tools with descriptions and schemas | [ctx.mcp](mcp-client/ctx-mcp.md) |
 | `useApp().call(method, args?)` | keys of `defineApp` `api` | [defineApp](app-contract/define-app.md) |
 | `useApp().on` / `onAny` | this app's push stream | [ctx.push](app-contract/ctx-push.md) |
 | `useApp().resolveAssetUrl(path)` | URL for a file under `assets/` | [assets](app-contract/assets.md) |

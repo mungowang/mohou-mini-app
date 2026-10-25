@@ -38,7 +38,7 @@ import { openStorage, type StorageFile } from '../storage/open.ts'
 import { createWebsiteSessions } from '../website/session.ts'
 import { createViewSessions } from '../process/view-session.ts'
 import { createSpawnRegistry, type AppSpawnRegistry } from '../process/spawn.ts'
-import { listMcpForAuthor, listMcpServersForApp, toolsMcpForAuthor } from './mcp-list.ts'
+import { listMcpForAuthor, listMcpServersForApp, listMcpToolsForApp, toolsMcpForAuthor } from './mcp-list.ts'
 import { AuthorError } from './codes.ts'
 
 /** Tools this implementation can run. The rest of the catalog is not mounted. */
@@ -1050,6 +1050,7 @@ function capabilitiesFor(
     metrics: ports.metrics,
     mcp: (serverId, toolName, args) => options.mcp.call(serverId, toolName, args ?? {}),
     mcpServers: includeAll => listMcpServersForApp(options.mcp, options.readMcpFailures?.() ?? [], includeAll === true),
+    mcpTools: serverId => listMcpToolsForApp(options.mcp, serverId),
     brain,
     spawn: (file, args, spawnOptions) => {
       if (spawnTag === 'website') return app.spawns.spawnWebsite(file, args, spawnOptions)

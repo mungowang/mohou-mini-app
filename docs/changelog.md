@@ -1,11 +1,15 @@
 ---
 status: locked
-updated: 2026-10-23
+updated: 2026-10-25
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.100
+
+`ctx.mcpTools(serverId)` returns one host MCP server's tools — `name`, `description`, `inputSchema`, and `outputSchema` when the server declares one — so an app can build a tool picker and its arguments without a schema copy. It opens the server the way `ctx.mcp` does; an unknown or failed server fails that call. `ctx.mcpServers` stays names only.
 
 ## 1.0.99
 

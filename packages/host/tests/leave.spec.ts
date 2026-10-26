@@ -1,10 +1,30 @@
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 
-import { leaveGuardSource } from '../src/compile/leave.ts'
+import { chordForwardSource, leaveGuardSource } from '../src/compile/leave.ts'
 import { renderRunnerDocument } from '../src/compile/runner.ts'
 
 const page = 'http://127.0.0.1:9743/app/com.example.app'
+
+interface ChordWindow {
+  document: {
+    createElement(tag: string): { textContent: string }
+    body: { append(node: { textContent: string }): void }
+    dispatchEvent(event: { defaultPrevented: boolean }): void
+  }
+  KeyboardEvent: new (type: string, init?: {
+    key?: string
+    shiftKey?: boolean
+    ctrlKey?: boolean
+    altKey?: boolean
+    metaKey?: boolean
+    repeat?: boolean
+    bubbles?: boolean
+    cancelable?: boolean
+  }) => { defaultPrevented: boolean }
+  parent: { postMessage(data: unknown, origin?: string): void }
+  close(): void
+}
 
 interface LeaveWindow {
   document: {
@@ -53,6 +73,34 @@ describe('link leave', () => {
     win.document.getElementById('form')?.dispatchEvent(submit)
     expect(submit.defaultPrevented).toBe(true)
     expect(opened).toEqual(['https://example.com/x', 'mailto:a@b.c', 'https://example.com/post'])
+    win.close()
+  })
+
+  it('forwards palette and tab-switch chords once and does not repeat them', () => {
+    const posted: unknown[] = []
+    const dom = new JSDOM('<!doctype html><body></body>', { url: page, runScripts: 'dangerously' })
+    const win = dom.window as unknown as ChordWindow
+    win.parent.postMessage = (data: unknown) => { posted.push(data) }
+    const script = win.document.createElement('script')
+    script.textContent = chordForwardSource()
+    win.document.body.append(script)
+    const press = (init: { key: string; shiftKey?: boolean; ctrlKey?: boolean; altKey?: boolean; metaKey?: boolean; repeat?: boolean }) => {
+      const event = new win.KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+      win.document.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    expect(press({ key: 'p', shiftKey: true, ctrlKey: true })).toBe(true)
+    expect(press({ key: 'ArrowRight', shiftKey: true, ctrlKey: true })).toBe(true)
+    expect(press({ key: 'ArrowLeft', shiftKey: true, metaKey: true })).toBe(true)
+    expect(press({ key: 'p', shiftKey: true, ctrlKey: true, repeat: true })).toBe(false)
+    expect(press({ key: 'ArrowLeft', shiftKey: true, ctrlKey: true, repeat: true })).toBe(false)
+    expect(press({ key: 'p', shiftKey: true, altKey: true, metaKey: true })).toBe(false)
+    expect(press({ key: 'ArrowLeft' })).toBe(false)
+    expect(posted).toEqual([
+      { type: 'mma-chord', key: 'p', code: '', shiftKey: true, altKey: false, metaKey: false, ctrlKey: true },
+      { type: 'mma-chord', key: 'ArrowRight', code: '', shiftKey: true, altKey: false, metaKey: false, ctrlKey: true },
+      { type: 'mma-chord', key: 'ArrowLeft', code: '', shiftKey: true, altKey: false, metaKey: true, ctrlKey: false },
+    ])
     win.close()
   })
 

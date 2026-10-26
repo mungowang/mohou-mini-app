@@ -1,12 +1,13 @@
 import { WorkbenchLibrary, workbenchEntries } from '@mohou/app-view'
 import { ArrowUpRight, Palette, Pin, RefreshCw, Search, Settings, Store, Trash2 } from 'lucide-react'
-import { cloneElement, isValidElement, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { cloneElement, isValidElement, useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
 
 import type { PanelLabelMode, PanelLocale } from '../labels.ts'
 import { panelText } from '../labels.ts'
-import { bindPaletteChord, chordLabel, isMacPlatform } from '../palette/chord.ts'
+import { bindPanelChords, chordLabel, isMacPlatform, tabSwitchChordLabel } from '../palette/chord.ts'
 import { MarketView } from '../market/view.tsx'
-import { CommandPalette } from '../palette/view.tsx'
+import { CommandPalette, type PaletteOpenTab } from '../palette/view.tsx'
+import { cycleTab } from './tabs.ts'
 import { Dialog } from '../ui/dialog.tsx'
 import { Tooltip } from '../ui/tooltip.tsx'
 import { readCardStyle, writeCardStyle } from './card-style.ts'
@@ -165,8 +166,27 @@ export function GalleryBody(props: {
   /** Resolves the chrome spin started by a market refresh click. */
   const marketRefreshSettle = useRef<(() => void) | undefined>(undefined)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const paletteOpenRef = useRef(false)
+  paletteOpenRef.current = paletteOpen
+  const paletteTabNavRef = useRef<((direction: 'prev' | 'next') => void) | undefined>(undefined)
+  const registerPaletteTabNav = useCallback((navigate: ((direction: 'prev' | 'next') => void) | undefined) => {
+    paletteTabNavRef.current = navigate
+  }, [])
+  const bodyTabsRef = useRef(state.tabs)
+  bodyTabsRef.current = state.tabs
   const mac = isMacPlatform(navigator.platform, navigator.userAgent)
-  useEffect(() => bindPaletteChord(document, () => { setPaletteOpen(open => !open) }), [])
+  useEffect(() => bindPanelChords(document, {
+    onPalette: () => { setPaletteOpen(open => !open) },
+    onTabSwitch: (direction) => {
+      if (paletteOpenRef.current) {
+        paletteTabNavRef.current?.(direction)
+        return
+      }
+      const next = cycleTab(bodyTabsRef.current, direction)
+      if (next.tabs.active === bodyTabsRef.current.active) return
+      dispatch({ type: 'switch', index: next.tabs.active })
+    },
+  }), [dispatch])
   const rail = useRef<HTMLDivElement>(null)
   const [glide, setGlide] = useState<{ left: number; width: number } | undefined>(undefined)
   const tabKey = state.tabs.tabs.map(tab => tab.kind === 'app' ? `${tab.appId}:${tab.title ?? ''}` : tab.kind).join('|')
@@ -214,7 +234,17 @@ export function GalleryBody(props: {
             </button>
           ))}
         </div>
-        <div className="flex-1" />
+        <div className="mma-chrome-hint" data-chrome-hint="" aria-hidden="true">
+          <span className="mma-chrome-hint-group">
+            <span className="mma-chrome-hint-keys">{chordLabel(mac)}</span>
+            <span className="mma-chrome-hint-text">{label('chrome-hint-palette')}</span>
+          </span>
+          <span className="mma-chrome-hint-rule" />
+          <span className="mma-chrome-hint-group">
+            <span className="mma-chrome-hint-keys">{tabSwitchChordLabel(mac)}</span>
+            <span className="mma-chrome-hint-text">{label('chrome-hint-tabs')}</span>
+          </span>
+        </div>
         {appTab ? null : (
           <DeskBar
             label={label('desk-switch')}
@@ -479,6 +509,8 @@ export function GalleryBody(props: {
           <CommandPalette
             apps={state.apps}
             openIds={new Set(state.tabs.tabs.flatMap(tab => tab.kind === 'app' ? [tab.appId] : []))}
+            openTabs={paletteOpenTabs(state, label)}
+            activeOpenIndex={state.tabs.active}
             {...active?.kind === 'app' ? { currentId: active.appId } : {}}
             {...paletteError(state, label)}
             locale={props.locale}
@@ -495,6 +527,11 @@ export function GalleryBody(props: {
               const index = state.tabs.tabs.findIndex(tab => tab.kind === 'gallery')
               if (index >= 0) dispatch({ type: 'switch', index })
             }}
+            onSelectOpenTab={(index) => {
+              setPaletteOpen(false)
+              dispatch({ type: 'switch', index })
+            }}
+            onRegisterTabNav={registerPaletteTabNav}
           />
         ) : null}
       </div>
@@ -506,6 +543,14 @@ function paletteError(state: GalleryState, label: (key: string) => string): { er
   if (!state.reachable) return { error: label('host-unreachable') }
   if (state.failed !== undefined) return { error: state.failed.length > 0 ? state.failed : label('list-failed') }
   return {}
+}
+
+function paletteOpenTabs(state: GalleryState, label: (key: string) => string): readonly PaletteOpenTab[] {
+  return state.tabs.tabs.map((tab) => {
+    if (tab.kind === 'gallery') return { key: 'gallery', kind: 'gallery', title: label('palette-library') }
+    if (tab.kind === 'market') return { key: 'market', kind: 'market', title: label('market') }
+    return { key: tab.appId, kind: 'app', appId: tab.appId, title: tab.title ?? tab.appId }
+  })
 }
 
 function openApp(

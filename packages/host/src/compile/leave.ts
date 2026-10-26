@@ -1,21 +1,35 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 /**
  * Runner guard for links and forms.
  * A same-frame external URL would replace the app document. The sandbox does not stop that.
  * `javascript:` still runs. A same-origin URL stays. `http` and `https` off this origin, and `mailto:`, open outside.
  * An app script can remove the listeners. That is the same limit as the sandbox attribute.
  */
+
+/** Shared wire matcher — same file the native frame hook embeds. Exports stripped for inline eval. */
+function chordWireSource(): string {
+  const path = join(dirname(fileURLToPath(import.meta.url)), '../../../panel/src/palette/chord-wire.js')
+  return readFileSync(path, 'utf8').replaceAll('export function', 'function')
+}
+
 /**
- * Capture Mod+Shift+P inside the app document and tell the parent.
+ * Capture panel chrome chords inside the app document and tell the parent.
+ * Match logic is `chord-wire.js` only — this source does not list keys.
  * A listener the parent adds on the iframe window does not see the key in WKWebView.
+ * A held key does not repeat the chord. A nested website frame is not this document;
+ * the window hook owns that path and posts the chord on to the panel.
  */
 export function chordForwardSource(): string {
-  return `document.addEventListener('keydown', (event) => {
-  if (event.altKey || !event.shiftKey) return
-  if (event.key !== 'p' && event.key !== 'P') return
-  if (!event.metaKey && !event.ctrlKey) return
+  return `${chordWireSource()}
+document.addEventListener('keydown', (event) => {
+  const kind = matchWireChord(event)
+  if (kind === null) return
   event.preventDefault()
-  event.stopPropagation()
-  parent.postMessage({ type: 'mma-chord', key: event.key, shiftKey: true, altKey: false, metaKey: event.metaKey, ctrlKey: event.ctrlKey }, location.origin)
+  event.stopImmediatePropagation()
+  parent.postMessage(wireChordPayload(event, kind), location.origin)
 }, true)
 `
 }

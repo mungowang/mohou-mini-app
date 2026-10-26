@@ -13,6 +13,15 @@ import { existsSync } from 'node:fs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 
+/** Drop host-owned env a live Mohou.app may have put on this shell (e.g. SUPERVISED=1). */
+function entryEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('MINI_APP_')) delete env[key]
+  }
+  return { ...env, ...extra }
+}
+
 describe('process entry', () => {
   it('serves the panel from dev.ts and leaves no process', async () => {
     const runtime = await mkdtemp(join(tmpdir(), 'mma-entry-'))
@@ -20,7 +29,7 @@ describe('process entry', () => {
     const before = windowPids()
     const child = spawn(process.execPath, ['--experimental-strip-types', 'packages/shell/src/dev.ts'], {
       cwd: root,
-      env: { ...process.env, MINI_APP_RUNTIME: runtime, MINI_APP_HOST_PORT: String(port) },
+      env: entryEnv({ MINI_APP_RUNTIME: runtime, MINI_APP_HOST_PORT: String(port) }),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     try {
@@ -47,12 +56,11 @@ describe('process entry', () => {
     const port = await freePort()
     const child = spawn(process.execPath, ['--experimental-strip-types', 'packages/shell/src/dev.ts'], {
       cwd: root,
-      env: {
-        ...process.env,
+      env: entryEnv({
         MINI_APP_RUNTIME: runtime,
         MINI_APP_HOST_PORT: String(port),
         MINI_APP_SKIP_WINDOW: '1',
-      },
+      }),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     try {
@@ -70,12 +78,11 @@ describe('process entry', () => {
     const port = await freePort()
     const child = spawn(process.execPath, ['--experimental-strip-types', 'packages/shell/src/dev.ts'], {
       cwd: root,
-      env: {
-        ...process.env,
+      env: entryEnv({
         MINI_APP_RUNTIME: runtime,
         MINI_APP_HOST_PORT: String(port),
         MINI_APP_SUPERVISED: '1',
-      },
+      }),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     try {

@@ -1,11 +1,31 @@
 ---
 status: locked
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.105
+
+Chrome shortcut watermark sits just after the tab strip (start-aligned), not centered in the gap.
+
+## 1.0.104
+
+Mod+Shift+ArrowLeft and Mod+Shift+ArrowRight cycle open panel tabs when the palette is closed (Command on macOS, Ctrl on Windows — same Mod as the palette chord). While the command palette is open, plain ←/→ move the open-tabs rail under the search field; Enter opens the focused open tab or the selected list row. Search stays first focus. The chrome gap shows a quiet shortcut watermark (palette + tab cycle). Chord match is one shared `chord-wire` file embedded by the panel, the app runner, and the native every-frame hook, so website iframes forward the same set. This release needs a new app install (native window).
+
+## 1.0.103
+
+Mod+Shift+ArrowLeft and Mod+Shift+ArrowRight cycle open panel tabs when the palette is closed (Command on macOS, Ctrl on Windows — same Mod as the palette chord). While the command palette is open, plain ←/→ move the open-tabs rail under the search field; Enter opens the focused open tab or the selected list row. Search stays first focus.
+
+## 1.0.102
+
+Adds the open-tabs rail on the command palette and the closed-panel tab cycle chord. Prefer 1.0.103 for the final Mod and plain-arrow behavior.
+
+## 1.0.101
+
+Mod+Shift+P opens the command palette when focus is inside a nested website iframe. The window runs a document-start hook in every frame so the chord can leave a cross-origin page; the app runner still forwards from the app document itself. A held key does not repeat the chord. This release needs a new app install (native window), not only a package hot update.
 
 ## 1.0.100
 

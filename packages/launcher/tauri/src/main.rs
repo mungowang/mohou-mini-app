@@ -93,6 +93,14 @@ fn run_supervisor(context: tauri::Context<tauri::Wry>, prefix: std::path::PathBu
         .expect("panel window failed");
 }
 
+/// The document-start script every frame runs. Owned here because only the window can install it.
+/// Match logic is `packages/panel/src/palette/chord-wire.js` — do not fork a second key list here.
+fn chord_frame_hook() -> String {
+    let wire = include_str!("../../../panel/src/palette/chord-wire.js").replace("export function", "function");
+    let body = include_str!("chord_frame_hook_body.js");
+    format!("(function () {{\n{wire}\n{body}\n}})()")
+}
+
 fn open_window(
     app: &tauri::App,
     url: tauri::WebviewUrl,
@@ -101,11 +109,15 @@ fn open_window(
 ) -> Result<tauri::WebviewWindow, Box<dyn std::error::Error>> {
     // Native file-drop is on by default and steals OS drops from HTML5 / react-dropzone
     // (required off for HTML5 DnD on Windows; macOS wry handler has the same effect).
+    // The hook runs in every frame so a nested website iframe can forward panel chrome chords.
+    // The page still has no Tauri IPC. frame_hook must outlive the builder call (script is copied).
+    let frame_hook = chord_frame_hook();
     let window = tauri::WebviewWindowBuilder::new(app, "main", url)
         .title("Mohou")
         .inner_size(1200.0, 800.0)
         .min_inner_size(800.0, 600.0)
         .disable_drag_drop_handler()
+        .initialization_script_for_all_frames(&frame_hook)
         .on_document_title_changed(|window, title| {
             if title.is_empty() {
                 return;
@@ -245,8 +257,18 @@ fn open_outside(url: &Url) {
 
 #[cfg(test)]
 mod tests {
-    use super::{admit_origin, boot_navigation, classify_leave, same_origin, Leave};
+    use super::{admit_origin, boot_navigation, chord_frame_hook, classify_leave, same_origin, Leave};
     use url::Url;
+
+    #[test]
+    fn frame_hook_forwards_the_palette_chord_and_stays_off_the_top_window() {
+        let hook = chord_frame_hook();
+        assert!(hook.contains("mma-chord"));
+        assert!(hook.contains("matchWireChord"));
+        assert!(hook.contains("ArrowLeft"));
+        assert!(hook.contains("parent === window"));
+        assert!(hook.contains("stopImmediatePropagation"));
+    }
 
     #[test]
     fn admits_the_splash_assets_and_nothing_else_before_the_origin() {

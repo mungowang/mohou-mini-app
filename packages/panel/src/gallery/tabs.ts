@@ -65,6 +65,18 @@ export function switchTab(state: PanelTabs, index: number): TabChange {
   return { tabs: { tabs: state.tabs, active: index }, reload: false }
 }
 
+/**
+ * Move one tab left or right, wrapping at the ends. A single tab is a no-op.
+ * @param state - current tabs
+ * @param direction - previous or next
+ */
+export function cycleTab(state: PanelTabs, direction: 'prev' | 'next'): TabChange {
+  if (state.tabs.length <= 1) return { tabs: state, reload: false }
+  const delta = direction === 'next' ? 1 : -1
+  const index = (state.active + delta + state.tabs.length) % state.tabs.length
+  return switchTab(state, index)
+}
+
 /** Point an open tab at a renamed app. The document is not reloaded here. */
 export function renameAppTab(state: PanelTabs, from: string, to: string): PanelTabs {
   return {

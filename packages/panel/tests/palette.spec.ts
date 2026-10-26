@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GalleryApp } from '../src/gallery/list.ts'
-import { chordLabel, isPaletteChord } from '../src/palette/chord.ts'
+import { chordLabel, isPaletteChord, isTabSwitchChord, matchPanelChord, tabSwitchChordLabel } from '../src/palette/chord.ts'
 import { rankApps, rankPalette } from '../src/palette/rank.ts'
 
 const lab: GalleryApp = {
@@ -45,6 +45,23 @@ describe('palette chord', () => {
     expect(isPaletteChord({ key: 'p', shiftKey: false, altKey: false, metaKey: true, ctrlKey: false })).toBe(false)
     expect(chordLabel(true)).toBe('⌘⇧P')
     expect(chordLabel(false)).toBe('Ctrl+Shift+P')
+  })
+
+  it('accepts Mod+Shift+Arrow for tab switch, like the palette chord', () => {
+    expect(isTabSwitchChord({ key: 'ArrowLeft', shiftKey: true, altKey: false, metaKey: false, ctrlKey: true })).toBe(true)
+    expect(isTabSwitchChord({ key: 'ArrowRight', shiftKey: true, altKey: false, metaKey: true, ctrlKey: false })).toBe(true)
+    expect(isTabSwitchChord({ key: 'ArrowLeft', shiftKey: true, altKey: true, metaKey: false, ctrlKey: true })).toBe(false)
+    expect(isTabSwitchChord({ key: 'ArrowLeft', shiftKey: false, altKey: false, metaKey: true, ctrlKey: false })).toBe(false)
+    expect(isTabSwitchChord({ key: 'ArrowLeft', shiftKey: false, altKey: false, metaKey: false, ctrlKey: false })).toBe(false)
+    expect(matchPanelChord({ key: 'ArrowLeft', shiftKey: true, altKey: false, metaKey: true, ctrlKey: false }))
+      .toEqual({ kind: 'tab-switch', direction: 'prev' })
+    expect(matchPanelChord({ key: 'ArrowRight', shiftKey: true, altKey: false, metaKey: false, ctrlKey: true }))
+      .toEqual({ kind: 'tab-switch', direction: 'next' })
+    expect(matchPanelChord({ key: 'ArrowUp', shiftKey: true, altKey: false, metaKey: false, ctrlKey: true })).toBeUndefined()
+    expect(matchPanelChord({ key: 'a', shiftKey: true, altKey: false, metaKey: false, ctrlKey: true })).toBeUndefined()
+    expect(matchPanelChord({ key: 'p', shiftKey: true, altKey: false, metaKey: false, ctrlKey: false })).toBeUndefined()
+    expect(tabSwitchChordLabel(true)).toBe('⌘⇧← →')
+    expect(tabSwitchChordLabel(false)).toBe('Ctrl+Shift+← →')
   })
 })
 

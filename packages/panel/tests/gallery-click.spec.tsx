@@ -232,4 +232,36 @@ describe('gallery clicks', () => {
     root.unmount()
     host.remove()
   })
+
+  it('cycles open tabs with Mod+Shift+Arrow and routes the chord into an open palette', async () => {
+    const switches: number[] = []
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    const listed = reduceGallery(galleryState('standalone'), { type: 'listed', apps: [todo] })
+    const opened = reduceGallery(listed, { type: 'open', appId: todo.id, title: 'Todo' })
+    const client = { list: () => Promise.resolve([todo]), open: () => Promise.resolve(), deleteApp: () => Promise.resolve() }
+    await act(async () => {
+      root.render(<GalleryBody state={opened} dispatch={(action) => { if (action.type === 'switch') switches.push(action.index) }} client={client} locale="en" mode="production" />)
+    })
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, metaKey: true, bubbles: true, cancelable: true }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, ctrlKey: true, bubbles: true, cancelable: true }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, altKey: true, bubbles: true, cancelable: true }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+    })
+    expect(switches).toEqual([0, 0])
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', shiftKey: true, metaKey: true, bubbles: true, cancelable: true }))
+    })
+    expect(host.querySelector('[data-palette]')).not.toBeNull()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, metaKey: true, bubbles: true, cancelable: true }))
+    })
+    // Palette absorbs the tab chord; no extra switch while it is open.
+    expect(switches).toEqual([0, 0])
+    expect(host.querySelector('[data-palette-open-tab][data-on]')?.textContent).toContain('Library')
+    root.unmount()
+    host.remove()
+  })
 })

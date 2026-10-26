@@ -18,4 +18,4 @@ The panel owns one chord and one overlay. The panel document captures the chord.
 
 ## Consequences
 
-`fuzzysort` is not on the app import allowlist. An app cannot import it yet. A substitution typo such as one wrong Chinese character does not match. The spelling is not stored in a file. The next list rebuilds it.
+`fuzzysort` is not on the app import allowlist. An app cannot import it yet. A substitution typo such as one wrong Chinese character does not match. The spelling is not stored in a file. The next list rebuilds it. A nested website frame is not this runner document. [Website frame forwards the palette chord](../bug-fix/2026-10-26-website-frame-chord.md) owns that path.

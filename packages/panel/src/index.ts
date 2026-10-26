@@ -22,6 +22,7 @@ export {
 } from './gallery/list.ts'
 export {
   closeTab,
+  cycleTab,
   deletePrompt,
   initialTabs,
   openAppTab,

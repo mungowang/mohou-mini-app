@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { closeTab, deletePrompt, dropAppTab, initialTabs, openAppTab, switchTab } from '../src/gallery/tabs.ts'
+import { closeTab, cycleTab, deletePrompt, dropAppTab, initialTabs, openAppTab, openMarketTab, switchTab } from '../src/gallery/tabs.ts'
 
 describe('panel tabs', () => {
   it('keeps the gallery, focuses an open app without reload, and asks before delete', () => {
@@ -32,5 +32,17 @@ describe('panel tabs', () => {
     expect(dropAppTab(second.tabs, 'com.example.missing')).toBe(second.tabs)
     expect(switchTab(second.tabs, -1).tabs).toBe(second.tabs)
     expect(switchTab(second.tabs, 99).tabs).toBe(second.tabs)
+  })
+
+  it('cycles open tabs left and right, wrapping at the ends', () => {
+    const one = openAppTab(initialTabs(), 'com.example.a', 'A')
+    const two = openAppTab(one.tabs, 'com.example.b', 'B')
+    const market = openMarketTab(two.tabs)
+    expect(cycleTab(market.tabs, 'next').tabs.active).toBe(0)
+    expect(cycleTab(market.tabs, 'prev').tabs.active).toBe(2)
+    const middle = switchTab(market.tabs, 1).tabs
+    expect(cycleTab(middle, 'next').tabs.active).toBe(2)
+    expect(cycleTab(middle, 'prev').tabs.active).toBe(0)
+    expect(cycleTab(initialTabs(), 'next').tabs.active).toBe(0)
   })
 })

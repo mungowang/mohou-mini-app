@@ -1,11 +1,27 @@
 ---
 status: locked
-updated: 2026-10-26
+updated: 2026-10-27
 ---
 
 # Changelog
 
 This page owns released version notes. The product version is the `version` field of `@mohou/shell`. `@mohou/host` carries the same string because the about block prints it. The window crate uses the same string. [development.md](development.md) owns the build command.
+
+## 1.0.109
+
+App iframes use `data-app-id` instead of `title`, so hover no longer shows the raw id tooltip. Reload, eval, and theme paint still target the frame by that attribute.
+
+## 1.0.108
+
+Chrome shortcut watermark opacity sits mid (readable, not loud).
+
+## 1.0.107
+
+Chrome shortcut watermark is quieter (lower opacity, softer caps).
+
+## 1.0.106
+
+Chrome shortcut watermark uses separate Kbd caps (⌘ ⇧ P · ← →), not a fused key string.
 
 ## 1.0.105
 

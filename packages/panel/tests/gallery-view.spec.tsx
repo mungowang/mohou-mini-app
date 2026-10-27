@@ -25,6 +25,8 @@ describe('GalleryBody', () => {
     expect(markup(reduceGallery(ready, { type: 'search', query: 'missing' }))).toContain('No matching apps')
     expect(markup(ready)).toContain('data-card="glass"')
     expect(markup(ready)).toContain('data-chrome-hint')
+    expect(markup(ready)).toContain('data-slot="kbd"')
+    expect(markup(ready)).toContain('data-slot="kbd-group"')
     expect(markup(ready)).toContain('Command palette')
     expect(markup(ready)).toContain('Switch tabs')
     expect(markup(ready)).toContain('Host ready')

@@ -4,7 +4,7 @@ import { cloneElement, isValidElement, useCallback, useEffect, useLayoutEffect, 
 
 import type { PanelLabelMode, PanelLocale } from '../labels.ts'
 import { panelText } from '../labels.ts'
-import { bindPanelChords, chordLabel, isMacPlatform, tabSwitchChordLabel } from '../palette/chord.ts'
+import { bindPanelChords, chordKeyParts, chordLabel, isMacPlatform, tabSwitchKeyParts } from '../palette/chord.ts'
 import { MarketView } from '../market/view.tsx'
 import { CommandPalette, type PaletteOpenTab } from '../palette/view.tsx'
 import { cycleTab } from './tabs.ts'
@@ -236,12 +236,12 @@ export function GalleryBody(props: {
         </div>
         <div className="mma-chrome-hint" data-chrome-hint="" aria-hidden="true">
           <span className="mma-chrome-hint-group">
-            <span className="mma-chrome-hint-keys">{chordLabel(mac)}</span>
+            <ChromeKbd keys={chordKeyParts(mac)} />
             <span className="mma-chrome-hint-text">{label('chrome-hint-palette')}</span>
           </span>
           <span className="mma-chrome-hint-rule" />
           <span className="mma-chrome-hint-group">
-            <span className="mma-chrome-hint-keys">{tabSwitchChordLabel(mac)}</span>
+            <ChromeKbd keys={tabSwitchKeyParts(mac)} />
             <span className="mma-chrome-hint-text">{label('chrome-hint-tabs')}</span>
           </span>
         </div>
@@ -551,6 +551,17 @@ function paletteOpenTabs(state: GalleryState, label: (key: string) => string): r
     if (tab.kind === 'market') return { key: 'market', kind: 'market', title: label('market') }
     return { key: tab.appId, kind: 'app', appId: tab.appId, title: tab.title ?? tab.appId }
   })
+}
+
+/** Chrome watermark keys — same shape as @mohou/ui Kbd / KbdGroup, panel-local styles. */
+function ChromeKbd(props: { readonly keys: readonly string[] }): ReactNode {
+  return (
+    <span className="mma-chrome-kbd-group" data-slot="kbd-group">
+      {props.keys.map((key, index) => (
+        <kbd key={`${key}-${index}`} className="mma-chrome-kbd" data-slot="kbd">{key}</kbd>
+      ))}
+    </span>
+  )
 }
 
 function openApp(

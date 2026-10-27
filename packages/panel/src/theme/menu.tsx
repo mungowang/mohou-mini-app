@@ -260,7 +260,7 @@ function paintStyle(style: string, appId?: string): void {
   }
   const frames = appId === undefined
     ? [...document.querySelectorAll('iframe')]
-    : [document.querySelector(`iframe[title="${CSS.escape(appId)}"]`)]
+    : [document.querySelector(`iframe[data-app-id="${CSS.escape(appId)}"]`)]
   for (const frame of frames) {
     if (frame instanceof HTMLIFrameElement) frame.contentWindow?.postMessage({ type: 'theme', style, variables: {} }, window.location.origin)
   }

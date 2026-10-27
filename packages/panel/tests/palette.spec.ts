@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GalleryApp } from '../src/gallery/list.ts'
-import { chordLabel, isPaletteChord, isTabSwitchChord, matchPanelChord, tabSwitchChordLabel } from '../src/palette/chord.ts'
+import { chordKeyParts, chordLabel, isPaletteChord, isTabSwitchChord, matchPanelChord, tabSwitchChordLabel, tabSwitchKeyParts } from '../src/palette/chord.ts'
 import { rankApps, rankPalette } from '../src/palette/rank.ts'
 
 const lab: GalleryApp = {
@@ -62,6 +62,10 @@ describe('palette chord', () => {
     expect(matchPanelChord({ key: 'p', shiftKey: true, altKey: false, metaKey: false, ctrlKey: false })).toBeUndefined()
     expect(tabSwitchChordLabel(true)).toBe('⌘⇧← →')
     expect(tabSwitchChordLabel(false)).toBe('Ctrl+Shift+← →')
+    expect(chordKeyParts(true)).toEqual(['⌘', '⇧', 'P'])
+    expect(chordKeyParts(false)).toEqual(['Ctrl', 'Shift', 'P'])
+    expect(tabSwitchKeyParts(true)).toEqual(['⌘', '⇧', '←', '→'])
+    expect(tabSwitchKeyParts(false)).toEqual(['Ctrl', 'Shift', '←', '→'])
   })
 })
 

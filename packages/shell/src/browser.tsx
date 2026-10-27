@@ -47,7 +47,7 @@ if (root) {
       mode="production"
       shell="standalone"
       frame={appId => (
-        <iframe className="block size-full border-0" sandbox={appFrameSandbox} src={runnerPath(appId)} title={appId} />
+        <iframe className="block size-full border-0" sandbox={appFrameSandbox} src={runnerPath(appId)} data-app-id={appId} />
       )}
       versions={[about.name, about.current].filter((part): part is string => typeof part === 'string' && part.length > 0).join(' ')}
       onControls={(next) => {
@@ -57,11 +57,11 @@ if (root) {
   )
 }
 
-/** The panel document holds one iframe per open app, titled with the app id. A missing frame is the panel's to report. */
+/** The panel document holds one iframe per open app, tagged with data-app-id. A missing frame is the panel's to report. */
 function postToAppFrame(appId: string, message: unknown): boolean {
   let posted = false
   for (const frame of document.querySelectorAll('iframe')) {
-    if (!(frame instanceof HTMLIFrameElement) || frame.title !== appId) continue
+    if (!(frame instanceof HTMLIFrameElement) || frame.dataset.appId !== appId) continue
     frame.contentWindow?.postMessage(message, window.location.origin)
     posted = true
   }
@@ -76,8 +76,10 @@ function reportAbsent(appId: string): void {
 function watchAppFrames(): void {
   const live = new Set<string>()
   for (const frame of document.querySelectorAll('iframe')) {
-    if (!(frame instanceof HTMLIFrameElement) || frame.title.length === 0) continue
-    live.add(frame.title)
+    if (!(frame instanceof HTMLIFrameElement)) continue
+    const id = frame.dataset.appId
+    if (id === undefined || id.length === 0) continue
+    live.add(id)
   }
   frames.sync(live)
 }

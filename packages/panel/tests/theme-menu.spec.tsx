@@ -63,7 +63,7 @@ describe('ThemeMenu', () => {
   it('paints appearance, palettes, and app pins', async () => {
     window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia
     const frame = document.createElement('iframe')
-    frame.title = 'com.example.app'
+    frame.dataset.appId = 'com.example.app'
     document.body.append(frame)
     const sheet = document.createElement('style')
     sheet.id = 'mma-theme'

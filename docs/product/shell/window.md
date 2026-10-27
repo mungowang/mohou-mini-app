@@ -1,7 +1,7 @@
 ---
 status: shape-locked
 progress: settled
-updated: 2026-10-26
+updated: 2026-10-27
 ---
 
 # Window and event bridge
@@ -19,4 +19,4 @@ Layer: [Shell](README.md). Index: [features.md](../features.md).
 ## Implementation
 
 
-Role: composition. The opened window is `mini-app-window`. It loads the loopback origin and nothing else. A document-start script runs in every frame, including a nested website frame, and forwards panel chrome chords (palette and open-tab switch). [Command palette](../panel/palette.md) owns those chords. The page still has no Tauri IPC. The panel document calls Host over HTTP. It subscribes to the host event stream and to each open app's author stream. `app:open` shows that app. `app:reload` and `app:eval` are posted to the iframe whose title is that app id; an `app:eval` no iframe carries is reported to Host as `absent`, so its caller learns the view is not open now. Author events are posted the same way, so `ctx.push` reaches `useApp().on`. `app:changed` tells the panel to refetch the builtin library. The app iframe carries `appFrameSandbox`. `createFrameBridge`, `watchHost`, and `ownerClients` remain for an in-process caller. The opened window does not use them. Shell does not read the iframe DOM and does not compile. Plan: [implementation.md](../implementation.md).
+Role: composition. The opened window is `mini-app-window`. It loads the loopback origin and nothing else. A document-start script runs in every frame, including a nested website frame, and forwards panel chrome chords (palette and open-tab switch). [Command palette](../panel/palette.md) owns those chords. The page still has no Tauri IPC. The panel document calls Host over HTTP. It subscribes to the host event stream and to each open app's author stream. `app:open` shows that app. `app:reload` and `app:eval` are posted to the iframe whose `data-app-id` is that app id; an `app:eval` no iframe carries is reported to Host as `absent`, so its caller learns the view is not open now. Author events are posted the same way, so `ctx.push` reaches `useApp().on`. `app:changed` tells the panel to refetch the builtin library. The app iframe carries `appFrameSandbox`. `createFrameBridge`, `watchHost`, and `ownerClients` remain for an in-process caller. The opened window does not use them. Shell does not read the iframe DOM and does not compile. Plan: [implementation.md](../implementation.md).

@@ -50,6 +50,16 @@ export function tabSwitchChordLabel(mac: boolean): string {
   return mac ? '⌘⇧← →' : 'Ctrl+Shift+← →'
 }
 
+/** Separate key caps for a chrome Kbd group — palette open. */
+export function chordKeyParts(mac: boolean): readonly string[] {
+  return mac ? ['⌘', '⇧', 'P'] : ['Ctrl', 'Shift', 'P']
+}
+
+/** Separate key caps for a chrome Kbd group — tab cycle. */
+export function tabSwitchKeyParts(mac: boolean): readonly string[] {
+  return mac ? ['⌘', '⇧', '←', '→'] : ['Ctrl', 'Shift', '←', '→']
+}
+
 export function isMacPlatform(platform: string, userAgent: string): boolean {
   return /Mac|iPhone|iPad/.test(platform) || userAgent.includes('Mac')
 }
